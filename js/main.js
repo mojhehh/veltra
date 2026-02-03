@@ -5,6 +5,77 @@
 // Get base path for GitHub Pages compatibility (must be at top level for early access)
 const veltraBasePath = window.location.pathname.includes('/veltra') ? '/veltra' : '';
 
+// ==================== VELTRA USER DATA PERSISTENCE ====================
+// Uses Veltra Firebase (veltra-6fea6) for user data, procces Firebase for backend URLs
+const VELTRA_USER_FIREBASE_URL = 'https://veltra-6fea6-default-rtdb.firebaseio.com';
+
+// Generate or get unique user ID for persistence
+function getVeltraUserId() {
+    let userId = localStorage.getItem('veltra_userId');
+    if (!userId) {
+        userId = 'user_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('veltra_userId', userId);
+    }
+    return userId;
+}
+
+// Save user settings to Firebase with localStorage fallback
+async function saveVeltraUserData(dataType, data) {
+    const userId = getVeltraUserId();
+    
+    // Always save to localStorage first (instant, works offline)
+    localStorage.setItem(`veltra_${dataType}`, JSON.stringify(data));
+    
+    // Then sync to Firebase
+    try {
+        const response = await fetch(`${VELTRA_USER_FIREBASE_URL}/users/${userId}/${dataType}.json`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        if (response.ok) {
+            console.log(`[Veltra] Saved ${dataType} to Firebase`);
+            return true;
+        }
+    } catch (err) {
+        console.warn(`[Veltra] Firebase save failed for ${dataType}:`, err.message);
+    }
+    return false;
+}
+
+// Load user settings from Firebase with localStorage fallback
+async function loadVeltraUserData(dataType, defaultValue = null) {
+    const userId = getVeltraUserId();
+    
+    // Try Firebase first
+    try {
+        const response = await fetch(`${VELTRA_USER_FIREBASE_URL}/users/${userId}/${dataType}.json`);
+        if (response.ok) {
+            const data = await response.json();
+            if (data !== null) {
+                // Update localStorage with Firebase data
+                localStorage.setItem(`veltra_${dataType}`, JSON.stringify(data));
+                console.log(`[Veltra] Loaded ${dataType} from Firebase`);
+                return data;
+            }
+        }
+    } catch (err) {
+        console.warn(`[Veltra] Firebase load failed for ${dataType}:`, err.message);
+    }
+    
+    // Fallback to localStorage
+    const localData = localStorage.getItem(`veltra_${dataType}`);
+    if (localData) {
+        try {
+            return JSON.parse(localData);
+        } catch (e) {
+            return defaultValue;
+        }
+    }
+    
+    return defaultValue;
+}
+
 // Fetch Veltra backend URL from Firebase with retry
 async function fetchVeltraBackend(retries = 3) {
     for (let i = 0; i < retries; i++) {
@@ -1348,8 +1419,8 @@ function setMusicServer(url) {
 }
 
 // ==================== MELODIFY APP ====================
-// Firebase URL for Melodify library persistence
-const MELODIFY_LIBRARY_FIREBASE_URL = 'https://procces-3efd9-default-rtdb.firebaseio.com/melodify_libraries';
+// Firebase URL for Melodify library persistence (Veltra Firebase for user data)
+const MELODIFY_LIBRARY_FIREBASE_URL = VELTRA_USER_FIREBASE_URL + '/melodify_libraries';
 
 let melodifyState = {
   isPlaying: false,
@@ -1359,15 +1430,8 @@ let melodifyState = {
   queue: [],
   library: [],
   downloads: [],
-  userId: localStorage.getItem('veltra_userId') || generateMelodifyUserId()
+  userId: getVeltraUserId() // Use shared Veltra user ID
 };
-
-// Generate unique user ID for Firebase persistence
-function generateMelodifyUserId() {
-  const id = 'user_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
-  localStorage.setItem('veltra_userId', id);
-  return id;
-}
 
 // Load library from Firebase with localStorage fallback
 async function loadMelodifyLibrary() {

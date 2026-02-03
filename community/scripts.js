@@ -66,7 +66,7 @@ const body = encodeURIComponent(`### ${capitalize(type)} submission\n\n`+
 
 
 const labels = encodeURIComponent(type);
-const link = `https://github.com/nautilus-os/community/issues/new?title=${title}&body=${body}&labels=${labels}`;
+const link = `https://github.com/veltra-os/community/issues/new?title=${title}&body=${body}&labels=${labels}`;
 window.open(link, '_blank','noopener');
 });
 }
@@ -85,8 +85,8 @@ const body = encodeURIComponent((f.get('body')||'').trim());
 
 
 const base = target === 'core'
-? 'https://github.com/nautilus-os/NautilusOS/issues/new'
-: 'https://github.com/nautilus-os/community/issues/new';
+? 'https://github.com/veltra-os/Veltra/issues/new'
+: 'https://github.com/veltra-os/community/issues/new';
 
 
 const labels = encodeURIComponent('feature');

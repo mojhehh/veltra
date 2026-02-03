@@ -1,4 +1,35 @@
-// ==================== NAUTILUS BIOS SYSTEM ====================
+﻿// ==================== VELTRA FIREBASE BACKEND CONFIG ====================
+// Note: VELTRA_FIREBASE_URL, NAUTILUS_FALLBACK_URL, and FALLBACK_WISP_URL
+// are declared in index.html's inline script to ensure early availability
+
+// Fetch Veltra backend URL from Firebase with retry
+async function fetchVeltraBackend(retries = 3) {
+    for (let i = 0; i < retries; i++) {
+        try {
+            const response = await fetch(VELTRA_FIREBASE_URL);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            if (data?.url) {
+                let wispUrl = data.url;
+                if (wispUrl.startsWith('https://')) {
+                    wispUrl = 'wss://' + wispUrl.slice(8);
+                } else if (wispUrl.startsWith('http://')) {
+                    wispUrl = 'ws://' + wispUrl.slice(7);
+                }
+                if (!wispUrl.endsWith('/wisp/')) {
+                    wispUrl = wispUrl.replace(/\/$/, '') + '/wisp/';
+                }
+                return wispUrl;
+            }
+        } catch (err) {
+            console.warn(`Backend fetch attempt ${i + 1}/${retries} failed:`, err.message);
+            if (i < retries - 1) await new Promise(r => setTimeout(r, 1000 * (i + 1)));
+        }
+    }
+    return null;
+}
+
+// ==================== VELTRA BIOS SYSTEM ====================
 // Press Delete, ~, or ` during boot to enter BIOS
 (function () {
   const bootloader = document.getElementById('bootloader');
@@ -35,10 +66,10 @@
     unlockAchievement("power-user");
     // Create BIOS overlay
     const biosOverlay = document.createElement('div');
-    biosOverlay.id = 'nautilusBIOS';
+    biosOverlay.id = 'veltraBIOS';
     biosOverlay.innerHTML = `
       <style>
-        #nautilusBIOS {
+        #veltraBIOS {
           position: fixed;
           inset: 0;
           background: #0000aa;
@@ -48,7 +79,7 @@
           padding: 20px;
           overflow: auto;
         }
-        #nautilusBIOS .bios-header {
+        #veltraBIOS .bios-header {
           background: #aaaaaa;
           color: #0000aa;
           padding: 8px 16px;
@@ -56,48 +87,48 @@
           font-size: 18px;
           margin-bottom: 20px;
         }
-        #nautilusBIOS .bios-section {
+        #veltraBIOS .bios-section {
           border: 1px solid #aaaaaa;
           margin: 10px 0;
           padding: 10px;
         }
-        #nautilusBIOS .bios-section-title {
+        #veltraBIOS .bios-section-title {
           background: #aaaaaa;
           color: #0000aa;
           padding: 4px 8px;
           margin: -10px -10px 10px -10px;
           font-weight: bold;
         }
-        #nautilusBIOS .bios-row {
+        #veltraBIOS .bios-row {
           display: flex;
           justify-content: space-between;
           padding: 4px 0;
         }
-        #nautilusBIOS .bios-label {
+        #veltraBIOS .bios-label {
           color: #ffffff;
         }
-        #nautilusBIOS .bios-value {
+        #veltraBIOS .bios-value {
           color: #ffff00;
         }
-        #nautilusBIOS .bios-menu-item {
+        #veltraBIOS .bios-menu-item {
           padding: 6px 12px;
           cursor: pointer;
         }
-        #nautilusBIOS .bios-menu-item.selected {
+        #veltraBIOS .bios-menu-item.selected {
           background: #aaaaaa;
           color: #0000aa;
         }
-        #nautilusBIOS .bios-menu-item:hover:not(.selected) {
+        #veltraBIOS .bios-menu-item:hover:not(.selected) {
           background: #555555;
         }
-        #nautilusBIOS .bios-toggle {
+        #veltraBIOS .bios-toggle {
           cursor: pointer;
           padding: 4px 8px;
         }
-        #nautilusBIOS .bios-toggle:hover {
+        #veltraBIOS .bios-toggle:hover {
           background: #555555;
         }
-        #nautilusBIOS .bios-footer {
+        #veltraBIOS .bios-footer {
           position: fixed;
           bottom: 0;
           left: 0;
@@ -108,12 +139,12 @@
           display: flex;
           justify-content: space-between;
         }
-        #nautilusBIOS .bios-warning {
+        #veltraBIOS .bios-warning {
           color: #ff5555;
           font-weight: bold;
         }
       </style>
-      <div class="bios-header">NautilusOS BIOS Setup Utility v1.0</div>
+      <div class="bios-header">Veltra BIOS Setup Utility v1.0</div>
       
       <div style="display: flex; gap: 20px;">
         <div style="flex: 1;">
@@ -121,7 +152,7 @@
             <div class="bios-section-title">System Information</div>
             <div class="bios-row">
               <span class="bios-label">OS Version:</span>
-              <span class="bios-value">NautilusOS 1.5</span>
+              <span class="bios-value">Veltra 1.5</span>
             </div>
             <div class="bios-row">
               <span class="bios-label">Browser:</span>
@@ -176,7 +207,7 @@
             
             <!-- Bypass File Protocol Warning -->
             <div class="bios-row bios-toggle" onclick="toggleBiosSetting('bypassFileWarning')">
-              <span class="bios-label">[${localStorage.getItem('nautilusOS_bypassFileWarning') === 'true' ? 'X' : ' '}] Bypass File Protocol Warnings</span>
+              <span class="bios-label">[${localStorage.getItem('Veltra_bypassFileWarning') === 'true' ? 'X' : ' '}] Bypass File Protocol Warnings</span>
             </div>
             
             <!-- Custom WebLLM Model -->
@@ -184,10 +215,10 @@
               <div class="bios-label" style="margin-bottom: 4px;">Custom WebLLM Model ID:</div>
               <div style="display: flex; gap: 8px;">
                 <input type="text" id="biosWebLLMModel" 
-                  value="${localStorage.getItem('nautilusOS_customWebLLMModel') || ''}" 
+                  value="${localStorage.getItem('Veltra_customWebLLMModel') || ''}" 
                   placeholder="e.g. Qwen2.5-0.5B-Instruct-q4f16_1-MLC"
                   style="flex: 1; background: #aaaaaa; color: #0000aa; border: none; font-family: 'Courier New', monospace; padding: 4px;"
-                  onchange="localStorage.setItem('nautilusOS_customWebLLMModel', this.value)">
+                  onchange="localStorage.setItem('Veltra_customWebLLMModel', this.value)">
               </div>
               <div style="font-size: 10px; color: #888; margin-top: 2px;">Leave empty to use default. Reload required.</div>
             </div>
@@ -208,7 +239,7 @@
       <div class="bios-footer">
         <span><i class="fa fa-mouse-pointer"></i>
  Navigate | Enter Select | ESC Exit</span>
-        <span>NautilusOS BIOS ${new Date().toLocaleString()}</span>
+        <span>Veltra BIOS ${new Date().toLocaleString()}</span>
       </div>
     `;
 
@@ -244,15 +275,15 @@
 
   // Global BIOS functions
   window.toggleBiosSetting = function (setting) {
-    const key = 'nautilusOS_' + setting;
+    const key = 'Veltra_' + setting;
     const current = localStorage.getItem(key) === 'true';
     localStorage.setItem(key, (!current).toString());
     location.reload();
   };
 
   window.biosResetAll = function () {
-    if (confirm('Are you sure you want to reset all NautilusOS settings? This cannot be undone.')) {
-      const keys = Object.keys(localStorage).filter(k => k.startsWith('nautilusOS_'));
+    if (confirm('Are you sure you want to reset all Veltra settings? This cannot be undone.')) {
+      const keys = Object.keys(localStorage).filter(k => k.startsWith('Veltra_'));
       keys.forEach(k => localStorage.removeItem(k));
       alert('Settings reset. The system will now reload.');
       location.reload();
@@ -260,11 +291,11 @@
   };
 
   window.biosClearData = function () {
-    if (confirm('WARNING: This will delete ALL NautilusOS data including files, settings, and accounts. Continue?')) {
+    if (confirm('WARNING: This will delete ALL Veltra data including files, settings, and accounts. Continue?')) {
       if (confirm('Are you ABSOLUTELY sure? This cannot be undone!')) {
         localStorage.clear();
         sessionStorage.clear();
-        indexedDB.deleteDatabase('NautilusFS');
+        indexedDB.deleteDatabase('VeltraFS');
         alert('All data cleared. The system will now reload.');
         location.reload();
       }
@@ -516,7 +547,7 @@ class encryption {
 const idb = new db("asdfsdff", "sdffjdk");
 let windows = {};
 let zIndexCounter = 100;
-let currentUsername = localStorage.getItem("nautilusOS_username") || "User";
+let currentUsername = localStorage.getItem("Veltra_username") || "User";
 let focusedWindow = null;
 
 function removeIdRecursively(obj) {
@@ -691,7 +722,7 @@ let fileSystem = {
   Photos: {},
   TextEditor: {
     "example.txt":
-      "This is an example text file.\n\nYou can edit this file using the Text Editor app.\n\nTry creating your own files by:\n1. Opening the Text Editor\n2. Writing your content\n3. Clicking Save As and entering a filename\n\nHave fun exploring NautilusOS!",
+      "This is an example text file.\n\nYou can edit this file using the Text Editor app.\n\nTry creating your own files by:\n1. Opening the Text Editor\n2. Writing your content\n3. Clicking Save As and entering a filename\n\nHave fun exploring Veltra!",
   },
 };
 async function saveFS(fs) {
@@ -723,6 +754,9 @@ async function saveFS(fs) {
 })()
 let currentPath = [];
 let currentFile = null;
+let terminalCwd = []; // Current working directory for terminal (array of path segments)
+let systemStartTime = Date.now(); // For uptime tracking
+let fastModeEnabled = false; // Performance mode for slow devices
 let settings = {
   use12Hour: true,
   showSeconds: false,
@@ -730,6 +764,7 @@ let settings = {
   bypassFileProtocolWarnings: false,
   desktopIconSize: 'medium',
   windowOpacity: 0.85,
+  fastMode: false, // Reduces animations for better performance on slow devices
 };
 let bootSelectedIndex = 0;
 let bootCountdownTimer = null;
@@ -760,7 +795,7 @@ class UserAccount {
 
 // Get all accounts from localStorage
 function getAllAccounts() {
-  const accountsData = localStorage.getItem("nautilusOS_accounts");
+  const accountsData = localStorage.getItem("Veltra_accounts");
   if (!accountsData) {
     return [];
   }
@@ -774,7 +809,7 @@ function getAllAccounts() {
 
 // Save all accounts to localStorage
 function saveAllAccounts(accounts) {
-  localStorage.setItem("nautilusOS_accounts", JSON.stringify(accounts));
+  localStorage.setItem("Veltra_accounts", JSON.stringify(accounts));
 }
 
 // Get account by username
@@ -858,9 +893,9 @@ function migrateToMultiUserSystem() {
   if (accounts.length > 0) return;
 
   // Check if old system has a user
-  const oldUsername = localStorage.getItem("nautilusOS_username");
-  const oldPassword = localStorage.getItem("nautilusOS_password");
-  const oldIsPasswordless = localStorage.getItem("nautilusOS_isPasswordless") === "true";
+  const oldUsername = localStorage.getItem("Veltra_username");
+  const oldPassword = localStorage.getItem("Veltra_password");
+  const oldIsPasswordless = localStorage.getItem("Veltra_isPasswordless") === "true";
 
   if (oldUsername) {
     // Create account from old system as superuser
@@ -875,10 +910,10 @@ function migrateToMultiUserSystem() {
   }
 }
 
-let loginStartTime = localStorage.getItem("nautilusOS_bootTime");
+let loginStartTime = localStorage.getItem("Veltra_bootTime");
 if (!loginStartTime) {
   loginStartTime = Date.now();
-  localStorage.setItem("nautilusOS_bootTime", loginStartTime);
+  localStorage.setItem("Veltra_bootTime", loginStartTime);
 } else {
   loginStartTime = parseInt(loginStartTime, 10);
 }
@@ -898,7 +933,7 @@ function checkFileProtocol(title = null) {
       title === "Visual Studio Code"
     );
     if (shouldShowToast && !hasShownFileProtocolToast) {
-      showToast("This feature doesn't work on file:// protocol. Please run NautilusOS from a web server.", "fa-exclamation-triangle");
+      showToast("This feature doesn't work on file:// protocol. Please run Veltra from a web server.", "fa-exclamation-triangle");
       hasShownFileProtocolToast = true;
     }
     return false;
@@ -955,7 +990,7 @@ function closeToast(btn) {
 }
 
 window.addEventListener("DOMContentLoaded", () => {
-  const savedBootChoice = localStorage.getItem("nautilusOS_bootChoice");
+  const savedBootChoice = localStorage.getItem("Veltra_bootChoice");
   if (savedBootChoice !== null) {
     bootSelectedIndex = parseInt(savedBootChoice, 10);
     selectBoot();
@@ -968,13 +1003,13 @@ const appMetadata = {
   terminal: { name: "Terminal", icon: "fa-terminal", preinstalled: true },
   settings: { name: "Settings", icon: "fa-cog", preinstalled: true },
   editor: { name: "Text Editor", icon: "fa-edit", preinstalled: true },
-  music: { name: "Music", icon: "fa-music", preinstalled: true },
+  melodify: { name: "Melodify", icon: "fa-music", preinstalled: true },
   photos: { name: "Photos", icon: "fa-images", preinstalled: true },
   help: { name: "Help", icon: "fa-question-circle", preinstalled: true },
   whatsnew: { name: "What's New", icon: "fa-star", preinstalled: true },
   appstore: { name: "App Store", icon: "fa-store", preinstalled: true },
   calculator: { name: "Calculator", icon: "fa-calculator", preinstalled: true },
-  browser: { name: "Nautilus Browser", icon: "fa-globe", preinstalled: true },
+  browser: { name: "Veltra Browser", icon: "fa-globe", preinstalled: true },
   cloaking: { name: "Cloaking", icon: "fa-mask", preinstalled: true },
   achievements: { name: "Achievements", icon: "fa-trophy", preinstalled: true },
   python: { name: "Python Interpreter", icon: "fa-code", preinstalled: true },
@@ -1018,13 +1053,13 @@ const appMetadata = {
     icon: "fa-brain",
     preinstalled: true,
   },
-  "nautilus-ai": {
-    name: "Nautilus AI Assistant",
+  "veltra-ai": {
+    name: "Veltra AI Assistant",
     icon: "fa-robot",
     preinstalled: true,
   },
   "about": {
-    name: "About NautilusOS",
+    name: "About Veltra",
     icon: "fa-info-circle",
     preinstalled: true,
   },
@@ -1034,6 +1069,721 @@ const appMetadata = {
     preinstalled: true,
   },
 };
+
+// ==================== MUSIC DOWNLOAD APP ====================
+// Melodify Firebase backend URL
+const MELODIFY_FIREBASE_URL = 'https://procces-3efd9-default-rtdb.firebaseio.com/backends/melodify.json';
+let MUSIC_SERVER_URL = localStorage.getItem('veltra_musicServerUrl') || 'http://localhost:8092';
+let melodifyBackendCache = { url: null, lastFetch: 0 };
+
+// Fetch dynamic Melodify backend URL from Firebase
+async function getMelodifyBackendUrl() {
+  const now = Date.now();
+  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+  
+  // Return cached URL if still valid
+  if (melodifyBackendCache.url && now - melodifyBackendCache.lastFetch < CACHE_DURATION) {
+    return melodifyBackendCache.url;
+  }
+  
+  try {
+    const response = await fetch(MELODIFY_FIREBASE_URL);
+    const data = await response.json();
+    if (data?.url) {
+      melodifyBackendCache = { url: data.url, lastFetch: now };
+      MUSIC_SERVER_URL = data.url;
+      console.log('[Melodify] Using Firebase backend:', data.url);
+      return data.url;
+    }
+  } catch (err) {
+    console.warn('[Melodify] Firebase fetch failed, using fallback:', err.message);
+  }
+  
+  // Fallback to localStorage or default
+  return localStorage.getItem('veltra_musicServerUrl') || 'http://localhost:8092';
+}
+
+// Initialize Melodify backend on load
+getMelodifyBackendUrl();
+
+let musicSearchResults = [];
+let musicDownloads = {};
+
+async function searchMusic(query) {
+  if (!query) return;
+  
+  const resultsDiv = document.getElementById('musicSearchResults');
+  const statusDiv = document.getElementById('musicSearchStatus');
+  
+  resultsDiv.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-secondary);"><i class="fas fa-spinner fa-spin fa-2x"></i><br><br>Searching...</div>';
+  statusDiv.textContent = 'Searching...';
+  
+  try {
+    // Get dynamic backend URL from Firebase
+    const serverUrl = await getMelodifyBackendUrl();
+    const response = await fetch(`${serverUrl}/api/search?q=${encodeURIComponent(query)}&max=12`);
+    const data = await response.json();
+    
+    if (data.error) {
+      resultsDiv.innerHTML = `<div style="text-align: center; padding: 2rem; color: var(--error);">Error: ${data.error}</div>`;
+      statusDiv.textContent = 'Search failed';
+      return;
+    }
+    
+    musicSearchResults = data.results || [];
+    statusDiv.textContent = `Found ${musicSearchResults.length} results`;
+    
+    if (musicSearchResults.length === 0) {
+      resultsDiv.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-secondary);">No results found</div>';
+      return;
+    }
+    
+    resultsDiv.innerHTML = musicSearchResults.map((song, i) => `
+      <div class="music-result-item" onclick="selectMusicResult(${i})">
+        <img src="${song.thumbnail}" alt="" class="music-result-thumb" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23333%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2250%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23666%22 font-size=%2240%22>â™ª</text></svg>'">
+        <div class="music-result-info">
+          <div class="music-result-title">${escapeHtml(song.title)}</div>
+          <div class="music-result-artist">${escapeHtml(song.artist)}</div>
+          <div class="music-result-duration">${song.duration_string || ''}</div>
+        </div>
+        <button class="music-play-btn" onclick="event.stopPropagation(); playMusicPreview(${i})" title="Play Preview">
+          <i class="fas fa-play"></i>
+        </button>
+        <button class="music-download-btn" onclick="event.stopPropagation(); startMusicDownload(${i})" title="Download">
+          <i class="fas fa-download"></i>
+        </button>
+      </div>
+    `).join('');
+    
+  } catch (err) {
+    console.error('Music search error:', err);
+    resultsDiv.innerHTML = `<div style="text-align: center; padding: 2rem; color: var(--error);">
+      <i class="fas fa-exclamation-triangle fa-2x" style="margin-bottom: 1rem;"></i><br>
+      Could not connect to music server<br>
+      <small style="opacity: 0.7;">Make sure the server is running at ${MUSIC_SERVER_URL}</small>
+    </div>`;
+    statusDiv.textContent = 'Connection failed';
+  }
+}
+
+let currentMusicPreviewAudio = null;
+
+function playMusicPreview(index) {
+  const song = musicSearchResults[index];
+  if (!song) return;
+  
+  // Extract video ID from URL
+  let videoId = song.id;
+  if (!videoId && song.url) {
+    const match = song.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&]+)/);
+    if (match) videoId = match[1];
+  }
+  
+  if (!videoId) {
+    showToast('Cannot preview this track', 'fa-exclamation-circle');
+    return;
+  }
+  
+  // Show preview with embedded YouTube player
+  const previewDiv = document.getElementById('musicPreview');
+  previewDiv.innerHTML = `
+    <div style="display: flex; gap: 1rem; align-items: flex-start;">
+      <div style="width: 280px; flex-shrink: 0;">
+        <iframe 
+          width="280" height="158" 
+          src="https://www.youtube.com/embed/${videoId}?autoplay=1" 
+          frameborder="0" 
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+          allowfullscreen
+          style="border-radius: 8px;">
+        </iframe>
+      </div>
+      <div style="flex: 1;">
+        <h3 style="margin: 0 0 0.5rem; color: var(--text-primary);">${escapeHtml(song.title)}</h3>
+        <p style="margin: 0 0 0.5rem; color: var(--text-secondary);">${escapeHtml(song.artist)}</p>
+        <p style="margin: 0 0 1rem; color: var(--text-secondary); font-size: 0.85rem;">Duration: ${song.duration_string}</p>
+        <button class="editor-btn" onclick="startMusicDownload(${index})" style="background: var(--accent); color: white;">
+          <i class="fas fa-download"></i> Download MP3
+        </button>
+        <button class="editor-btn" onclick="closeMusicPreview()" style="margin-left: 0.5rem;">
+          <i class="fas fa-times"></i> Close
+        </button>
+      </div>
+    </div>
+  `;
+  previewDiv.style.display = 'block';
+}
+
+function closeMusicPreview() {
+  const previewDiv = document.getElementById('musicPreview');
+  previewDiv.innerHTML = '';
+  previewDiv.style.display = 'none';
+}
+
+function selectMusicResult(index) {
+  const song = musicSearchResults[index];
+  if (!song) return;
+  
+  // Show preview with image (click play button for video)
+  const previewDiv = document.getElementById('musicPreview');
+  previewDiv.innerHTML = `
+    <div style="display: flex; gap: 1rem; align-items: flex-start;">
+      <img src="${song.thumbnail}" style="width: 120px; height: 120px; border-radius: 8px; object-fit: cover; cursor: pointer;" onclick="playMusicPreview(${index})" title="Click to play">
+      <div style="flex: 1;">
+        <h3 style="margin: 0 0 0.5rem; color: var(--text-primary);">${escapeHtml(song.title)}</h3>
+        <p style="margin: 0 0 0.5rem; color: var(--text-secondary);">${escapeHtml(song.artist)}</p>
+        <p style="margin: 0 0 1rem; color: var(--text-secondary); font-size: 0.85rem;">Duration: ${song.duration_string}</p>
+        <button class="editor-btn" onclick="playMusicPreview(${index})" style="background: var(--accent); color: white;">
+          <i class="fas fa-play"></i> Play Preview
+        </button>
+        <button class="editor-btn" onclick="startMusicDownload(${index})" style="margin-left: 0.5rem;">
+          <i class="fas fa-download"></i> Download MP3
+        </button>
+      </div>
+    </div>
+  `;
+  previewDiv.style.display = 'block';
+}
+
+async function startMusicDownload(index) {
+  const song = musicSearchResults[index];
+  if (!song) return;
+  
+  const downloadsDiv = document.getElementById('musicDownloads');
+  const downloadId = 'dl_' + Date.now();
+  
+  // Add to downloads list
+  const downloadItem = document.createElement('div');
+  downloadItem.className = 'music-download-item';
+  downloadItem.id = downloadId;
+  downloadItem.innerHTML = `
+    <img src="${song.thumbnail}" class="music-dl-thumb" onerror="this.style.display='none'">
+    <div class="music-dl-info">
+      <div class="music-dl-title">${escapeHtml(song.title)}</div>
+      <div class="music-dl-artist">${escapeHtml(song.artist)}</div>
+      <div class="music-dl-progress">
+        <div class="music-dl-progress-bar" style="width: 0%"></div>
+      </div>
+      <div class="music-dl-status">Starting download...</div>
+    </div>
+  `;
+  downloadsDiv.prepend(downloadItem);
+  
+  try {
+    // Start download
+    const serverUrl = await getMelodifyBackendUrl();
+    const response = await fetch(`${serverUrl}/api/download`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: song.url || song.id })
+    });
+    
+    const data = await response.json();
+    if (data.error) {
+      updateDownloadStatus(downloadId, 'error', data.error);
+      return;
+    }
+    
+    // Poll for status
+    pollDownloadStatus(downloadId, data.download_id);
+    
+  } catch (err) {
+    console.error('Download error:', err);
+    updateDownloadStatus(downloadId, 'error', 'Connection failed');
+  }
+}
+
+async function pollDownloadStatus(uiId, serverId) {
+  try {
+    const serverUrl = await getMelodifyBackendUrl();
+    const response = await fetch(`${serverUrl}/api/status/${serverId}`);
+    const data = await response.json();
+    
+    const item = document.getElementById(uiId);
+    if (!item) return;
+    
+    const progressBar = item.querySelector('.music-dl-progress-bar');
+    const statusText = item.querySelector('.music-dl-status');
+    
+    if (data.status === 'downloading' || data.status === 'queued') {
+      progressBar.style.width = (data.progress || 0) + '%';
+      statusText.textContent = `Downloading... ${data.progress || 0}%`;
+      setTimeout(() => pollDownloadStatus(uiId, serverId), 1000);
+    } else if (data.status === 'complete') {
+      progressBar.style.width = '100%';
+      progressBar.style.background = 'var(--accent)';
+      statusText.innerHTML = `
+        <i class="fas fa-check" style="color: var(--accent);"></i> Complete - 
+        <a href="${serverUrl}/api/file/${encodeURIComponent(data.result.file)}" download style="color: var(--accent);">Download MP3</a>
+      `;
+    } else if (data.status === 'error') {
+      updateDownloadStatus(uiId, 'error', data.error || 'Download failed');
+    }
+  } catch (err) {
+    console.error('Status poll error:', err);
+  }
+}
+
+function updateDownloadStatus(uiId, status, message) {
+  const item = document.getElementById(uiId);
+  if (!item) return;
+  
+  const statusText = item.querySelector('.music-dl-status');
+  const progressBar = item.querySelector('.music-dl-progress-bar');
+  
+  if (status === 'error') {
+    progressBar.style.background = 'var(--error)';
+    statusText.innerHTML = `<i class="fas fa-times" style="color: var(--error);"></i> ${message}`;
+  }
+}
+
+function setMusicServer(url) {
+  if (url) {
+    localStorage.setItem('veltra_musicServerUrl', url);
+    showToast('Music server URL updated', 'fa-check');
+  }
+}
+
+// ==================== MELODIFY APP ====================
+let melodifyState = {
+  isPlaying: false,
+  isRepeat: false,
+  isShuffle: false,
+  currentTrack: null,
+  queue: [],
+  library: JSON.parse(localStorage.getItem('melodify_library') || '[]'),
+  downloads: []
+};
+
+function melodifyShowTab(tab) {
+  document.querySelectorAll('.melodify-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.melodify-nav-item').forEach(n => n.classList.remove('active'));
+  
+  const tabEl = document.getElementById(`melodify${tab.charAt(0).toUpperCase() + tab.slice(1)}Tab`);
+  if (tabEl) tabEl.classList.add('active');
+  
+  const navItems = document.querySelectorAll('.melodify-nav-item');
+  navItems.forEach(n => {
+    if (n.textContent.toLowerCase().includes(tab)) n.classList.add('active');
+  });
+
+  // Update greeting based on time
+  if (tab === 'home') {
+    const hour = new Date().getHours();
+    let greeting = 'Good evening';
+    if (hour < 12) greeting = 'Good morning';
+    else if (hour < 18) greeting = 'Good afternoon';
+    const greetingEl = document.querySelector('.melodify-greeting');
+    if (greetingEl) greetingEl.textContent = greeting;
+  }
+}
+
+function melodifyLoadLocalFile() {
+  document.getElementById('melodifyFileInput')?.click();
+}
+
+function loadMelodifyFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  const audio = document.getElementById('melodifyAudio');
+  const url = URL.createObjectURL(file);
+  
+  audio.src = url;
+  melodifyState.currentTrack = {
+    title: file.name.replace(/\.[^/.]+$/, ''),
+    artist: 'Local File',
+    thumbnail: null
+  };
+  
+  updateMelodifyUI();
+  audio.play();
+  melodifyState.isPlaying = true;
+  updateMelodifyPlayButton();
+  showToast('Now playing: ' + melodifyState.currentTrack.title, 'fa-music');
+}
+
+async function searchMelodify(query) {
+  if (!query) return;
+  
+  const resultsDiv = document.getElementById('melodifySearchResults');
+  const statusDiv = document.getElementById('melodifySearchStatus');
+  
+  resultsDiv.innerHTML = '<div class="melodify-loading"><i class="fas fa-spinner fa-spin fa-2x"></i><p>Searching...</p></div>';
+  statusDiv.textContent = 'Searching...';
+  
+  try {
+    const response = await fetch(`${MUSIC_SERVER_URL}/api/search?q=${encodeURIComponent(query)}&max=20`);
+    const data = await response.json();
+    
+    if (data.error) {
+      resultsDiv.innerHTML = `<div class="melodify-empty"><i class="fas fa-exclamation-circle"></i><p>${data.error}</p></div>`;
+      statusDiv.textContent = 'Search failed';
+      return;
+    }
+    
+    musicSearchResults = data.results || [];
+    statusDiv.textContent = `Found ${musicSearchResults.length} results`;
+    
+    if (musicSearchResults.length === 0) {
+      resultsDiv.innerHTML = '<div class="melodify-empty"><i class="fas fa-search"></i><p>No results found</p></div>';
+      return;
+    }
+    
+    resultsDiv.innerHTML = `
+      <div class="melodify-results-header">
+        <span class="melodify-col-num">#</span>
+        <span class="melodify-col-title">TITLE</span>
+        <span class="melodify-col-duration"><i class="far fa-clock"></i></span>
+        <span class="melodify-col-actions"></span>
+      </div>
+      ${musicSearchResults.map((song, i) => `
+        <div class="melodify-track-row" ondblclick="playMelodifyTrack(${i})">
+          <span class="melodify-col-num">
+            <span class="melodify-track-num">${i + 1}</span>
+            <button class="melodify-row-play" onclick="playMelodifyTrack(${i})"><i class="fas fa-play"></i></button>
+          </span>
+          <div class="melodify-col-title">
+            <img src="${song.thumbnail}" class="melodify-track-img" onerror="this.style.display='none'">
+            <div>
+              <div class="melodify-track-name">${escapeHtml(song.title)}</div>
+              <div class="melodify-track-artist">${escapeHtml(song.artist)}</div>
+            </div>
+          </div>
+          <span class="melodify-col-duration">${song.duration_string || '--:--'}</span>
+          <span class="melodify-col-actions">
+            <button onclick="event.stopPropagation(); addToMelodifyLibrary(${i})" title="Add to Library"><i class="far fa-heart"></i></button>
+            <button onclick="event.stopPropagation(); startMelodifyDownload(${i})" title="Download"><i class="fas fa-download"></i></button>
+          </span>
+        </div>
+      `).join('')}
+    `;
+    
+  } catch (err) {
+    console.error('Melodify search error:', err);
+    resultsDiv.innerHTML = `<div class="melodify-empty">
+      <i class="fas fa-plug"></i>
+      <p>Could not connect to server</p>
+      <p style="font-size: 0.85rem; opacity: 0.7;">Make sure the music server is running</p>
+    </div>`;
+    statusDiv.textContent = 'Connection failed';
+  }
+}
+
+function playMelodifyTrack(index) {
+  const song = musicSearchResults[index];
+  if (!song) return;
+  
+  let videoId = song.id;
+  if (!videoId && song.url) {
+    const match = song.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&]+)/);
+    if (match) videoId = match[1];
+  }
+  
+  if (!videoId) {
+    showToast('Cannot play this track', 'fa-exclamation-circle');
+    return;
+  }
+  
+  melodifyState.currentTrack = {
+    title: song.title,
+    artist: song.artist,
+    thumbnail: song.thumbnail,
+    videoId: videoId,
+    duration: song.duration_string
+  };
+  
+  // Use an audio proxy or embed - for now show YouTube embed option
+  updateMelodifyUI();
+  
+  // Show a mini player notification
+  showToast('Playing: ' + song.title, 'fa-music');
+  
+  // Open YouTube in embedded player format
+  const artworkDiv = document.getElementById('melodifyArtwork');
+  if (artworkDiv) {
+    artworkDiv.innerHTML = `<iframe width="56" height="56" src="https://www.youtube.com/embed/${videoId}?autoplay=1&controls=0" frameborder="0" allow="autoplay" style="border-radius: 4px; pointer-events: none;"></iframe>`;
+  }
+  
+  melodifyState.isPlaying = true;
+  updateMelodifyPlayButton();
+}
+
+function updateMelodifyUI() {
+  const track = melodifyState.currentTrack;
+  if (!track) return;
+  
+  const titleEl = document.getElementById('melodifyTitle');
+  const artistEl = document.getElementById('melodifyArtist');
+  const artworkEl = document.getElementById('melodifyArtwork');
+  
+  if (titleEl) titleEl.textContent = track.title;
+  if (artistEl) artistEl.textContent = track.artist;
+  if (artworkEl && track.thumbnail) {
+    artworkEl.innerHTML = `<img src="${track.thumbnail}" alt="">`;
+  }
+}
+
+function updateMelodifyPlayButton() {
+  const btn = document.getElementById('melodifyPlayBtn');
+  if (btn) {
+    btn.innerHTML = melodifyState.isPlaying ? '<i class="fas fa-pause"></i>' : '<i class="fas fa-play"></i>';
+  }
+}
+
+function toggleMelodifyPlay() {
+  const audio = document.getElementById('melodifyAudio');
+  if (!audio) return;
+  
+  if (melodifyState.isPlaying) {
+    audio.pause();
+  } else {
+    audio.play();
+  }
+  melodifyState.isPlaying = !melodifyState.isPlaying;
+  updateMelodifyPlayButton();
+}
+
+function toggleMelodifyRepeat() {
+  melodifyState.isRepeat = !melodifyState.isRepeat;
+  const btn = document.getElementById('melodifyRepeatBtn');
+  if (btn) btn.classList.toggle('active', melodifyState.isRepeat);
+  
+  const audio = document.getElementById('melodifyAudio');
+  if (audio) audio.loop = melodifyState.isRepeat;
+}
+
+function melodifyShuffle() {
+  melodifyState.isShuffle = !melodifyState.isShuffle;
+  const btn = document.getElementById('melodifyShuffleBtn');
+  if (btn) btn.classList.toggle('active', melodifyState.isShuffle);
+  showToast(melodifyState.isShuffle ? 'Shuffle enabled' : 'Shuffle disabled', 'fa-random');
+}
+
+function melodifyPrev() {
+  const audio = document.getElementById('melodifyAudio');
+  if (audio) audio.currentTime = 0;
+}
+
+function melodifyNext() {
+  showToast('Queue is empty', 'fa-list');
+}
+
+function seekMelodify(event) {
+  const audio = document.getElementById('melodifyAudio');
+  const bar = event.currentTarget;
+  if (!audio || !audio.duration) return;
+  
+  const rect = bar.getBoundingClientRect();
+  const percent = (event.clientX - rect.left) / rect.width;
+  audio.currentTime = percent * audio.duration;
+}
+
+function changeMelodifyVolume(value) {
+  const audio = document.getElementById('melodifyAudio');
+  if (audio) audio.volume = value / 100;
+  
+  const icon = document.getElementById('melodifyVolumeIcon');
+  if (icon) {
+    if (value == 0) icon.className = 'fas fa-volume-mute';
+    else if (value < 50) icon.className = 'fas fa-volume-down';
+    else icon.className = 'fas fa-volume-up';
+  }
+}
+
+function toggleMelodifyLike() {
+  const btn = document.getElementById('melodifyLikeBtn');
+  const track = melodifyState.currentTrack;
+  if (!track) {
+    showToast('No track playing', 'fa-heart');
+    return;
+  }
+  
+  const isLiked = btn.querySelector('i').classList.contains('fas');
+  btn.innerHTML = isLiked ? '<i class="far fa-heart"></i>' : '<i class="fas fa-heart" style="color: #1DB954;"></i>';
+  
+  if (!isLiked) {
+    addToMelodifyLibrary(-1, track);
+  }
+}
+
+function addToMelodifyLibrary(index, track = null) {
+  const song = track || musicSearchResults[index];
+  if (!song) return;
+  
+  const exists = melodifyState.library.some(t => t.title === song.title);
+  if (!exists) {
+    melodifyState.library.push(song);
+    localStorage.setItem('melodify_library', JSON.stringify(melodifyState.library));
+    showToast('Added to library: ' + song.title, 'fa-heart');
+    updateMelodifyLibraryUI();
+  } else {
+    showToast('Already in library', 'fa-heart');
+  }
+}
+
+function updateMelodifyLibraryUI() {
+  const container = document.getElementById('melodifyLibrary');
+  if (!container) return;
+  
+  if (melodifyState.library.length === 0) {
+    container.innerHTML = `<div class="melodify-empty"><i class="fas fa-heart"></i><p>Your library is empty</p></div>`;
+    return;
+  }
+  
+  container.innerHTML = melodifyState.library.map((song, i) => `
+    <div class="melodify-track-row" ondblclick="playFromLibrary(${i})">
+      <span class="melodify-col-num">
+        <span class="melodify-track-num">${i + 1}</span>
+        <button class="melodify-row-play" onclick="playFromLibrary(${i})"><i class="fas fa-play"></i></button>
+      </span>
+      <div class="melodify-col-title">
+        <img src="${song.thumbnail}" class="melodify-track-img" onerror="this.style.display='none'">
+        <div>
+          <div class="melodify-track-name">${escapeHtml(song.title)}</div>
+          <div class="melodify-track-artist">${escapeHtml(song.artist)}</div>
+        </div>
+      </div>
+      <span class="melodify-col-duration">${song.duration_string || '--:--'}</span>
+      <span class="melodify-col-actions">
+        <button onclick="event.stopPropagation(); removeFromLibrary(${i})" title="Remove"><i class="fas fa-trash"></i></button>
+      </span>
+    </div>
+  `).join('');
+}
+
+function playFromLibrary(index) {
+  const song = melodifyState.library[index];
+  if (song) {
+    musicSearchResults = [song];
+    playMelodifyTrack(0);
+  }
+}
+
+function removeFromLibrary(index) {
+  const song = melodifyState.library[index];
+  melodifyState.library.splice(index, 1);
+  localStorage.setItem('melodify_library', JSON.stringify(melodifyState.library));
+  showToast('Removed: ' + song.title, 'fa-trash');
+  updateMelodifyLibraryUI();
+}
+
+async function startMelodifyDownload(index) {
+  const song = musicSearchResults[index];
+  if (!song) return;
+  
+  const container = document.getElementById('melodifyDownloads');
+  const downloadId = 'mldl_' + Date.now();
+  
+  const item = document.createElement('div');
+  item.className = 'melodify-download-item';
+  item.id = downloadId;
+  item.innerHTML = `
+    <img src="${song.thumbnail}" class="melodify-dl-img" onerror="this.style.display='none'">
+    <div class="melodify-dl-info">
+      <div class="melodify-dl-title">${escapeHtml(song.title)}</div>
+      <div class="melodify-dl-progress"><div class="melodify-dl-bar"></div></div>
+      <div class="melodify-dl-status">Starting...</div>
+    </div>
+  `;
+  container.prepend(item);
+  
+  // Switch to downloads tab
+  melodifyShowTab('downloads');
+  
+  try {
+    const response = await fetch(`${MUSIC_SERVER_URL}/api/download`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: song.url || song.id })
+    });
+    
+    const data = await response.json();
+    if (data.error) {
+      updateMelodifyDlStatus(downloadId, 'error', data.error);
+      return;
+    }
+    
+    pollMelodifyDownload(downloadId, data.download_id);
+    
+  } catch (err) {
+    updateMelodifyDlStatus(downloadId, 'error', 'Connection failed');
+  }
+}
+
+async function pollMelodifyDownload(uiId, serverId) {
+  try {
+    const response = await fetch(`${MUSIC_SERVER_URL}/api/status/${serverId}`);
+    const data = await response.json();
+    
+    const item = document.getElementById(uiId);
+    if (!item) return;
+    
+    const bar = item.querySelector('.melodify-dl-bar');
+    const status = item.querySelector('.melodify-dl-status');
+    
+    if (data.status === 'downloading' || data.status === 'queued') {
+      bar.style.width = (data.progress || 0) + '%';
+      status.textContent = `Downloading ${data.progress || 0}%`;
+      setTimeout(() => pollMelodifyDownload(uiId, serverId), 1000);
+    } else if (data.status === 'complete') {
+      bar.style.width = '100%';
+      bar.style.background = '#1DB954';
+      status.innerHTML = `<a href="${MUSIC_SERVER_URL}/api/file/${encodeURIComponent(data.result.file)}" download class="melodify-dl-link"><i class="fas fa-download"></i> Download MP3</a>`;
+    } else if (data.status === 'error') {
+      updateMelodifyDlStatus(uiId, 'error', data.error || 'Failed');
+    }
+  } catch (err) {
+    console.error('Poll error:', err);
+  }
+}
+
+function updateMelodifyDlStatus(uiId, status, msg) {
+  const item = document.getElementById(uiId);
+  if (!item) return;
+  
+  const bar = item.querySelector('.melodify-dl-bar');
+  const statusEl = item.querySelector('.melodify-dl-status');
+  
+  if (status === 'error') {
+    bar.style.background = '#e91e63';
+    statusEl.innerHTML = `<span style="color: #e91e63;"><i class="fas fa-times"></i> ${msg}</span>`;
+  }
+}
+
+function toggleMelodifyQueue() {
+  showToast('Queue feature coming soon', 'fa-list');
+}
+
+// Initialize melodify audio events
+document.addEventListener('DOMContentLoaded', () => {
+  const audio = document.getElementById('melodifyAudio');
+  if (audio) {
+    audio.addEventListener('timeupdate', () => {
+      const current = document.getElementById('melodifyCurrentTime');
+      const total = document.getElementById('melodifyTotalTime');
+      const fill = document.getElementById('melodifyProgressFill');
+      
+      if (current) current.textContent = formatMusicTime(audio.currentTime);
+      if (total && audio.duration) total.textContent = formatMusicTime(audio.duration);
+      if (fill && audio.duration) fill.style.width = (audio.currentTime / audio.duration * 100) + '%';
+    });
+    
+    audio.addEventListener('ended', () => {
+      melodifyState.isPlaying = false;
+      updateMelodifyPlayButton();
+    });
+    
+    audio.volume = 0.7;
+  }
+});
+
+function formatMusicTime(seconds) {
+  if (!seconds || isNaN(seconds)) return '0:00';
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
 
 function getDefaultSnapSettings() {
   return {
@@ -1211,7 +1961,7 @@ function ensureSnapSettingsDefaults() {
 }
 
 function loadSnapSettings() {
-  const saved = localStorage.getItem("nautilusOS_snapSettings");
+  const saved = localStorage.getItem("Veltra_snapSettings");
   if (saved) {
     try {
       snapSettings = JSON.parse(saved);
@@ -1224,7 +1974,7 @@ function loadSnapSettings() {
 
 function saveSnapSettings() {
   if (!snapSettings) return;
-  localStorage.setItem("nautilusOS_snapSettings", JSON.stringify(snapSettings));
+  localStorage.setItem("Veltra_snapSettings", JSON.stringify(snapSettings));
 }
 
 function initializeSnapOverlay() {
@@ -2019,7 +2769,7 @@ function startBootCountdown() {
 }
 
 function selectBoot() {
-  localStorage.setItem("nautilusOS_bootChoice", bootSelectedIndex);
+  localStorage.setItem("Veltra_bootChoice", bootSelectedIndex);
 
   // Request fullscreen on boot
   if (document.documentElement.requestFullscreen) {
@@ -2040,7 +2790,7 @@ function startBootSequence() {
 
   if (bootSelectedIndex === 1) {
     messages = [
-      "Starting boot sequence for NautilusOS (Command Line)...",
+      "Starting boot sequence for Veltra (Command Line)...",
       "Initializing command-line interface...",
       "Loading system utilities...",
       "- bash shell v5.1",
@@ -2052,7 +2802,7 @@ function startBootSequence() {
     ];
   } else {
     messages = [
-      "Starting boot sequence for NautilusOS...",
+      "Starting boot sequence for Veltra...",
       "Running startup functions...",
       "- startLoginClock()",
       "- updateLoginClock()",
@@ -2097,7 +2847,7 @@ function startBootSequence() {
             }, 500);
           } else {
             const setupComplete = localStorage.getItem(
-              "nautilusOS_setupComplete"
+              "Veltra_setupComplete"
             );
 
             if (!setupComplete) {
@@ -2112,7 +2862,7 @@ function startBootSequence() {
               setTimeout(() => {
                 console.log(`[BOOT LOG] ${new Date().toISOString()}: Showing login screen`);
                 const savedUsername = localStorage.getItem(
-                  "nautilusOS_username"
+                  "Veltra_username"
                 );
                 if (savedUsername) {
                   document.getElementById("username").value = savedUsername;
@@ -2138,7 +2888,7 @@ function generateFileTree(fs, prefix = "", isLast = true) {
 
   entries.forEach((entry, index) => {
     const isLastEntry = index === entries.length - 1;
-    const connector = isLastEntry ? "└── " : "├── ";
+    const connector = isLastEntry ? "â””â”€â”€ " : "â”œâ”€â”€ ";
     const isFolder = typeof fs[entry] === "object";
     const icon = isFolder
       ? '<i class="fas fa-folder"></i>'
@@ -2146,7 +2896,7 @@ function generateFileTree(fs, prefix = "", isLast = true) {
     result += `${prefix}${connector}${icon} ${entry}\n`;
 
     if (isFolder && Object.keys(fs[entry]).length > 0) {
-      const newPrefix = prefix + (isLastEntry ? "    " : "│   ");
+      const newPrefix = prefix + (isLastEntry ? "    " : "â”‚   ");
       result += generateFileTree(fs[entry], newPrefix, isLastEntry);
     }
   });
@@ -2154,38 +2904,344 @@ function generateFileTree(fs, prefix = "", isLast = true) {
   return result;
 }
 
+// Terminal helper functions for filesystem navigation
+function getTerminalPath() {
+  return terminalCwd.length === 0 ? '~' : '~/' + terminalCwd.join('/');
+}
+
+function resolvePath(pathStr) {
+  // Handle absolute vs relative paths
+  let parts;
+  if (pathStr.startsWith('/') || pathStr.startsWith('~')) {
+    // Absolute path from root
+    parts = pathStr.replace(/^[~\/]+/, '').split('/').filter(p => p);
+  } else {
+    // Relative path
+    parts = [...terminalCwd, ...pathStr.split('/').filter(p => p)];
+  }
+  
+  // Process . and ..
+  const resolved = [];
+  for (const part of parts) {
+    if (part === '..') {
+      resolved.pop();
+    } else if (part !== '.') {
+      resolved.push(part);
+    }
+  }
+  return resolved;
+}
+
+function getFSNode(pathParts) {
+  let node = fileSystem;
+  for (const part of pathParts) {
+    if (node && typeof node === 'object' && part in node) {
+      node = node[part];
+    } else {
+      return null;
+    }
+  }
+  return node;
+}
+
+function setFSNode(pathParts, value) {
+  if (pathParts.length === 0) return false;
+  let node = fileSystem;
+  for (let i = 0; i < pathParts.length - 1; i++) {
+    if (node && typeof node === 'object' && pathParts[i] in node) {
+      node = node[pathParts[i]];
+    } else {
+      return false;
+    }
+  }
+  if (typeof node === 'object') {
+    node[pathParts[pathParts.length - 1]] = value;
+    saveFS(fileSystem);
+    return true;
+  }
+  return false;
+}
+
+function deleteFSNode(pathParts) {
+  if (pathParts.length === 0) return false;
+  let node = fileSystem;
+  for (let i = 0; i < pathParts.length - 1; i++) {
+    if (node && typeof node === 'object' && pathParts[i] in node) {
+      node = node[pathParts[i]];
+    } else {
+      return false;
+    }
+  }
+  if (typeof node === 'object' && pathParts[pathParts.length - 1] in node) {
+    delete node[pathParts[pathParts.length - 1]];
+    saveFS(fileSystem);
+    return true;
+  }
+  return false;
+}
+
+function formatUptime() {
+  const now = Date.now();
+  const diff = now - systemStartTime;
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  
+  const h = hours % 24;
+  const m = minutes % 60;
+  const s = seconds % 60;
+  
+  let result = '';
+  if (days > 0) result += `${days} day${days !== 1 ? 's' : ''}, `;
+  if (h > 0) result += `${h} hour${h !== 1 ? 's' : ''}, `;
+  result += `${m} min${m !== 1 ? 's' : ''}, ${s} sec${s !== 1 ? 's' : ''}`;
+  return result;
+}
+
+function generateNeofetch() {
+  const userAgent = navigator.userAgent;
+  let browser = 'Unknown Browser';
+  let os = 'Unknown OS';
+  
+  // Detect browser
+  if (userAgent.includes('Firefox')) browser = 'Firefox';
+  else if (userAgent.includes('Edg')) browser = 'Microsoft Edge';
+  else if (userAgent.includes('Chrome')) browser = 'Chrome';
+  else if (userAgent.includes('Safari')) browser = 'Safari';
+  
+  // Detect OS
+  if (userAgent.includes('Windows NT 10')) os = 'Windows 10/11';
+  else if (userAgent.includes('Windows')) os = 'Windows';
+  else if (userAgent.includes('Mac OS X')) os = 'macOS';
+  else if (userAgent.includes('Linux')) os = 'Linux';
+  else if (userAgent.includes('Android')) os = 'Android';
+  else if (userAgent.includes('iPhone') || userAgent.includes('iPad')) os = 'iOS/iPadOS';
+  else if (userAgent.includes('CrOS')) os = 'Chrome OS';
+  
+  const themeCount = installedThemes.length + 1;
+  const fileCount = countFiles(fileSystem);
+  const folderCount = countFolders(fileSystem);
+  
+  const logo = [
+    '       <span style="color:#3b82f6;">â–ˆâ–ˆâ–ˆâ•—   â–ˆâ–ˆâ•— â–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ•— â–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ•—</span>',
+    '       <span style="color:#3b82f6;">â–ˆâ–ˆâ–ˆâ–ˆâ•—  â–ˆâ–ˆâ•‘â–ˆâ–ˆâ•”â•â•â•â–ˆâ–ˆâ•—â–ˆâ–ˆâ•”â•â•â•â•â•</span>',
+    '       <span style="color:#60a5fa;">â–ˆâ–ˆâ•”â–ˆâ–ˆâ•— â–ˆâ–ˆâ•‘â–ˆâ–ˆâ•‘   â–ˆâ–ˆâ•‘â–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ•—</span>',
+    '       <span style="color:#60a5fa;">â–ˆâ–ˆâ•‘â•šâ–ˆâ–ˆâ•—â–ˆâ–ˆâ•‘â–ˆâ–ˆâ•‘   â–ˆâ–ˆâ•‘â•šâ•â•â•â•â–ˆâ–ˆâ•‘</span>',
+    '       <span style="color:#93c5fd;">â–ˆâ–ˆâ•‘ â•šâ–ˆâ–ˆâ–ˆâ–ˆâ•‘â•šâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ•”â•â–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ•‘</span>',
+    '       <span style="color:#93c5fd;">â•šâ•â•  â•šâ•â•â•â• â•šâ•â•â•â•â•â• â•šâ•â•â•â•â•â•â•</span>',
+  ];
+  
+  const info = [
+    `<span style="color:#3b82f6;">${currentUsername}@Veltra</span>`,
+    '<span style="color:#888;">â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€</span>',
+    `<span style="color:#3b82f6;">OS:</span> Veltra v1.5`,
+    `<span style="color:#3b82f6;">Host:</span> ${os}`,
+    `<span style="color:#3b82f6;">Browser:</span> ${browser}`,
+    `<span style="color:#3b82f6;">Uptime:</span> ${formatUptime()}`,
+    `<span style="color:#3b82f6;">Themes:</span> ${themeCount} installed`,
+    `<span style="color:#3b82f6;">Files:</span> ${fileCount} files, ${folderCount} folders`,
+    `<span style="color:#3b82f6;">Resolution:</span> ${window.innerWidth}x${window.innerHeight}`,
+    `<span style="color:#3b82f6;">Memory:</span> ${navigator.deviceMemory ? navigator.deviceMemory + ' GB' : 'N/A'}`,
+    '',
+    '<span style="background:#ef4444;">   </span><span style="background:#f97316;">   </span><span style="background:#eab308;">   </span><span style="background:#22c55e;">   </span><span style="background:#3b82f6;">   </span><span style="background:#8b5cf6;">   </span><span style="background:#ec4899;">   </span><span style="background:#ffffff;">   </span>',
+  ];
+  
+  let output = '';
+  const maxLines = Math.max(logo.length, info.length);
+  for (let i = 0; i < maxLines; i++) {
+    const logoLine = logo[i] || '                                  ';
+    const infoLine = info[i] || '';
+    output += logoLine + '  ' + infoLine + '\n';
+  }
+  return output;
+}
+
+function countFiles(fs) {
+  let count = 0;
+  for (const key in fs) {
+    if (typeof fs[key] === 'object') {
+      count += countFiles(fs[key]);
+    } else {
+      count++;
+    }
+  }
+  return count;
+}
+
+function countFolders(fs) {
+  let count = 0;
+  for (const key in fs) {
+    if (typeof fs[key] === 'object') {
+      count++;
+      count += countFolders(fs[key]);
+    }
+  }
+  return count;
+}
+
+let cliTerminalCwd = []; // Current working directory for CLI terminal
+
 function handleCLIInput(e) {
   if (e.key === "Enter") {
     const input = e.target;
     const command = input.value.trim();
     const terminal = document.getElementById("cliTerminal");
+    const cliPath = cliTerminalCwd.length === 0 ? '~' : '~/' + cliTerminalCwd.join('/');
+    const prompt = `${currentUsername}@veltra:${cliPath}$`;
 
     const cmdLine = document.createElement("div");
     cmdLine.className = "cli-line";
-    cmdLine.innerHTML = `<span class="cli-prompt">user@nautilusos:~$ </span>${command}`;
+    cmdLine.innerHTML = `<span class="cli-prompt">${prompt} </span>${escapeHtml(command)}`;
     terminal.insertBefore(cmdLine, terminal.lastElementChild);
 
     const output = document.createElement("div");
     output.className = "cli-line";
 
-    if (command === "help") {
+    // Parse command and arguments
+    const args = command.match(/(?:[^\s"]+|"[^"]*")+/g) || [];
+    const cmd = args[0]?.toLowerCase();
+    const cmdArgs = args.slice(1).map(a => a.replace(/^"|"$/g, ''));
+
+    if (cmd === "help") {
       output.innerHTML =
-        "Available commands:<br>" +
-        "help - Show this list<br>" +
-        "ls - List files in file system<br>" +
-        "apps - List installed applications<br>" +
-        "themes - List installed themes<br>" +
-        "clear - Clear terminal<br>" +
-        "date - Show current date and time<br>" +
-        "whoami - Display current username<br>" +
-        "reset-boot - Reset bootloader preferences<br>" +
-        "echo [text] - Display text<br>" +
-        "gui - Switch to graphical mode";
-    } else if (command === "ls") {
-      const tree = ".\n" + generateFileTree(fileSystem);
-      output.innerHTML =
-        '<pre style="margin: 0; font-family: inherit;">' + tree + "</pre>";
-    } else if (command === "apps") {
+        '<span style="color: var(--accent);">Veltra CLI - Available Commands:</span><br><br>' +
+        '<span style="color: #60a5fa;">Navigation:</span><br>' +
+        '  cd [dir]      - Change directory<br>' +
+        '  pwd           - Print working directory<br>' +
+        '  ls [dir]      - List directory contents<br><br>' +
+        '<span style="color: #60a5fa;">File Operations:</span><br>' +
+        '  cat [file]    - Display file contents<br>' +
+        '  mkdir [name]  - Create directory<br>' +
+        '  touch [name]  - Create empty file<br>' +
+        '  rm [name]     - Remove file or empty folder<br><br>' +
+        '<span style="color: #60a5fa;">System Info:</span><br>' +
+        '  neofetch      - Display system information<br>' +
+        '  whoami        - Display current username<br>' +
+        '  hostname      - Display hostname<br>' +
+        '  date          - Show current date and time<br><br>' +
+        '<span style="color: #60a5fa;">Other:</span><br>' +
+        '  apps          - List installed applications<br>' +
+        '  themes        - List installed themes<br>' +
+        '  echo [text]   - Display text<br>' +
+        '  clear         - Clear terminal<br>' +
+        '  reset-boot    - Reset bootloader preferences<br>' +
+        '  gui           - Switch to graphical mode';
+    } else if (cmd === "cd") {
+      if (!cmdArgs[0] || cmdArgs[0] === '~') {
+        cliTerminalCwd = [];
+        output.innerHTML = '';
+      } else {
+        const newPath = resolveCliPath(cmdArgs[0]);
+        const node = getFSNode(newPath);
+        if (node === null) {
+          output.innerHTML = `<span style="color: #ef4444;">cd: no such directory: ${cmdArgs[0]}</span>`;
+        } else if (typeof node !== 'object') {
+          output.innerHTML = `<span style="color: #ef4444;">cd: not a directory: ${cmdArgs[0]}</span>`;
+        } else {
+          cliTerminalCwd = newPath;
+          output.innerHTML = '';
+        }
+      }
+    } else if (cmd === "pwd") {
+      output.textContent = '/' + cliTerminalCwd.join('/') || '/';
+    } else if (cmd === "ls") {
+      let targetPath = cliTerminalCwd;
+      if (cmdArgs[0]) {
+        targetPath = resolveCliPath(cmdArgs[0]);
+      }
+      const node = getFSNode(targetPath);
+      if (node === null) {
+        output.innerHTML = `<span style="color: #ef4444;">ls: cannot access '${cmdArgs[0] || '.'}': No such file or directory</span>`;
+      } else if (typeof node !== 'object') {
+        output.textContent = cmdArgs[0];
+      } else {
+        const entries = Object.keys(node);
+        if (entries.length === 0) {
+          output.innerHTML = '<span style="color: #888;">(empty directory)</span>';
+        } else {
+          const formatted = entries.map(e => {
+            const isDir = typeof node[e] === 'object';
+            return isDir 
+              ? `<span style="color: #3b82f6;">${e}/</span>` 
+              : e;
+          }).join('  ');
+          output.innerHTML = formatted;
+        }
+      }
+    } else if (cmd === "cat") {
+      if (!cmdArgs[0]) {
+        output.innerHTML = '<span style="color: #ef4444;">cat: missing file operand</span>';
+      } else {
+        const filePath = resolveCliPath(cmdArgs[0]);
+        const node = getFSNode(filePath);
+        if (node === null) {
+          output.innerHTML = `<span style="color: #ef4444;">cat: ${cmdArgs[0]}: No such file or directory</span>`;
+        } else if (typeof node === 'object') {
+          output.innerHTML = `<span style="color: #ef4444;">cat: ${cmdArgs[0]}: Is a directory</span>`;
+        } else {
+          output.innerHTML = '<pre style="margin: 0; font-family: inherit; white-space: pre-wrap;">' + escapeHtml(node) + '</pre>';
+        }
+      }
+    } else if (cmd === "mkdir") {
+      if (!cmdArgs[0]) {
+        output.innerHTML = '<span style="color: #ef4444;">mkdir: missing operand</span>';
+      } else {
+        const newPath = resolveCliPath(cmdArgs[0]);
+        const parentPath = newPath.slice(0, -1);
+        const dirName = newPath[newPath.length - 1];
+        const parent = newPath.length === 1 ? fileSystem : getFSNode(parentPath);
+        
+        if (parent === null || typeof parent !== 'object') {
+          output.innerHTML = `<span style="color: #ef4444;">mkdir: cannot create directory '${cmdArgs[0]}': No such file or directory</span>`;
+        } else if (dirName in parent) {
+          output.innerHTML = `<span style="color: #ef4444;">mkdir: cannot create directory '${cmdArgs[0]}': File exists</span>`;
+        } else {
+          parent[dirName] = {};
+          saveFS(fileSystem);
+          output.innerHTML = `<span style="color: #4ade80;">âœ“ Created directory: ${dirName}</span>`;
+        }
+      }
+    } else if (cmd === "touch") {
+      if (!cmdArgs[0]) {
+        output.innerHTML = '<span style="color: #ef4444;">touch: missing file operand</span>';
+      } else {
+        const newPath = resolveCliPath(cmdArgs[0]);
+        const parentPath = newPath.slice(0, -1);
+        const fileName = newPath[newPath.length - 1];
+        const parent = newPath.length === 1 ? fileSystem : getFSNode(parentPath);
+        
+        if (parent === null || typeof parent !== 'object') {
+          output.innerHTML = `<span style="color: #ef4444;">touch: cannot create '${cmdArgs[0]}': No such file or directory</span>`;
+        } else if (fileName in parent && typeof parent[fileName] === 'object') {
+          output.innerHTML = `<span style="color: #ef4444;">touch: cannot overwrite directory '${cmdArgs[0]}'</span>`;
+        } else {
+          parent[fileName] = parent[fileName] || '';
+          saveFS(fileSystem);
+          output.innerHTML = `<span style="color: #4ade80;">âœ“ Created file: ${fileName}</span>`;
+        }
+      }
+    } else if (cmd === "rm") {
+      if (!cmdArgs[0]) {
+        output.innerHTML = '<span style="color: #ef4444;">rm: missing operand</span>';
+      } else {
+        const targetPath = resolveCliPath(cmdArgs[0]);
+        const node = getFSNode(targetPath);
+        
+        if (node === null) {
+          output.innerHTML = `<span style="color: #ef4444;">rm: cannot remove '${cmdArgs[0]}': No such file or directory</span>`;
+        } else if (typeof node === 'object' && Object.keys(node).length > 0) {
+          output.innerHTML = `<span style="color: #ef4444;">rm: cannot remove '${cmdArgs[0]}': Directory not empty</span>`;
+        } else {
+          deleteFSNode(targetPath);
+          output.innerHTML = `<span style="color: #4ade80;">âœ“ Removed: ${cmdArgs[0]}</span>`;
+        }
+      }
+    } else if (cmd === "neofetch") {
+      output.innerHTML = '<pre style="margin: 0; font-family: monospace; line-height: 1.4;">' + generateNeofetch() + '</pre>';
+    } else if (cmd === "hostname") {
+      output.textContent = 'Veltra';
+    } else if (cmd === "apps") {
       const appList = [
         "Files - File manager and explorer",
         "Terminal - Command line interface",
@@ -2200,8 +3256,8 @@ function handleCLIInput(e) {
       ];
       output.innerHTML =
         '<span style="color: var(--accent);">Installed Applications:</span><br>' +
-        appList.map((app) => `  • ${app}`).join("<br>");
-    } else if (command === "themes") {
+        appList.map((app) => `  â€¢ ${app}`).join("<br>");
+    } else if (cmd === "themes") {
       const themeList = ["Dark Theme (Default)"];
       if (installedThemes.length > 0) {
         installedThemes.forEach((theme) => {
@@ -2212,22 +3268,23 @@ function handleCLIInput(e) {
       }
       output.innerHTML =
         '<span style="color: var(--accent);">Installed Themes:</span><br>' +
-        themeList.map((theme) => `  • ${theme}`).join("<br>");
-    } else if (command === "whoami") {
+        themeList.map((theme) => `  â€¢ ${theme}`).join("<br>");
+    } else if (cmd === "whoami") {
       output.textContent = "User";
-    } else if (command === "reset-boot") {
-      localStorage.removeItem("nautilusOS_bootChoice");
+    } else if (cmd === "reset-boot") {
+      localStorage.removeItem("Veltra_bootChoice");
       output.innerHTML =
-        '<span style="color: #4ade80;">✓ Bootloader preferences reset successfully</span><br>' +
+        '<span style="color: #4ade80;">âœ“ Bootloader preferences reset successfully</span><br>' +
         "The bootloader menu will appear on next page reload.";
-    } else if (command === "clear") {
+    } else if (cmd === "clear") {
       terminal.innerHTML = `
-                      <div class="cli-line" style="color: var(--accent);">NautilusOS Command Line Interface v1.5</div>
+                      <div class="cli-line" style="color: var(--accent);">Veltra Command Line Interface v2.0</div>
                       <div class="cli-line" style="color: #888; margin-bottom: 1rem;">Type 'help' for available commands, 'gui' to switch to graphical mode</div>
                   `;
-    } else if (command === "date") {
+      cliTerminalCwd = [];
+    } else if (cmd === "date") {
       output.textContent = new Date().toString();
-    } else if (command === "gui") {
+    } else if (cmd === "gui") {
       output.textContent = "Switching to graphical mode...";
       terminal.insertBefore(output, terminal.lastElementChild);
       setTimeout(() => {
@@ -2238,7 +3295,7 @@ function handleCLIInput(e) {
           cliMode.style.opacity = "1";
 
           const setupComplete = localStorage.getItem(
-            "nautilusOS_setupComplete"
+            "Veltra_setupComplete"
           );
 
           if (!setupComplete) {
@@ -2248,7 +3305,7 @@ function handleCLIInput(e) {
               setup.style.opacity = "1";
             }, 50);
           } else {
-            const savedUsername = localStorage.getItem("nautilusOS_username");
+            const savedUsername = localStorage.getItem("Veltra_username");
             if (savedUsername) {
               document.getElementById("username").value = savedUsername;
             }
@@ -2263,19 +3320,48 @@ function handleCLIInput(e) {
       input.value = "";
       terminal.scrollTop = terminal.scrollHeight;
       return;
-    } else if (command.startsWith("echo ")) {
-      output.textContent = command.substring(5);
+    } else if (cmd === "echo") {
+      output.textContent = cmdArgs.join(' ');
     } else if (command) {
-      output.innerHTML = `<span style="color: #ef4444;">Command not found: ${command}</span><br>Type 'help' for available commands.`;
+      output.innerHTML = `<span style="color: #ef4444;">Command not found: ${cmd}</span><br>Type 'help' for available commands.`;
     }
 
-    if (command !== "clear" && command) {
+    if (cmd !== "clear" && command) {
       terminal.insertBefore(output, terminal.lastElementChild);
+    }
+
+    // Update prompt with new path
+    const newPath = cliTerminalCwd.length === 0 ? '~' : '~/' + cliTerminalCwd.join('/');
+    const newPrompt = `${currentUsername}@veltra:${newPath}$`;
+    const inputLine = terminal.lastElementChild;
+    const promptSpan = inputLine.querySelector('.cli-prompt');
+    if (promptSpan) {
+      promptSpan.textContent = newPrompt + ' ';
     }
 
     input.value = "";
     terminal.scrollTop = terminal.scrollHeight;
   }
+}
+
+// Helper function to resolve paths for CLI terminal
+function resolveCliPath(pathStr) {
+  let parts;
+  if (pathStr.startsWith('/') || pathStr.startsWith('~')) {
+    parts = pathStr.replace(/^[~\/]+/, '').split('/').filter(p => p);
+  } else {
+    parts = [...cliTerminalCwd, ...pathStr.split('/').filter(p => p)];
+  }
+  
+  const resolved = [];
+  for (const part of parts) {
+    if (part === '..') {
+      resolved.pop();
+    } else if (part !== '.') {
+      resolved.push(part);
+    }
+  }
+  return resolved;
 }
 
 function startLoginClock() {
@@ -2331,20 +3417,30 @@ function startLoginClock() {
 
 function login() {
   console.log(`[LOGIN LOG] ${new Date().toISOString()}: Login function called`);
-  const username = document.getElementById("username").value;
+  const usernameInput = document.getElementById("username");
+  const username = usernameInput ? usernameInput.value : "";
   const password = document.getElementById("password").value;
 
   // Migrate old system if needed
   migrateToMultiUserSystem();
+
+  // Check if multiple accounts exist and no account is selected
+  const accounts = getAllAccounts();
+  if (accounts.length > 1 && (!username || usernameInput.style.display === "none")) {
+    showToast("Please select an account first", "fa-user-circle");
+    // Ensure account selector is visible
+    updateLoginScreen();
+    return;
+  }
 
   // Get account from new multi-user system
   const account = getAccountByUsername(username);
 
   if (!account) {
     // Fallback to old system for backwards compatibility
-    const savedUsername = localStorage.getItem("nautilusOS_username");
-    const savedPassword = localStorage.getItem("nautilusOS_password");
-    const isPasswordless = localStorage.getItem("nautilusOS_isPasswordless") === "true";
+    const savedUsername = localStorage.getItem("Veltra_username");
+    const savedPassword = localStorage.getItem("Veltra_password");
+    const isPasswordless = localStorage.getItem("Veltra_isPasswordless") === "true";
 
     if (!username) {
       showToast("Please enter username", "fa-exclamation-circle");
@@ -2469,7 +3565,7 @@ function login() {
         }, 1000);
       }
 
-      const showWhatsNew = localStorage.getItem("nautilusOS_showWhatsNew");
+      const showWhatsNew = localStorage.getItem("Veltra_showWhatsNew");
       if (showWhatsNew === null || showWhatsNew === "true") {
         console.log(`[LOGIN LOG] ${new Date().toISOString()}: Opening What's New app`);
         setTimeout(() => {
@@ -3375,7 +4471,7 @@ function saveToDevice() {
 }
 
 function resetBootloader() {
-  localStorage.removeItem("nautilusOS_bootChoice");
+  localStorage.removeItem("Veltra_bootChoice");
   showToast(
     "Boot preference cleared. The bootloader will appear on next reload.",
     "fa-redo"
@@ -3396,7 +4492,7 @@ function openApp(appName, editorContent = "", filename = "") {
   }
 
   // Handle installed community apps
-  const communityApps = JSON.parse(localStorage.getItem('nautilusOS_communityApps') || '{}');
+  const communityApps = JSON.parse(localStorage.getItem('Veltra_communityApps') || '{}');
   if (communityApps[appName]) {
     const appData = communityApps[appName];
     // Create a floating window for the installed app
@@ -3415,16 +4511,16 @@ function openApp(appName, editorContent = "", filename = "") {
     );
   }
   const sameBackgroundSetting = localStorage.getItem(
-    "nautilusOS_useSameBackground"
+    "Veltra_useSameBackground"
   );
   const useSameBackground =
     sameBackgroundSetting === null || sameBackgroundSetting === "true";
-  const hasWallpaper = !!localStorage.getItem("nautilusOS_wallpaper");
+  const hasWallpaper = !!localStorage.getItem("Veltra_wallpaper");
   const hasLoginWallpaper = !!localStorage.getItem(
-    "nautilusOS_loginBackground"
+    "Veltra_loginBackground"
   );
   const hasProfilePicture = !!localStorage.getItem(
-    "nautilusOS_profilePicture"
+    "Veltra_profilePicture"
   );
   const apps = {
     files: {
@@ -3497,10 +4593,10 @@ function openApp(appName, editorContent = "", filename = "") {
       icon: "fas fa-terminal",
       content: `
               <div class="terminal" id="terminalContent">
-                  <div class="terminal-line" style="color: var(--accent);">NautilusOS Terminal v1.5</div>
-                  <div class="terminal-line" style="color: #888; margin-bottom: 1rem;">Type 'help' for available commands</div>
+                  <div class="terminal-line" style="color: var(--accent);">Veltra Terminal v2.0</div>
+                  <div class="terminal-line" style="color: #888; margin-bottom: 1rem;">Type 'help' for available commands â€¢ Try 'neofetch'</div>
                   <div class="terminal-line">
-                      <span class="terminal-prompt">user@nautilusos:~$ </span><input type="text" class="terminal-input" id="terminalInput" onkeypress="handleTerminalInput(event)">
+                      <span class="terminal-prompt">${currentUsername}@veltra:~$ </span><input type="text" class="terminal-input" id="terminalInput" onkeypress="handleTerminalInput(event)">
                   </div>
               </div>
           `,
@@ -3545,15 +4641,15 @@ function openApp(appName, editorContent = "", filename = "") {
       height: 600,
     },
     browser: {
-      title: "Nautilus Browser",
+      title: "Veltra Browser",
       icon: "fas fa-globe",
       content: (() => {
-        if (!checkFileProtocol("Nautilus Browser")) {
+        if (!checkFileProtocol("Veltra Browser")) {
           return `
             <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 3rem; background: rgba(10, 14, 26, 0.8);">
               <i class="fas fa-exclamation-triangle" style="font-size: 5rem; color: var(--error-red); margin-bottom: 2rem;"></i>
               <h2 style="margin-bottom: 1rem; color: var(--text-primary);">Browser Unavailable</h2>
-              <p style="color: var(--text-secondary); text-align: center; max-width: 400px;">The browser doesn't work on file:// protocol. Please run NautilusOS from a web server to use this feature.</p>
+              <p style="color: var(--text-secondary); text-align: center; max-width: 400px;">The browser doesn't work on file:// protocol. Please run Veltra from a web server to use this feature.</p>
             </div>
           `;
         }
@@ -3668,10 +4764,10 @@ function openApp(appName, editorContent = "", filename = "") {
                         </div>
                         <div class="cloaking-preview-tab" id="cloakPreview">
                             <img class="cloaking-preview-favicon" id="previewFavicon"
-src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='75' font-size=85' fill='white'%3E🌐︎%3C/text%3E%3C/svg%3E"
+src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='75' font-size=85' fill='white'%3EðŸŒï¸Ž%3C/text%3E%3C/svg%3E"
 alt="favicon">
 
-                            <span class="cloaking-preview-title" id="previewTitle">NautilusOS</span>
+                            <span class="cloaking-preview-title" id="previewTitle">Veltra</span>
                         </div>
                     </div>
                     
@@ -3729,9 +4825,9 @@ alt="favicon">
                         <div class="cloaking-preview-tab" id="clickoffPreview">
                             <i class="fas fa-globe" style="font-size: 1.2rem; color: var(--accent); margin-right: 0.5rem;"></i>
                             <img class="cloaking-preview-favicon" id="clickoffPreviewFavicon"
-                                src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='75' font-size='85' fill='white'%3E🌐︎%3C/text%3E%3C/svg%3E"
+                                src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='75' font-size='85' fill='white'%3EðŸŒï¸Ž%3C/text%3E%3C/svg%3E"
                                 alt="favicon">
-                            <span class="cloaking-preview-title" id="clickoffPreviewTitle">NautilusOS</span>
+                            <span class="cloaking-preview-title" id="clickoffPreviewTitle">Veltra</span>
                         </div>
                     </div>
 
@@ -3984,7 +5080,7 @@ alt="favicon">
                             </div>
                             <div class="cloaking-status-text">
                                 <div class="cloaking-status-title">Screen Monitoring Detection</div>
-                                <div class="cloaking-status-desc">${cloakingConfig.antiScreenMonitoring ? "Enabled - NautilusOS will black out when you switch tabs, preventing monitering software from viewing Nautilus" : "Disabled"}</div>
+                                <div class="cloaking-status-desc">${cloakingConfig.antiScreenMonitoring ? "Enabled - Veltra will black out when you switch tabs, preventing monitering software from viewing Veltra" : "Disabled"}</div>
                             </div>
                             <div class="toggle-switch ${cloakingConfig.antiScreenMonitoring ? "active" : ""}" id="antiScreenMonitoringToggle" onclick="toggleAntiScreenMonitoring()"></div>
                         </div>
@@ -4021,7 +5117,7 @@ alt="favicon">
                                 >
                                 <span class="cloaking-slider-value" id="antiMonitorDelayValue">${cloakingConfig.antiMonitorDelay}ms</span>
                             </div>
-                            <div class="cloaking-hint">How long NautilusOS stays blacked out after you switch back to this tab (delays unblacking.) Helpful if you cycle through tabs</div>
+                            <div class="cloaking-hint">How long Veltra stays blacked out after you switch back to this tab (delays unblacking.) Helpful if you cycle through tabs</div>
                         </div>
                     </div>
                     
@@ -4035,6 +5131,19 @@ alt="favicon">
                                 <div class="cloaking-status-desc">${cloakingConfig.confirmPageClosing ? "Enabled - Alert will show to confirm page close before closing, preventing admin-installed software from remotely closing your tab" : "Disabled"}</div>
                             </div>
                             <div class="toggle-switch ${cloakingConfig.confirmPageClosing ? "active" : ""}" id="confirmPageClosingToggle" onclick="toggleConfirmPageClosing()"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="cloaking-status-card" style="margin-top: 1rem;">
+                        <div class="cloaking-status-indicator ${cloakingConfig.bypassLeaveConfirmation ? "active" : ""}">
+                            <div class="cloaking-status-icon">
+                                <i class="fas ${cloakingConfig.bypassLeaveConfirmation ? "fa-bolt" : "fa-hand-paper"}"></i>
+                            </div>
+                            <div class="cloaking-status-text">
+                                <div class="cloaking-status-title">Bypass Leave Prompt on Panic</div>
+                                <div class="cloaking-status-desc">${cloakingConfig.bypassLeaveConfirmation ? "Enabled - Panic will instantly redirect without 'Leave site?' confirmation" : "Disabled - You may see a 'Leave site?' prompt when using panic"}</div>
+                            </div>
+                            <div class="toggle-switch ${cloakingConfig.bypassLeaveConfirmation ? "active" : ""}" id="bypassLeaveToggle" onclick="toggleBypassLeaveConfirmation()"></div>
                         </div>
                     </div>
                 </div>
@@ -4227,7 +5336,7 @@ alt="favicon">
                                 <div class="settings-item-desc">Open the What's New app automatically after logging in</div>
                             </div>
                             <div class="toggle-switch ${localStorage.getItem(
-          "nautilusOS_showWhatsNew"
+          "Veltra_showWhatsNew"
         ) !== "false"
           ? "active"
           : ""
@@ -4318,8 +5427,25 @@ alt="favicon">
                                 <div class="settings-item-title">Full Taskbar</div>
                                 <div class="settings-item-desc">Stretch the taskbar to the full width of the screen (Windows style)</div>
                             </div>
-                            <div class="toggle-switch ${localStorage.getItem('nautilusOS_taskbarStyle') === 'full' ? 'active' : ''}" 
+                            <div class="toggle-switch ${localStorage.getItem('veltra_taskbarStyle') === 'full' ? 'active' : ''}" 
                                 onclick="toggleTaskbarStyle(); this.classList.toggle('active');"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="settings-card">
+                    <div class="settings-card-header">
+                        <i class="fas fa-bolt"></i>
+                        <span>Performance</span>
+                    </div>
+                    <div class="settings-card-body">
+                         <div class="settings-item">
+                            <div class="settings-item-text">
+                                <div class="settings-item-title">Fast Mode</div>
+                                <div class="settings-item-desc">Reduces animations and effects for better performance on slower devices (iPad, Chromebook, etc.)</div>
+                            </div>
+                            <div class="toggle-switch ${localStorage.getItem('veltra_fastMode') === 'true' ? 'active' : ''}" id="fastModeToggle"
+                                onclick="toggleFastMode(); this.classList.toggle('active');"></div>
                         </div>
                     </div>
                 </div>
@@ -4370,7 +5496,7 @@ alt="favicon">
                                 <div class="settings-empty">
                                     <i class="fas fa-paint-brush"></i>
                                     <h3>No Themes Installed</h3>
-                                    <p>Visit the App Store to browse and install custom themes for NautilusOS.</p>
+                                    <p>Visit the App Store to browse and install custom themes for Veltra.</p>
                                     <button class="settings-action-btn" onclick="hideContextMenu(); openApp('appstore'); setTimeout(() => { const themesBtn = document.querySelector('.appstore-section:nth-child(2)'); if(themesBtn) switchAppStoreSection('themes', themesBtn); }, 100);">
                                         <i class="fas fa-store"></i> Open App Store
                                     </button>
@@ -4458,7 +5584,7 @@ alt="favicon">
                                     class="searchEngineI" 
                                     style="margin-left: 0; width: 100%;" 
                                     id="wispUrlInput" 
-                                    value="${localStorage.getItem('nOS_wispUrl') || 'wss://wisp.rhw.one/'}"
+                                    value="${localStorage.getItem('veltra_wispUrl') || 'wss://wisp.rhw.one/'}"
                                     placeholder="wss://..."
                                     onchange="changeWispUrl(this.value)">
                                 <button class="settings-action-btn" onclick="resetWispUrl()" style="padding: 0 1rem; margin-left: 0.5rem;">
@@ -4588,7 +5714,7 @@ alt="favicon">
                                 <div class="settings-item-title">Bypass File Protocol Warnings</div>
                                 <div class="settings-item-desc">
                                     Allow experimental browser features on file:// protocol. By enabling this, you agree to report any bugs as GitHub issues.
-                                    <a href="https://github.com/nautilus-os/NautilusOS/issues" target="_blank" style="color: var(--primary-blue); text-decoration: underline;">Report issues here</a>
+                                    <a href="https://github.com/veltra/Veltra/issues" target="_blank" style="color: var(--primary-blue); text-decoration: underline;">Report issues here</a>
                                 </div>
                             </div>
                             <div class="toggle-switch ${settings.bypassFileProtocolWarnings ? "active" : ""
@@ -4637,65 +5763,164 @@ alt="favicon">
       width: 900,
       height: 600,
     },
-    music: {
-      title: "Music",
+    melodify: {
+      title: "Melodify",
       icon: "fas fa-music",
       content: `
-          <div class="music-player">
-              <div class="music-header">
-                  <div class="music-artwork">
-                      <i class="fas fa-music"></i>
-                  </div>
-                  <div class="music-info">
-                      <div class="music-title" id="musicTitle">No Track Loaded</div>
-                      <div class="music-artist" id="musicArtist">Select a music file to play</div>
-                  </div>
-                  <div class="music-load-section">
-                      <label for="musicFileInput" class="music-load-btn">
-                          <i class="fas fa-folder-open"></i> Load Music
-                          <input type="file" id="musicFileInput" accept="audio/*" onchange="loadMusicFile(event)" style="display: none;">
-                      </label>
-                  </div>
+        <div class="melodify-app">
+          <!-- Sidebar -->
+          <div class="melodify-sidebar">
+            <div class="melodify-logo">
+              <i class="fas fa-music"></i>
+              <span>Melodify</span>
+            </div>
+            <nav class="melodify-nav">
+              <div class="melodify-nav-item active" onclick="melodifyShowTab('home')">
+                <i class="fas fa-home"></i> Home
               </div>
-
-              <div class="music-progress-section">
-                  <div class="music-time" id="currentTime">0:00</div>
-                  <div class="music-progress-bar" onclick="seekMusic(event)">
-                      <div class="music-progress-fill" id="progressFill"></div>
-                  </div>
-                  <div class="music-time" id="totalTime">0:00</div>
+              <div class="melodify-nav-item" onclick="melodifyShowTab('search')">
+                <i class="fas fa-search"></i> Search
               </div>
-
-              <div class="music-controls">
-                  <button class="music-control-btn" onclick="restartMusic()" title="Restart">
-                      <i class="fas fa-redo"></i>
-                  </button>
-                  <button class="music-control-btn" onclick="skipBackward()" title="Skip Back 10s">
-                      <i class="fas fa-backward"></i>
-                  </button>
-                  <button class="music-control-btn play-btn" id="playPauseBtn" onclick="togglePlayPause()">
-                      <i class="fas fa-play"></i>
-                  </button>
-                  <button class="music-control-btn" onclick="skipForward()" title="Skip Forward 10s">
-                      <i class="fas fa-forward"></i>
-                  </button>
-                  <button class="music-control-btn" id="loopBtn" onclick="toggleLoop()" title="Loop">
-                      <i class="fas fa-repeat"></i>
-                  </button>
+              <div class="melodify-nav-item" onclick="melodifyShowTab('library')">
+                <i class="fas fa-book"></i> Your Library
               </div>
-
-              <div class="music-volume-section">
-                  <i class="fas fa-volume-up"></i>
-                  <input type="range" class="music-volume-slider" id="volumeSlider" min="0" max="100" value="70" oninput="changeVolume(this.value)">
-                  <span id="volumePercent">70%</span>
+              <div class="melodify-nav-item" onclick="melodifyShowTab('downloads')">
+                <i class="fas fa-download"></i> Downloads
               </div>
-
-              <audio id="audioPlayer" style="display: none;"></audio>
+            </nav>
+            <div class="melodify-sidebar-section">
+              <div class="melodify-sidebar-title">Playlists</div>
+              <div class="melodify-playlist-item" onclick="melodifyLoadLocalFile()">
+                <i class="fas fa-plus"></i> Load Local File
+              </div>
+              <input type="file" id="melodifyFileInput" accept="audio/*" onchange="loadMelodifyFile(event)" style="display: none;">
+            </div>
           </div>
+
+          <!-- Main Content -->
+          <div class="melodify-main">
+            <!-- Home Tab -->
+            <div class="melodify-tab active" id="melodifyHomeTab">
+              <h1 class="melodify-greeting">Good evening</h1>
+              <div class="melodify-section">
+                <h2>Quick Actions</h2>
+                <div class="melodify-cards">
+                  <div class="melodify-card" onclick="melodifyShowTab('search')">
+                    <div class="melodify-card-img" style="background: linear-gradient(135deg, #1DB954, #191414);">
+                      <i class="fas fa-search"></i>
+                    </div>
+                    <div class="melodify-card-title">Search Songs</div>
+                    <div class="melodify-card-desc">Find and play music</div>
+                  </div>
+                  <div class="melodify-card" onclick="melodifyLoadLocalFile()">
+                    <div class="melodify-card-img" style="background: linear-gradient(135deg, #E91E63, #9C27B0);">
+                      <i class="fas fa-folder-open"></i>
+                    </div>
+                    <div class="melodify-card-title">Local Files</div>
+                    <div class="melodify-card-desc">Play from your device</div>
+                  </div>
+                  <div class="melodify-card" onclick="melodifyShowTab('downloads')">
+                    <div class="melodify-card-img" style="background: linear-gradient(135deg, #2196F3, #00BCD4);">
+                      <i class="fas fa-download"></i>
+                    </div>
+                    <div class="melodify-card-title">Downloads</div>
+                    <div class="melodify-card-desc">Your downloaded tracks</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Search Tab -->
+            <div class="melodify-tab" id="melodifySearchTab">
+              <div class="melodify-search-header">
+                <div class="melodify-search-box">
+                  <i class="fas fa-search"></i>
+                  <input type="text" id="melodifySearchInput" placeholder="What do you want to listen to?" 
+                    onkeydown="if(event.key === 'Enter') searchMelodify(this.value)">
+                </div>
+              </div>
+              <div id="melodifySearchStatus" class="melodify-status">Search for your favorite songs</div>
+              <div id="melodifySearchResults" class="melodify-results">
+                <div class="melodify-empty">
+                  <i class="fas fa-music"></i>
+                  <p>Search for songs, artists, or albums</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Library Tab -->
+            <div class="melodify-tab" id="melodifyLibraryTab">
+              <h1>Your Library</h1>
+              <div id="melodifyLibrary" class="melodify-library">
+                <div class="melodify-empty">
+                  <i class="fas fa-heart"></i>
+                  <p>Your library is empty</p>
+                  <p style="font-size: 0.85rem;">Search and add songs to build your collection</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Downloads Tab -->
+            <div class="melodify-tab" id="melodifyDownloadsTab">
+              <h1>Downloads</h1>
+              <div id="melodifyDownloads" class="melodify-downloads">
+                <div class="melodify-empty">
+                  <i class="fas fa-download"></i>
+                  <p>No downloads yet</p>
+                  <p style="font-size: 0.85rem;">Search for songs and download them</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Now Playing Bar -->
+          <div class="melodify-player">
+            <div class="melodify-now-playing">
+              <div class="melodify-artwork" id="melodifyArtwork">
+                <i class="fas fa-music"></i>
+              </div>
+              <div class="melodify-track-info">
+                <div class="melodify-track-title" id="melodifyTitle">No track playing</div>
+                <div class="melodify-track-artist" id="melodifyArtist">Select a song to play</div>
+              </div>
+              <button class="melodify-like-btn" onclick="toggleMelodifyLike()" id="melodifyLikeBtn">
+                <i class="far fa-heart"></i>
+              </button>
+            </div>
+            <div class="melodify-controls">
+              <div class="melodify-control-btns">
+                <button onclick="melodifyShuffle()" id="melodifyShuffleBtn"><i class="fas fa-random"></i></button>
+                <button onclick="melodifyPrev()"><i class="fas fa-step-backward"></i></button>
+                <button class="melodify-play-btn" onclick="toggleMelodifyPlay()" id="melodifyPlayBtn">
+                  <i class="fas fa-play"></i>
+                </button>
+                <button onclick="melodifyNext()"><i class="fas fa-step-forward"></i></button>
+                <button onclick="toggleMelodifyRepeat()" id="melodifyRepeatBtn"><i class="fas fa-redo"></i></button>
+              </div>
+              <div class="melodify-progress">
+                <span id="melodifyCurrentTime">0:00</span>
+                <div class="melodify-progress-bar" onclick="seekMelodify(event)">
+                  <div class="melodify-progress-fill" id="melodifyProgressFill"></div>
+                </div>
+                <span id="melodifyTotalTime">0:00</span>
+              </div>
+            </div>
+            <div class="melodify-extra-controls">
+              <button onclick="toggleMelodifyQueue()" title="Queue"><i class="fas fa-list"></i></button>
+              <div class="melodify-volume">
+                <i class="fas fa-volume-up" id="melodifyVolumeIcon"></i>
+                <input type="range" class="melodify-volume-slider" id="melodifyVolumeSlider" 
+                  min="0" max="100" value="70" oninput="changeMelodifyVolume(this.value)">
+              </div>
+            </div>
+          </div>
+
+          <audio id="melodifyAudio"></audio>
+        </div>
       `,
       noPadding: true,
-      width: 900,
-      height: 600,
+      width: 1100,
+      height: 700,
     },
     photos: {
       title: "Photos",
@@ -4742,7 +5967,7 @@ alt="favicon">
       content: (() => {
         // Base (static) help topics we always want present
         const baseTopics = [
-          { id: 'welcome', icon: 'fa-info-circle', title: 'Welcome', preview: 'Introduction to NautilusOS' },
+          { id: 'welcome', icon: 'fa-info-circle', title: 'Welcome', preview: 'Introduction to Veltra' },
           { id: 'cloaking', icon: 'fa-mask', title: 'Cloaking', preview: 'Tab disguise features' },
           { id: 'boot', icon: 'fa-power-off', title: 'Boot Options', preview: 'Graphical vs command-line' },
           { id: 'apps', icon: 'fa-th', title: 'Applications', preview: 'Built-in apps guide' },
@@ -4808,13 +6033,13 @@ alt="favicon">
       height: 600,
     },
     whatsnew: {
-      title: "What's New in NautilusOS",
+      title: "What's New in Veltra",
       icon: "fas fa-star",
       content: `
               <div class="whats-new-content">
                   <center>
                   <div class="whats-new-header">
-                      <h1 style="text-align: center !important; font-size: 2rem; margin-bottom: 0.5rem; line-height: 1.2;">Welcome to NautilusOS <br>v1.5! What's new?</h1>
+                      <h1 style="text-align: center !important; font-size: 2rem; margin-bottom: 0.5rem; line-height: 1.2;">Welcome to Veltra <br>v1.5! What's new?</h1>
                       <p>AI Assistant, 3 Browsers, More Themes, VS Code, Window Snapping, Games, and more!</p>
                   </div>
                   </center>
@@ -4858,7 +6083,7 @@ alt="favicon">
                           </div>
                           <div class="carousel-content">
                               <h2>Multiple Boot Options</h2>
-                              <p>Choose between graphical mode or command-line interface on startup. Your preference is remembered, giving you full control over your NautilusOS experience.</p>
+                              <p>Choose between graphical mode or command-line interface on startup. Your preference is remembered, giving you full control over your Veltra experience.</p>
                           </div>
                       </div>
 
@@ -4938,7 +6163,7 @@ alt="favicon">
                           </div>
                           <div class="carousel-content">
                               <h2>Built-in App Store</h2>
-                              <p>Discover and install new applications from the NautilusOS App Store. Browse featured themes, apps, and tools to extend your desktop experience with just a click!</p>
+                              <p>Discover and install new applications from the Veltra App Store. Browse featured themes, apps, and tools to extend your desktop experience with just a click!</p>
                           </div>
                       </div>
 
@@ -4952,7 +6177,7 @@ alt="favicon">
                           </div>
                           <div class="carousel-content">
                               <h2>Fully Customizable</h2>
-                              <p>Personalize your experience with extensive settings. Make NautilusOS truly yours by installing different themes, changing cloaking settings, arranging desktop icons, configuring boot preferences, and more.</p>
+                              <p>Personalize your experience with extensive settings. Make Veltra truly yours by installing different themes, changing cloaking settings, arranging desktop icons, configuring boot preferences, and more.</p>
                           </div>
                       </div>
 
@@ -5005,7 +6230,7 @@ alt="favicon">
                           </div>
                           <div class="carousel-content">
                               <h2>Built-in Web Browser</h2>
-                              <p>Browse the web without leaving NautilusOS! Full-featured browser with multiple tabs, navigation controls, and URL bar. Visit your favorite websites right from your virtual desktop.</p>
+                              <p>Browse the web without leaving Veltra! Full-featured browser with multiple tabs, navigation controls, and URL bar. Visit your favorite websites right from your virtual desktop.</p>
                           </div>
                       </div>
 
@@ -5049,7 +6274,7 @@ alt="favicon">
     </div>
     <div class="carousel-content">
         <h2>Import & Export Profiles</h2>
-        <p>Backup your entire NautilusOS experience! Export your profile to save settings, files, apps, and themes. Import profiles to restore your setup on any device or share configurations with others.</p>
+        <p>Backup your entire Veltra experience! Export your profile to save settings, files, apps, and themes. Import profiles to restore your setup on any device or share configurations with others.</p>
     </div>
 </div>
 
@@ -5068,7 +6293,7 @@ alt="favicon">
           </div>
           <div class="carousel-content">
               <h2>Notification Center</h2>
-              <p>Never miss important system messages! View all your notifications in one place, track their history, and clear them when you're done. Stay informed about everything happening in NautilusOS.</p>
+              <p>Never miss important system messages! View all your notifications in one place, track their history, and clear them when you're done. Stay informed about everything happening in Veltra.</p>
           </div>
       </div>
 
@@ -5110,7 +6335,7 @@ alt="favicon">
     </div>
     <div class="carousel-content">
         <h2>Personalization & Wallpapers</h2>
-        <p>Make NautilusOS truly yours! Upload custom wallpapers for both desktop and login screen, set a profile picture to personalize your account, and choose whether to use the same background everywhere or different ones for each screen.</p>
+        <p>Make Veltra truly yours! Upload custom wallpapers for both desktop and login screen, set a profile picture to personalize your account, and choose whether to use the same background everywhere or different ones for each screen.</p>
     </div>
 </div>
 <div class="carousel-slide" data-slide="15">
@@ -5133,7 +6358,7 @@ alt="favicon">
     </div>
     <div class="carousel-content">
         <h2>Advanced Tab Cloaking</h2>
-        <p>Stay under the radar with powerful disguise tools! Auto-rotate through multiple tab disguises, change what blocking extensions see when you're not on Nautilus, prevent remote tab closing, configure panic keys for instant redirects, and more!</p>
+        <p>Stay under the radar with powerful disguise tools! Auto-rotate through multiple tab disguises, change what blocking extensions see when you're not on Veltra, prevent remote tab closing, configure panic keys for instant redirects, and more!</p>
     </div>
 </div>
 
@@ -5152,8 +6377,8 @@ alt="favicon">
         </div>
     </div>
     <div class="carousel-content">
-        <h2>Nautilus AI Assistant</h2>
-        <p>Meet your new intelligent companion! The Nautilus AI Assistant helps you with tasks, answers questions, and makes your NautilusOS experience smarter. Powered by advanced AI technology right in your browser.</p>
+        <h2>Veltra AI Assistant</h2>
+        <p>Meet your new intelligent companion! The Veltra AI Assistant helps you with tasks, answers questions, and makes your Veltra experience smarter. Powered by advanced AI technology right in your browser.</p>
     </div>
 </div>
 
@@ -5173,7 +6398,7 @@ alt="favicon">
     </div>
     <div class="carousel-content">
         <h2>3 Browser Options</h2>
-        <p>Choose your browsing experience! Nautilus Browser for quick access, Helios Browser for a premium experience, and UV for advanced unblocking. Each browser offers unique features tailored to your needs.</p>
+        <p>Choose your browsing experience! Veltra Browser for quick access, Helios Browser for a premium experience, and UV for advanced unblocking. Each browser offers unique features tailored to your needs.</p>
     </div>
 </div>
 
@@ -5295,7 +6520,7 @@ alt="favicon">
                   <div class="whats-new-footer">
                       <div class="footer-card">
                           <h3><i class="fas fa-question-circle"></i> Need Help?</h3>
-                          <p>Check out our comprehensive help guide to learn more about all the features and keyboard shortcuts available in NautilusOS.</p>
+                          <p>Check out our comprehensive help guide to learn more about all the features and keyboard shortcuts available in Veltra.</p>
                           <a href="#" onclick="event.preventDefault(); hideContextMenu(); openApp('help')">
                               Open Help <i class="fas fa-arrow-right"></i>
                           </a>
@@ -5303,8 +6528,8 @@ alt="favicon">
 
                       <div class="footer-card">
                           <h3><i class="fas fa-code"></i> Open Source</h3>
-                          <p>NautilusOS is crafted with care by <strong>dinguschan</strong>. Built with vanilla HTML, CSS, and JavaScript - no frameworks needed!</p>
-                          <a href="https://github.com/dinguschan-owo/NautilusOS" onclick="event.stopPropagation()">
+                          <p>Veltra is crafted with care by <strong>dinguschan</strong>. Built with vanilla HTML, CSS, and JavaScript - no frameworks needed!</p>
+                          <a href="https://github.com/dinguschan-owo/Veltra" onclick="event.stopPropagation()">
                               View on GitHub <i class="fas fa-external-link-alt"></i>
                           </a>
                       </div>
@@ -5315,7 +6540,7 @@ alt="favicon">
       height: 600,
     },
     about: {
-      title: "About NautilusOS",
+      title: "About Veltra",
       icon: "fas fa-info-circle",
       content: `
         <div class="about-app-container" style="padding: 1.75rem 1.25rem 4rem; max-height: 80vh; overflow: auto; display: flex; flex-direction: column; box-sizing: border-box;">
@@ -5323,10 +6548,10 @@ alt="favicon">
             <div style="width: 100px; height: 100px; background: linear-gradient(135deg, var(--accent), var(--accent-hover)); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; animation: float 3s ease-in-out infinite;">
               <i class="fas fa-fish" style="font-size: 3rem; color: var(--bg-primary);"></i>
             </div>
-            <h1 style="font-size: 2rem; margin-bottom: 0; color: var(--text-primary); font-family: fontb; text-align: center; width: 100%;">NautilusOS</h1>
+            <h1 style="font-size: 2rem; margin-bottom: 0; color: var(--text-primary); font-family: fontb; text-align: center; width: 100%;">Veltra</h1>
             <p style="color: var(--text-secondary); font-size: 1rem; margin: 0; text-align: center; width: 100%;">Version 1.5</p>
             <p style="color: var(--text-secondary); font-size: 0.9rem; max-width:700px; margin: 1rem auto 0; line-height:1.6; text-align: center;">
-              A beautiful, fully-featured web-based operating system experience. Built with vanilla HTML, CSS, and JavaScript — no frameworks needed! NautilusOS brings you a complete desktop environment right in your browser, with file management, multiple apps, themes, and more.
+              A beautiful, fully-featured web-based operating system experience. Built with vanilla HTML, CSS, and JavaScript â€” no frameworks needed! Veltra brings you a complete desktop environment right in your browser, with file management, multiple apps, themes, and more.
             </p>
           </div>
 
@@ -5428,7 +6653,7 @@ alt="favicon">
                 <div class="dev-info" id="devinfo-lanefiedler731" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease; background: rgba(21, 25, 35, 0.5);">
                   <div style="padding: 1rem; border-top: 1px solid var(--border);">
                     <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1rem; line-height: 1.6;">
-                      A talented contributor who has helped expand NautilusOS with new features, improvements, and bug fixes. 
+                      A talented contributor who has helped expand Veltra with new features, improvements, and bug fixes. 
                       Passionate about creating great user experiences and pushing the boundaries of web-based applications.
                     </p>
                     <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1rem;">
@@ -5473,7 +6698,7 @@ alt="favicon">
               <i class="fas fa-hands-helping" style="color: var(--accent);"></i> Contributors
             </h2>
             <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1rem;">
-              Special thanks to our contributors who help improve NautilusOS!
+              Special thanks to our contributors who help improve Veltra!
             </p>
 
             <div class="contributors-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
@@ -5529,10 +6754,10 @@ alt="favicon">
 
           <div class="about-footer" style="display: flex; flex-direction: column; align-items: center; text-align: center; padding: 1rem 1rem 0.5rem; border-top: 1px solid var(--border); margin-top: auto; background: transparent;">
             <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.75rem; text-align: center;">
-              Made with <i class="fas fa-heart" style="color: #ef4444;"></i> by the NautilusOS team
+              Made with <i class="fas fa-heart" style="color: #ef4444;"></i> by the Veltra team
             </p>
             <div style="display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap;">
-              <a href="https://github.com/nautilus-os/NautilusOS" target="_blank" style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; background: rgba(125, 211, 192, 0.15); border: 1px solid rgba(125, 211, 192, 0.3); border-radius: 8px; color: var(--text-primary); text-decoration: none; font-size: 0.85rem; transition: all 0.2s ease;"
+              <a href="https://github.com/veltra/Veltra" target="_blank" style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; background: rgba(125, 211, 192, 0.15); border: 1px solid rgba(125, 211, 192, 0.3); border-radius: 8px; color: var(--text-primary); text-decoration: none; font-size: 0.85rem; transition: all 0.2s ease;"
                    onmouseover="this.style.background='rgba(125, 211, 192, 0.25)'" onmouseout="this.style.background='rgba(125, 211, 192, 0.15)'">
                 <i class="fab fa-github"></i> View on GitHub
               </a>
@@ -5559,7 +6784,7 @@ alt="favicon">
                   <div class="calculator-buttons">
                       <button class="calculator-btn clear" onclick="calcClear()">C</button>
                       <button class="calculator-btn operator" onclick="calcInput('/')">/</button>
-                      <button class="calculator-btn operator" onclick="calcInput('*')">×</button>
+                      <button class="calculator-btn operator" onclick="calcInput('*')">Ã—</button>
       <button class="calculator-btn operator" onclick="calcBackspace()"><i class="fas fa-backspace"></i></button>
 
                       <button class="calculator-btn" onclick="calcInput('7')">7</button>
@@ -5614,7 +6839,7 @@ alt="favicon">
                           </div>
                           <textarea class="python-code-editor" id="pythonCodeEditor" placeholder="# Write your Python code here
 # Example:
-print('Hello from NautilusOS!')
+print('Hello from Veltra!')
 
 # Basic operations
 x = 10
@@ -5658,7 +6883,7 @@ print(f'Sum: {sum(numbers)}')
             <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 3rem; background: rgba(10, 14, 26, 0.8);">
               <i class="fas fa-exclamation-triangle" style="font-size: 5rem; color: var(--error-red); margin-bottom: 2rem;"></i>
               <h2 style="margin-bottom: 1rem; color: var(--text-primary);">Ultraviolet Unavailable</h2>
-              <p style="color: var(--text-secondary); text-align: center; max-width: 400px;">Ultraviolet doesn't work on file:// protocol. Please run NautilusOS from a web server to use this feature.</p>
+              <p style="color: var(--text-secondary); text-align: center; max-width: 400px;">Ultraviolet doesn't work on file:// protocol. Please run Veltra from a web server to use this feature.</p>
             </div>
           `;
         }
@@ -5681,7 +6906,7 @@ print(f'Sum: {sum(numbers)}')
             <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 3rem; background: rgba(10, 14, 26, 0.8);">
               <i class="fas fa-exclamation-triangle" style="font-size: 5rem; color: var(--error-red); margin-bottom: 2rem;"></i>
               <h2 style="margin-bottom: 1rem; color: var(--text-primary);">VS Code Unavailable</h2>
-              <p style="color: var(--text-secondary); text-align: center; max-width: 400px;">Visual Studio Code doesn't work on file:// protocol. Please run NautilusOS from a web server to use this feature.</p>
+              <p style="color: var(--text-secondary); text-align: center; max-width: 400px;">Visual Studio Code doesn't work on file:// protocol. Please run Veltra from a web server to use this feature.</p>
             </div>
           `;
         }
@@ -5732,7 +6957,7 @@ print(f'Sum: {sum(numbers)}')
             <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 3rem; background: rgba(10, 14, 26, 0.8);">
               <i class="fas fa-exclamation-triangle" style="font-size: 5rem; color: var(--error-red); margin-bottom: 2rem;"></i>
               <h2 style="margin-bottom: 1rem; color: var(--text-primary);">Helios Unavailable</h2>
-              <p style="color: var(--text-secondary); text-align: center; max-width: 400px;">Helios Browser doesn't work on file:// protocol. Please run NautilusOS from a web server to use this feature.</p>
+              <p style="color: var(--text-secondary); text-align: center; max-width: 400px;">Helios Browser doesn't work on file:// protocol. Please run Veltra from a web server to use this feature.</p>
             </div>
           `;
         }
@@ -5766,6 +6991,10 @@ print(f'Sum: {sum(numbers)}')
             <i class="fas fa-gamepad"></i>
             <span>Games</span>
         </div>
+        <div class="appstore-section" onclick="switchAppStoreSection('gemtra', this)">
+            <i class="fas fa-globe"></i>
+            <span>Gemtra</span>
+        </div>
         <div class="appstore-section" onclick="switchAppStoreSection('community', this)">
             <i class="fas fa-users"></i>
             <span>Community</span>
@@ -5774,7 +7003,7 @@ print(f'Sum: {sum(numbers)}')
     <div class="appstore-main" id="appstoreMain">
         <div class="appstore-header">
             <h2>Themes</h2>
-            <p>Customize your NautilusOS experience</p>
+            <p>Customize your Veltra experience</p>
         </div>
         <div class="appstore-grid">
             <div class="appstore-item">
@@ -5782,7 +7011,7 @@ print(f'Sum: {sum(numbers)}')
                     <i class="fas fa-moon"></i>
                 </div>
                 <div class="appstore-item-name">Dark Theme by dinguschan</div>
-                <div class="appstore-item-desc">The default NautilusOS theme. Sleek dark interface with teal accents,
+                <div class="appstore-item-desc">The default Veltra theme. Sleek dark interface with teal accents,
                     perfect for extended use and reducing eye strain.</div>
                 <button class="appstore-item-btn installed" style="opacity: 0.6; cursor: not-allowed;" disabled>
                     Installed (Default)
@@ -6093,22 +7322,22 @@ print(f'Sum: {sum(numbers)}')
       width: 850,
       height: 600,
     },
-    "nautilus-ai": {
-      title: "Nautilus AI Assistant",
+    "veltra-ai": {
+      title: "Veltra AI Assistant",
       icon: "fas fa-robot",
       content: `
-        <div id="nautilusAiContainer" style="display: flex; flex-direction: column; height: 100%; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);">
+        <div id="veltraAIContainer" style="display: flex; flex-direction: column; height: 100%; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);">
           <div style="background: rgba(15, 23, 42, 0.9); border-bottom: 2px solid rgba(125, 211, 192, 0.3); padding: 15px 20px;">
             <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
               <i class="fas fa-robot" style="color: var(--accent); font-size: 24px;"></i>
               <div>
-                <h2 style="color: var(--accent); margin: 0; font-size: 18px;">Nautilus AI Assistant</h2>
-                <div style="color: #94a3b8; font-size: 11px; margin-top: 2px;">by lanefiedler-731 | Powered by WebLLM</div>
+                <h2 style="color: var(--accent); margin: 0; font-size: 18px;">Veltra AI Assistant</h2>
+                <div style="color: #94a3b8; font-size: 11px; margin-top: 2px;">Powered by Cerebras Cloud AI</div>
               </div>
             </div>
-            <div id="aiStatus" style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #64748b;">
-              <div class="loading-spinner" style="width: 12px; height: 12px; border: 2px solid rgba(125, 211, 192, 0.3); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite;"></div>
-              <span>Initializing AI model...</span>
+            <div id="aiStatus" style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--accent);">
+              <i class="fas fa-check-circle"></i>
+              <span>Ready - Using cloud AI models</span>
             </div>
           </div>
           
@@ -6116,25 +7345,14 @@ print(f'Sum: {sum(numbers)}')
             <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; font-size: 11px; color: #64748b;">
               <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
                 <div style="display: flex; align-items: center; gap: 8px;">
-                  <i class="fas fa-robot" style="color: var(--accent);"></i>
-                  <span>Model:</span>
-                  <select id="aiModelSelect" onchange="switchAIModel(this.value)" style="background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(125, 211, 192, 0.3); border-radius: 4px; padding: 4px 8px; color: var(--accent); cursor: pointer; font-size: 11px;">
-                    <option value="fast" selected><i class="fas fa-bolt"></i> Dumb Fast</option>
-                    <option value="smart"><i class="fa-solid fa-brain"></i> Smart Slow</option>
-                  </select>
-                </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <i class="fas fa-microchip" style="color: var(--accent);"></i>
-                  <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                    <input type="checkbox" id="aiWebGPUToggle" checked style="cursor: pointer;">
-                    <span>WebGPU</span>
-                  </label>
+                  <i class="fas fa-cloud" style="color: var(--accent);"></i>
+                  <span id="aiModelDisplay">Model: Auto-select (Qwen 235B)</span>
                 </div>
               </div>
               <div style="display: flex; align-items: center; gap: 8px;">
                 <i class="fas fa-cogs" style="color: var(--accent);"></i>
                 <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                  <input type="checkbox" id="aiAutomationToggle" checked style="cursor: pointer;" onchange="nautilusAI.toolsEnabled = this.checked; showToast(this.checked ? 'OS Automation Enabled' : 'OS Automation Disabled', 'fa-cogs');">
+                  <input type="checkbox" id="aiAutomationToggle" checked style="cursor: pointer;" onchange="veltraAI.toolsEnabled = this.checked; showToast(this.checked ? 'OS Automation Enabled' : 'OS Automation Disabled', 'fa-cogs');">
                   <span style="color: var(--accent); font-weight: bold;"> Automation</span>
                 </label>
               </div>
@@ -6145,57 +7363,34 @@ print(f'Sum: {sum(numbers)}')
             <div style="background: rgba(125, 211, 192, 0.1); border: 1px solid rgba(125, 211, 192, 0.3); border-radius: 10px; padding: 15px;">
               <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                 <i class="fas fa-robot" style="color: var(--accent); font-size: 18px;"></i>
-                <strong style="color: var(--accent);">Nautilus AI</strong>
+                <strong style="color: var(--accent);">Veltra AI</strong>
               </div>
               <div style="color: #cbd5e1; line-height: 1.6;">
-                Hello! I'm your Nautilus AI Assistant. I can help you understand and navigate NautilusOS.<br><br>
-                <strong style="color: var(--accent);"><i class="fas fa-brain"></i> Model: Smarty (Qwen3-0.6B)</strong><br>
-                Advanced reasoning with thinking mode enabled. Switch models in the dropdown if needed.<br><br>
+                Hello! I'm your Veltra AI Assistant powered by <strong style="color: var(--accent);">Cerebras Cloud AI</strong>.<br><br>
+                <strong style="color: var(--accent);"><i class="fas fa-bolt"></i> Lightning Fast</strong><br>
+                Using cloud-based models with automatic fallback: Qwen 235B -> GPT-OSS 120B -> Llama 3.3 70B -> more...<br><br>
                 <strong style="color: var(--accent);"><i class="fa-solid fa-robot"></i> OS Automation Enabled!</strong><br>
-                I can control NautilusOS for you! I can open apps, run terminal commands, manage files, change settings, and more. Just ask me to do something and I'll request your approval before taking action.<br><br>
-                <strong style="color: var(--accent);"><i class="fa-solid fa-cloud"></i> Thinking Mode Active!</strong><br>
-                For complex tasks, I'll show my reasoning process in a collapsible "Thinking" section.<br><br>
-                Try: "Open calculator" or "Change theme to blue"
+                I can control Veltra for you! Open apps, run terminal commands, manage files, change settings, and more.<br><br>
+                Try: "Open calculator" or "Change theme to blue" or "Tell me a joke"
               </div>
             </div>
           </div>
           
           <div style="background: rgba(15, 23, 42, 0.9); border-top: 2px solid rgba(125, 211, 192, 0.3); padding: 15px 20px;">
             <div style="display: flex; gap: 10px;">
-              <textarea id="aiInput" placeholder="Ask me anything about NautilusOS..." style="flex: 1; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(125, 211, 192, 0.3); border-radius: 8px; padding: 12px; color: #e2e8f0; font-size: 14px; resize: none; font-family: inherit; min-height: 25px; max-height: 150px;" rows="1"></textarea>
-              <button
-  id="aiSendBtn"
-  onclick="sendAiMessage()"
-  style="
-    background: var(--accent);
-    border: none;
-    border-radius: 8px;
-    padding: 0 20px;
-    height: 45px;              
-    display: inline-flex;      
-    align-items: center;       
-    gap: 6px;                  
-    cursor: pointer;
-    color: #0f172a;
-    font-weight: bold;
-    font-size: 14px;
-    transition: background-color 0.2s; 
-  "
-  onmouseover="this.style.background='var(--accent-hover)'"
-  onmouseout="this.style.background='var(--accent)'"
->
-  <i class="fas fa-paper-plane"></i> Send
-</button>
-
+              <textarea id="aiInput" placeholder="Ask me anything..." style="flex: 1; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(125, 211, 192, 0.3); border-radius: 8px; padding: 12px; color: #e2e8f0; font-size: 14px; resize: none; font-family: inherit; min-height: 25px; max-height: 150px;" rows="1"></textarea>
+              <button id="aiSendBtn" onclick="sendAiMessage()" style="background: var(--accent); border: none; border-radius: 8px; padding: 0 20px; height: 45px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: #0f172a; font-weight: bold; font-size: 14px; transition: background-color 0.2s;" onmouseover="this.style.background='var(--accent-hover)'" onmouseout="this.style.background='var(--accent)'">
+                <i class="fas fa-paper-plane"></i> Send
+              </button>
             </div>
             <div style="display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap;">
-              <button onclick="sendQuickQuestion('What apps are available in NautilusOS?')" style="background: rgba(125, 211, 192, 0.15); border: 1px solid rgba(125, 211, 192, 0.3); color: var(--accent); padding: 6px 12px; border-radius: 6px; font-size: 11px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(125, 211, 192, 0.25)'" onmouseout="this.style.background='rgba(125, 211, 192, 0.15)'">
+              <button onclick="sendQuickQuestion('What apps are available in Veltra?')" style="background: rgba(125, 211, 192, 0.15); border: 1px solid rgba(125, 211, 192, 0.3); color: var(--accent); padding: 6px 12px; border-radius: 6px; font-size: 11px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(125, 211, 192, 0.25)'" onmouseout="this.style.background='rgba(125, 211, 192, 0.15)'">
                 <i class="fas fa-th"></i> Available Apps
               </button>
-              <button onclick="sendQuickQuestion('How do I manage files in NautilusOS?')" style="background: rgba(125, 211, 192, 0.15); border: 1px solid rgba(125, 211, 192, 0.3); color: var(--accent); padding: 6px 12px; border-radius: 6px; font-size: 11px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(125, 211, 192, 0.25)'" onmouseout="this.style.background='rgba(125, 211, 192, 0.15)'">
-                <i class="fas fa-folder"></i> File Management
+              <button onclick="sendQuickQuestion('Tell me a joke')" style="background: rgba(125, 211, 192, 0.15); border: 1px solid rgba(125, 211, 192, 0.3); color: var(--accent); padding: 6px 12px; border-radius: 6px; font-size: 11px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(125, 211, 192, 0.25)'" onmouseout="this.style.background='rgba(125, 211, 192, 0.15)'">
+                <i class="fas fa-laugh"></i> Tell a Joke
               </button>
-              <button onclick="sendQuickQuestion('How do I customize my NautilusOS experience?')" style="background: rgba(125, 211, 192, 0.15); border: 1px solid rgba(125, 211, 192, 0.3); color: var(--accent); padding: 6px 12px; border-radius: 6px; font-size: 11px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(125, 211, 192, 0.25)'" onmouseout="this.style.background='rgba(125, 211, 192, 0.15)'">
+              <button onclick="sendQuickQuestion('How do I customize my Veltra experience?')" style="background: rgba(125, 211, 192, 0.15); border: 1px solid rgba(125, 211, 192, 0.3); color: var(--accent); padding: 6px 12px; border-radius: 6px; font-size: 11px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(125, 211, 192, 0.25)'" onmouseout="this.style.background='rgba(125, 211, 192, 0.15)'">
                 <i class="fas fa-palette"></i> Customization
               </button>
               <button onclick="clearAiChat()" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; padding: 6px 12px; border-radius: 6px; font-size: 11px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(239, 68, 68, 0.25)'" onmouseout="this.style.background='rgba(239, 68, 68, 0.15)'">
@@ -6352,7 +7547,7 @@ print(f'Sum: {sum(numbers)}')
     if (appName === "browser") {
       setTimeout(() => {
         showToast(
-          "Nautilus Browser not good enough? Check out Helios Browser and UV on the App Store!",
+          "Veltra Browser not good enough? Check out Helios Browser and UV on the App Store!",
           "fa-info-circle"
         );
       }, 500);
@@ -6396,9 +7591,9 @@ print(f'Sum: {sum(numbers)}')
       }, 50);
     }
 
-    if (appName === "nautilus-ai") {
+    if (appName === "veltra-ai") {
       setTimeout(() => {
-        initializeNautilusAI();
+        initializeveltraAI();
       }, 50);
     }
 
@@ -6415,99 +7610,274 @@ function handleTerminalInput(e) {
     const input = e.target;
     const command = input.value.trim();
     const terminal = document.getElementById("terminalContent");
+    const prompt = `${currentUsername}@Veltra:${getTerminalPath()}$`;
 
     const cmdLine = document.createElement("div");
     cmdLine.className = "terminal-line";
-    cmdLine.innerHTML = `<span class="terminal-prompt">user@nautilusos:~$ </span>${command}`;
+    cmdLine.innerHTML = `<span class="terminal-prompt">${prompt} </span>${escapeHtml(command)}`;
     terminal.insertBefore(cmdLine, terminal.lastElementChild);
 
     const output = document.createElement("div");
     output.className = "terminal-line";
 
-    if (command === "help") {
+    // Parse command and arguments
+    const args = command.match(/(?:[^\s"]+|"[^"]*")+/g) || [];
+    const cmd = args[0]?.toLowerCase();
+    const cmdArgs = args.slice(1).map(a => a.replace(/^"|"$/g, ''));
+
+    if (cmd === "help") {
       output.innerHTML =
-        "Available commands:<br>" +
-        "help - Show this list<br>" +
-        "ls - List files in file system<br>" +
-        "apps - List installed applications<br>" +
-        "themes - List installed themes<br>" +
-        "clear - Clear terminal<br>" +
-        "date - Show current date and time<br>" +
-        "whoami - Display current username<br>" +
-        "reset-boot - Reset bootloader preferences<br>" +
-        "refresh-cache - Purge jsDelivr cache for community apps<br>" +
-        "echo [text] - Display text";
-    } else if (command === "ls") {
-      const tree = ".\n" + generateFileTree(fileSystem);
-      output.innerHTML =
-        '<pre style="margin: 0; font-family: inherit;">' + tree + "</pre>";
-    } else if (command === "apps") {
+        '<span style="color: var(--accent);">Veltra Terminal - Available Commands:</span><br><br>' +
+        '<span style="color: #60a5fa;">Navigation:</span><br>' +
+        '  cd [dir]      - Change directory<br>' +
+        '  pwd           - Print working directory<br>' +
+        '  ls [dir]      - List directory contents<br><br>' +
+        '<span style="color: #60a5fa;">File Operations:</span><br>' +
+        '  cat [file]    - Display file contents<br>' +
+        '  mkdir [name]  - Create directory<br>' +
+        '  touch [name]  - Create empty file<br>' +
+        '  rm [name]     - Remove file or empty folder<br><br>' +
+        '<span style="color: #60a5fa;">System Info:</span><br>' +
+        '  neofetch      - Display system information<br>' +
+        '  whoami        - Display current username<br>' +
+        '  hostname      - Display hostname<br>' +
+        '  uptime        - Show system uptime<br>' +
+        '  date          - Show current date and time<br><br>' +
+        '<span style="color: #60a5fa;">Applications:</span><br>' +
+        '  apps          - List installed applications<br>' +
+        '  themes        - List installed themes<br>' +
+        '  open [app]    - Open an application<br><br>' +
+        '<span style="color: #60a5fa;">Other:</span><br>' +
+        '  echo [text]   - Display text<br>' +
+        '  clear         - Clear terminal<br>' +
+        '  reset-boot    - Reset bootloader preferences<br>' +
+        '  refresh-cache - Purge jsDelivr cache<br>' +
+        '  history       - Show command history<br>' +
+        '  exit          - Close terminal';
+    } else if (cmd === "cd") {
+      if (!cmdArgs[0] || cmdArgs[0] === '~') {
+        terminalCwd = [];
+        output.innerHTML = '';
+      } else {
+        const newPath = resolvePath(cmdArgs[0]);
+        const node = getFSNode(newPath);
+        if (node === null) {
+          output.innerHTML = `<span style="color: #ef4444;">cd: no such directory: ${cmdArgs[0]}</span>`;
+        } else if (typeof node !== 'object') {
+          output.innerHTML = `<span style="color: #ef4444;">cd: not a directory: ${cmdArgs[0]}</span>`;
+        } else {
+          terminalCwd = newPath;
+          output.innerHTML = '';
+        }
+      }
+    } else if (cmd === "pwd") {
+      output.textContent = '/' + terminalCwd.join('/') || '/';
+    } else if (cmd === "ls") {
+      let targetPath = terminalCwd;
+      if (cmdArgs[0]) {
+        targetPath = resolvePath(cmdArgs[0]);
+      }
+      const node = getFSNode(targetPath);
+      if (node === null) {
+        output.innerHTML = `<span style="color: #ef4444;">ls: cannot access '${cmdArgs[0] || '.'}': No such file or directory</span>`;
+      } else if (typeof node !== 'object') {
+        output.textContent = cmdArgs[0];
+      } else {
+        const entries = Object.keys(node);
+        if (entries.length === 0) {
+          output.innerHTML = '<span style="color: #888;">(empty directory)</span>';
+        } else {
+          const formatted = entries.map(e => {
+            const isDir = typeof node[e] === 'object';
+            return isDir 
+              ? `<span style="color: #3b82f6;"><i class="fas fa-folder"></i> ${e}/</span>` 
+              : `<i class="fas fa-file-alt"></i> ${e}`;
+          }).join('  ');
+          output.innerHTML = formatted;
+        }
+      }
+    } else if (cmd === "cat") {
+      if (!cmdArgs[0]) {
+        output.innerHTML = '<span style="color: #ef4444;">cat: missing file operand</span>';
+      } else {
+        const filePath = resolvePath(cmdArgs[0]);
+        const node = getFSNode(filePath);
+        if (node === null) {
+          output.innerHTML = `<span style="color: #ef4444;">cat: ${cmdArgs[0]}: No such file or directory</span>`;
+        } else if (typeof node === 'object') {
+          output.innerHTML = `<span style="color: #ef4444;">cat: ${cmdArgs[0]}: Is a directory</span>`;
+        } else {
+          output.innerHTML = '<pre style="margin: 0; font-family: inherit; white-space: pre-wrap;">' + escapeHtml(node) + '</pre>';
+        }
+      }
+    } else if (cmd === "mkdir") {
+      if (!cmdArgs[0]) {
+        output.innerHTML = '<span style="color: #ef4444;">mkdir: missing operand</span>';
+      } else {
+        const newPath = resolvePath(cmdArgs[0]);
+        const parentPath = newPath.slice(0, -1);
+        const dirName = newPath[newPath.length - 1];
+        const parent = newPath.length === 1 ? fileSystem : getFSNode(parentPath);
+        
+        if (parent === null || typeof parent !== 'object') {
+          output.innerHTML = `<span style="color: #ef4444;">mkdir: cannot create directory '${cmdArgs[0]}': No such file or directory</span>`;
+        } else if (dirName in parent) {
+          output.innerHTML = `<span style="color: #ef4444;">mkdir: cannot create directory '${cmdArgs[0]}': File exists</span>`;
+        } else {
+          parent[dirName] = {};
+          saveFS(fileSystem);
+          output.innerHTML = `<span style="color: #4ade80;">âœ“ Created directory: ${dirName}</span>`;
+        }
+      }
+    } else if (cmd === "touch") {
+      if (!cmdArgs[0]) {
+        output.innerHTML = '<span style="color: #ef4444;">touch: missing file operand</span>';
+      } else {
+        const newPath = resolvePath(cmdArgs[0]);
+        const parentPath = newPath.slice(0, -1);
+        const fileName = newPath[newPath.length - 1];
+        const parent = newPath.length === 1 ? fileSystem : getFSNode(parentPath);
+        
+        if (parent === null || typeof parent !== 'object') {
+          output.innerHTML = `<span style="color: #ef4444;">touch: cannot create '${cmdArgs[0]}': No such file or directory</span>`;
+        } else if (fileName in parent && typeof parent[fileName] === 'object') {
+          output.innerHTML = `<span style="color: #ef4444;">touch: cannot overwrite directory '${cmdArgs[0]}'</span>`;
+        } else {
+          parent[fileName] = parent[fileName] || '';
+          saveFS(fileSystem);
+          output.innerHTML = `<span style="color: #4ade80;">âœ“ Created file: ${fileName}</span>`;
+        }
+      }
+    } else if (cmd === "rm") {
+      if (!cmdArgs[0]) {
+        output.innerHTML = '<span style="color: #ef4444;">rm: missing operand</span>';
+      } else {
+        const targetPath = resolvePath(cmdArgs[0]);
+        const node = getFSNode(targetPath);
+        
+        if (node === null) {
+          output.innerHTML = `<span style="color: #ef4444;">rm: cannot remove '${cmdArgs[0]}': No such file or directory</span>`;
+        } else if (typeof node === 'object' && Object.keys(node).length > 0) {
+          output.innerHTML = `<span style="color: #ef4444;">rm: cannot remove '${cmdArgs[0]}': Directory not empty (use rm -r)</span>`;
+        } else {
+          deleteFSNode(targetPath);
+          output.innerHTML = `<span style="color: #4ade80;">âœ“ Removed: ${cmdArgs[0]}</span>`;
+        }
+      }
+    } else if (cmd === "neofetch") {
+      output.innerHTML = '<pre style="margin: 0; font-family: monospace; line-height: 1.4;">' + generateNeofetch() + '</pre>';
+    } else if (cmd === "hostname") {
+      output.textContent = 'Veltra';
+    } else if (cmd === "uptime") {
+      output.innerHTML = `<span style="color: var(--accent);">System uptime:</span> ${formatUptime()}`;
+    } else if (cmd === "apps") {
       const appList = [
-        "Files - File manager and explorer",
-        "Terminal - Command line interface",
-        "Browser - Web browser",
-        "Settings - System settings",
-        "Text Editor - Edit text files",
-        "Music - Music player",
-        "Photos - Photo viewer",
-        "Help - System help and documentation",
-        "What's New - View latest features",
-        "App Store - Browse and install apps/themes",
+        "files       - File manager and explorer",
+        "terminal    - Command line interface",
+        "browser     - Web browser",
+        "settings    - System settings",
+        "texteditor  - Edit text files",
+        "music       - Music player",
+        "photos      - Photo viewer",
+        "help        - System help and documentation",
+        "whatsnew    - View latest features",
+        "appstore    - Browse and install apps/themes",
+        "snake       - Classic snake game",
+        "2048        - 2048 puzzle game",
+        "tictactoe   - Tic Tac Toe game",
+        "ai-snake    - AI Snake Learning",
       ];
       output.innerHTML =
         '<span style="color: var(--accent);">Installed Applications:</span><br>' +
-        appList.map((app) => `  • ${app}`).join("<br>");
-    } else if (command === "themes") {
-      const themeList = ["Dark Theme (Default)"];
+        '<span style="color: #888;">Use "open [appname]" to launch</span><br><br>' +
+        appList.map((app) => `  <span style="color: #60a5fa;">${app.split(' - ')[0].padEnd(12)}</span>${app.split(' - ')[1]}`).join("<br>");
+    } else if (cmd === "open") {
+      if (!cmdArgs[0]) {
+        output.innerHTML = '<span style="color: #ef4444;">open: missing application name</span>';
+      } else {
+        const appName = cmdArgs[0].toLowerCase().replace(/\s+/g, '');
+        const appMap = {
+          'files': 'files', 'terminal': 'terminal', 'browser': 'browser',
+          'settings': 'settings', 'texteditor': 'texteditor', 'music': 'music',
+          'photos': 'photos', 'help': 'help', 'whatsnew': 'whatsnew',
+          'appstore': 'appstore', 'snake': 'snake', '2048': '2048',
+          'tictactoe': 'tictactoe', 'ai-snake': 'ai-snake', 'aisnake': 'ai-snake',
+          'calculator': 'calculator', 'veltra-ai': 'veltra-ai', 'veltraAI': 'veltra-ai',
+        };
+        if (appMap[appName]) {
+          openApp(appMap[appName]);
+          output.innerHTML = `<span style="color: #4ade80;">âœ“ Opening ${appName}...</span>`;
+        } else {
+          output.innerHTML = `<span style="color: #ef4444;">open: application '${cmdArgs[0]}' not found</span>`;
+        }
+      }
+    } else if (cmd === "themes") {
+      const themeList = ["dark (default)"];
       if (installedThemes.length > 0) {
         installedThemes.forEach((theme) => {
-          themeList.push(
-            `${theme.charAt(0).toUpperCase() + theme.slice(1)} Theme`
-          );
+          themeList.push(theme);
         });
       }
       output.innerHTML =
         '<span style="color: var(--accent);">Installed Themes:</span><br>' +
-        themeList.map((theme) => `  • ${theme}`).join("<br>");
-    } else if (command === "whoami") {
+        themeList.map((theme) => `  â€¢ ${theme}`).join("<br>");
+    } else if (cmd === "whoami") {
       output.textContent = currentUsername;
-    } else if (command === "reset-boot") {
-      localStorage.removeItem("nautilusOS_bootChoice");
+    } else if (cmd === "reset-boot") {
+      localStorage.removeItem("Veltra_bootChoice");
       output.innerHTML =
-        '<span style="color: #4ade80;">✓ Bootloader preferences reset successfully</span><br>' +
+        '<span style="color: #4ade80;">âœ“ Bootloader preferences reset successfully</span><br>' +
         "The bootloader menu will appear on next page reload.";
-    } else if (command === "refresh-cache") {
+    } else if (cmd === "refresh-cache") {
       output.innerHTML = "Submitting purge request to jsDelivr...<br>";
-
-      // Asynchronously purge key files
       fetch('https://purge.jsdelivr.net/gh/nautilus-os/community@main/files/info.json').catch(e => { });
       fetch('https://purge.jsdelivr.net/gh/nautilus-os/community@main/apps').catch(e => { });
-
-      // We can't actually verify purge easily from client without CORS issues sometimes?
-      // But the request fires.
-      output.innerHTML += '<span style="color: #4ade80;">✓ Purge request sent.</span><br>' +
+      output.innerHTML += '<span style="color: #4ade80;">âœ“ Purge request sent.</span><br>' +
         "Please wait a few moments and try reloading the store.";
-    } else if (command === "clear") {
+    } else if (cmd === "clear") {
       terminal.innerHTML = `
-                      <div class="terminal-line" style="color: var(--accent);">NautilusOS Terminal v1.5</div>
+                      <div class="terminal-line" style="color: var(--accent);">Veltra Terminal v2.0</div>
                       <div class="terminal-line" style="color: #888; margin-bottom: 1rem;">Type 'help' for available commands</div>
                   `;
-    } else if (command === "date") {
+      terminalCwd = []; // Reset to home
+    } else if (cmd === "date") {
       output.textContent = new Date().toString();
-    } else if (command.startsWith("echo ")) {
-      output.textContent = command.substring(5);
+    } else if (cmd === "echo") {
+      output.textContent = cmdArgs.join(' ');
+    } else if (cmd === "history") {
+      const history = JSON.parse(localStorage.getItem('Veltra_terminalHistory') || '[]');
+      if (history.length === 0) {
+        output.innerHTML = '<span style="color: #888;">No command history</span>';
+      } else {
+        output.innerHTML = history.slice(-20).map((h, i) => `  ${(i + 1).toString().padStart(3)}  ${h}`).join('<br>');
+      }
+    } else if (cmd === "exit") {
+      const terminalWindow = terminal.closest('.window');
+      if (terminalWindow) {
+        closeWindow(terminalWindow);
+      }
+      return;
     } else if (command) {
-      output.innerHTML = `<span style="color: #ef4444;">Command not found: ${command}</span><br>Type 'help' for available commands.`;
+      output.innerHTML = `<span style="color: #ef4444;">Command not found: ${cmd}</span><br>Type 'help' for available commands.`;
     }
 
-    if (command !== "clear" && command) {
+    // Save command to history
+    if (command) {
+      const history = JSON.parse(localStorage.getItem('Veltra_terminalHistory') || '[]');
+      history.push(command);
+      if (history.length > 100) history.shift();
+      localStorage.setItem('Veltra_terminalHistory', JSON.stringify(history));
+    }
+
+    if (cmd !== "clear" && command) {
       terminal.insertBefore(output, terminal.lastElementChild);
     }
 
+    const newPrompt = `${currentUsername}@Veltra:${getTerminalPath()}$`;
     const newInputLine = document.createElement("div");
     newInputLine.className = "terminal-line";
     newInputLine.innerHTML =
-      '<span class="terminal-prompt">user@nautilusos:~$ </span><input type="text" class="terminal-input" id="terminalInput" onkeypress="handleTerminalInput(event)">';
+      `<span class="terminal-prompt">${newPrompt} </span><input type="text" class="terminal-input" id="terminalInput" onkeypress="handleTerminalInput(event)">`;
 
     terminal.removeChild(terminal.lastElementChild);
     terminal.appendChild(newInputLine);
@@ -6515,15 +7885,16 @@ function handleTerminalInput(e) {
     const newInput = document.getElementById("terminalInput");
     if (newInput) newInput.focus();
 
+    input.value = "";
     terminal.scrollTop = terminal.scrollHeight;
   }
 }
 
 function toggleSetting(setting) {
   if (setting === "showWhatsNew") {
-    const currentValue = localStorage.getItem("nautilusOS_showWhatsNew");
+    const currentValue = localStorage.getItem("Veltra_showWhatsNew");
     const newValue = currentValue === "false" ? "true" : "false";
-    localStorage.setItem("nautilusOS_showWhatsNew", newValue);
+    localStorage.setItem("Veltra_showWhatsNew", newValue);
 
     const toggles = document.querySelectorAll(".toggle-switch");
     toggles.forEach((toggle) => {
@@ -6635,9 +8006,9 @@ function applyUserBackgrounds() {
   const desktop = document.getElementById("desktop");
   const login = document.getElementById("login");
   const wallpaperLayer = document.querySelector(".wallpaper");
-  const wallpaperData = localStorage.getItem("nautilusOS_wallpaper");
-  const loginBackgroundData = localStorage.getItem("nautilusOS_loginBackground");
-  const sameSetting = localStorage.getItem("nautilusOS_useSameBackground");
+  const wallpaperData = localStorage.getItem("Veltra_wallpaper");
+  const loginBackgroundData = localStorage.getItem("Veltra_loginBackground");
+  const sameSetting = localStorage.getItem("Veltra_useSameBackground");
   const useSame = sameSetting === null || sameSetting === "true";
   const loginData = useSame ? wallpaperData : loginBackgroundData;
 
@@ -6665,16 +8036,16 @@ function applyUserBackgrounds() {
 }
 
 function initializeAppearanceSettings() {
-  const sameSetting = localStorage.getItem("nautilusOS_useSameBackground");
+  const sameSetting = localStorage.getItem("Veltra_useSameBackground");
   const useSame = sameSetting === null || sameSetting === "true";
   const toggle = document.getElementById("loginWallpaperToggle");
   const controls = document.getElementById("loginWallpaperControls");
   const desktopButton = document.getElementById("desktopWallpaperButton");
   const loginButton = document.getElementById("loginWallpaperButton");
   const profileButton = document.getElementById("profilePictureButton");
-  const hasWallpaper = !!localStorage.getItem("nautilusOS_wallpaper");
-  const hasLoginWallpaper = !!localStorage.getItem("nautilusOS_loginBackground");
-  const hasProfile = !!localStorage.getItem("nautilusOS_profilePicture");
+  const hasWallpaper = !!localStorage.getItem("Veltra_wallpaper");
+  const hasLoginWallpaper = !!localStorage.getItem("Veltra_loginBackground");
+  const hasProfile = !!localStorage.getItem("Veltra_profilePicture");
 
   if (toggle) {
     if (useSame) {
@@ -6763,7 +8134,7 @@ function selectDesktopIconSize(name, size) {
 function handleWallpaperUpload(event) {
   const file = event.target.files[0];
   if (!readImageFile(file, (data) => {
-    localStorage.setItem("nautilusOS_wallpaper", data);
+    localStorage.setItem("Veltra_wallpaper", data);
     applyUserBackgrounds();
     initializeAppearanceSettings();
     showToast("Desktop wallpaper updated!", "fa-check-circle");
@@ -6774,11 +8145,11 @@ function handleWallpaperUpload(event) {
 }
 
 function clearWallpaper() {
-  if (!localStorage.getItem("nautilusOS_wallpaper")) {
+  if (!localStorage.getItem("Veltra_wallpaper")) {
     showToast("No desktop wallpaper is set.", "fa-info-circle");
     return;
   }
-  localStorage.removeItem("nautilusOS_wallpaper");
+  localStorage.removeItem("Veltra_wallpaper");
   applyUserBackgrounds();
   initializeAppearanceSettings();
   const input = document.getElementById("wallpaperInput");
@@ -6787,10 +8158,10 @@ function clearWallpaper() {
 }
 
 function toggleLoginWallpaperLink(element) {
-  const sameSetting = localStorage.getItem("nautilusOS_useSameBackground");
+  const sameSetting = localStorage.getItem("Veltra_useSameBackground");
   const useSame = sameSetting === null || sameSetting === "true";
   const newValue = !useSame;
-  localStorage.setItem("nautilusOS_useSameBackground", newValue ? "true" : "false");
+  localStorage.setItem("Veltra_useSameBackground", newValue ? "true" : "false");
   if (element) {
     if (newValue) {
       element.classList.add("active");
@@ -6809,7 +8180,7 @@ function toggleLoginWallpaperLink(element) {
 function handleLoginBackgroundUpload(event) {
   const file = event.target.files[0];
   if (!readImageFile(file, (data) => {
-    localStorage.setItem("nautilusOS_loginBackground", data);
+    localStorage.setItem("Veltra_loginBackground", data);
     applyUserBackgrounds();
     initializeAppearanceSettings();
     showToast("Login wallpaper updated!", "fa-check-circle");
@@ -6820,11 +8191,11 @@ function handleLoginBackgroundUpload(event) {
 }
 
 function clearLoginWallpaper() {
-  if (!localStorage.getItem("nautilusOS_loginBackground")) {
+  if (!localStorage.getItem("Veltra_loginBackground")) {
     showToast("No login wallpaper is set.", "fa-info-circle");
     return;
   }
-  localStorage.removeItem("nautilusOS_loginBackground");
+  localStorage.removeItem("Veltra_loginBackground");
   applyUserBackgrounds();
   initializeAppearanceSettings();
   const input = document.getElementById("loginWallpaperInput");
@@ -6835,7 +8206,7 @@ function clearLoginWallpaper() {
 function handleProfilePictureUpload(event) {
   const file = event.target.files[0];
   if (!readImageFile(file, (data) => {
-    localStorage.setItem("nautilusOS_profilePicture", data);
+    localStorage.setItem("Veltra_profilePicture", data);
     applyProfilePicture();
     initializeAppearanceSettings();
     showToast("Profile picture updated!", "fa-check-circle");
@@ -6846,11 +8217,11 @@ function handleProfilePictureUpload(event) {
 }
 
 function clearProfilePicture() {
-  if (!localStorage.getItem("nautilusOS_profilePicture")) {
+  if (!localStorage.getItem("Veltra_profilePicture")) {
     showToast("No profile picture is set.", "fa-info-circle");
     return;
   }
-  localStorage.removeItem("nautilusOS_profilePicture");
+  localStorage.removeItem("Veltra_profilePicture");
   applyProfilePicture();
   initializeAppearanceSettings();
   const input = document.getElementById("profilePictureInput");
@@ -6859,7 +8230,7 @@ function clearProfilePicture() {
 }
 
 function applyProfilePicture() {
-  const data = localStorage.getItem("nautilusOS_profilePicture");
+  const data = localStorage.getItem("Veltra_profilePicture");
   const avatars = document.querySelectorAll(".login-avatar, .start-avatar");
   avatars.forEach((avatar) => {
     if (data) {
@@ -6877,7 +8248,7 @@ function updateLoginGreeting() {
   const hour = now.getHours();
   const greetingEl = document.getElementById("loginGreeting");
   let greeting = "Welcome Back";
-  const username = localStorage.getItem("nautilusOS_username") || "User";
+  const username = localStorage.getItem("Veltra_username") || "User";
 
   if (hour >= 5 && hour < 12) {
     greeting = `Good Morning, ${username}`;
@@ -7161,6 +8532,8 @@ async function createNewFolder() {
 
 function showContextMenu(x, y, items) {
   const menu = document.getElementById("contextMenu");
+  if (!menu) return;
+  
   menu.innerHTML = items
     .map((item) => {
       if (item.divider) {
@@ -7176,26 +8549,37 @@ function showContextMenu(x, y, items) {
     })
     .join("");
 
+  // Reset display before positioning
+  menu.style.display = "block";
+  menu.style.visibility = "hidden";
   menu.style.left = x + "px";
   menu.style.top = y + "px";
-  menu.classList.add("active");
-
-  setTimeout(() => {
+  
+  // Calculate position after render
+  requestAnimationFrame(() => {
     const rect = menu.getBoundingClientRect();
+    let newX = x;
+    let newY = y;
+    
     if (rect.right > window.innerWidth) {
-      menu.style.left = x - rect.width + "px";
+      newX = Math.max(0, x - rect.width);
     }
     if (rect.bottom > window.innerHeight) {
-      menu.style.top = y - rect.height + "px";
+      newY = Math.max(0, y - rect.height);
     }
-  }, 0);
+    
+    menu.style.left = newX + "px";
+    menu.style.top = newY + "px";
+    menu.style.visibility = "visible";
+    menu.classList.add("active");
+  });
 }
 
 function hideContextMenu() {
   const menu = document.getElementById("contextMenu");
   if (menu) {
-    menu.style.display = "none";
     menu.classList.remove("active");
+    menu.style.display = "none";
   }
 }
 
@@ -7221,12 +8605,12 @@ const APP_NAMES = {
   calculator: "Calculator",
   cloaking: "Cloaking",
   achievements: "Achievements",
-  browser: "Nautilus Browser",
+  browser: "Veltra Browser",
   "ai-snake": "AI Snake Learning",
-  "nautilus-ai": "Nautilus AI Assistant",
+  "veltra-ai": "Veltra AI Assistant",
   python: "Python Interpreter",
   "web-app-creator": "Web App Creator",
-  about: "About NautilusOS"
+  about: "About Veltra"
 };
 
 function initTaskbarTooltips() {
@@ -7280,14 +8664,14 @@ function initTaskbarTooltips() {
 async function downloadOneFile() {
   try {
     showToast("Preparing download...", "fa-download");
-    const response = await fetch('https://raw.githubusercontent.com/nautilus-os/NautilusOS/refs/heads/main/NautilusOS-OneFile/index.html');
+    const response = await fetch('https://raw.githubusercontent.com/veltra/Veltra/refs/heads/main/Veltra-OneFile/index.html');
     if (!response.ok) throw new Error("Network response was not ok");
 
     const blob = await response.blob();
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'NautilusOS-OneFile.html';
+    a.download = 'Veltra-OneFile.html';
     document.body.appendChild(a);
     a.click();
     window.URL.revokeObjectURL(url);
@@ -7296,7 +8680,7 @@ async function downloadOneFile() {
   } catch (error) {
     console.error("Download failed:", error);
     showToast("Download failed! Opening link instead.", "fa-exclamation-triangle");
-    window.open('https://raw.githubusercontent.com/nautilus-os/NautilusOS/refs/heads/main/NautilusOS-OneFile/index.html', '_blank');
+    window.open('https://raw.githubusercontent.com/veltra/Veltra/refs/heads/main/Veltra-OneFile/index.html', '_blank');
   }
 }
 
@@ -7448,6 +8832,100 @@ function initContextMenu() {
       hideContextMenu();
     }
   });
+
+  // Touch support: Long-press for context menu on touch devices
+  let longPressTimer = null;
+  let longPressTarget = null;
+  let startX = 0, startY = 0;
+  const LONG_PRESS_DURATION = 500; // ms
+  const MOVE_THRESHOLD = 10; // px
+
+  document.addEventListener("touchstart", (e) => {
+    if (e.touches.length !== 1) return;
+    
+    const touch = e.touches[0];
+    startX = touch.clientX;
+    startY = touch.clientY;
+    longPressTarget = e.target;
+
+    longPressTimer = setTimeout(() => {
+      // Simulate contextmenu event
+      const fakeEvent = {
+        preventDefault: () => {},
+        clientX: startX,
+        clientY: startY,
+        target: longPressTarget
+      };
+
+      // Desktop context menu
+      if (longPressTarget.closest("#desktop") && !longPressTarget.closest(".desktop-icon") && !longPressTarget.closest(".window")) {
+        fakeEvent.preventDefault();
+        showContextMenu(startX, startY, [
+          { icon: "fa-sync", label: "Refresh", action: "hideContextMenu(); refreshDesktop()" },
+          { divider: true },
+          { icon: "fa-file", label: "New Text File", action: "hideContextMenu(); openNewTextFile()" },
+          { icon: "fa-folder-plus", label: "New Folder", action: "hideContextMenu(); openNewFolder()" },
+          { divider: true },
+          { icon: "fa-question-circle", label: "Help", action: "hideContextMenu(); openApp('help')" },
+        ]);
+        // Haptic feedback if available
+        if (navigator.vibrate) navigator.vibrate(50);
+      }
+      // Desktop icon context menu
+      else if (longPressTarget.closest(".desktop-icon")) {
+        const icon = longPressTarget.closest(".desktop-icon");
+        const appName = icon.getAttribute("data-app");
+        showContextMenu(startX, startY, [
+          { icon: "fa-folder-open", label: "Open", action: `hideContextMenu(); openApp('${appName}')` },
+          { divider: true },
+          { icon: "fa-info-circle", label: "Properties", action: `hideContextMenu(); showProperties('${appName}', ${startX}, ${startY})` },
+        ]);
+        if (navigator.vibrate) navigator.vibrate(50);
+      }
+      // Window context menu
+      else if (longPressTarget.closest(".window")) {
+        const windowEl = longPressTarget.closest(".window");
+        const appName = windowEl.dataset.appName || "";
+        const isMaximized = windowEl.dataset.maximized === "true";
+        showContextMenu(startX, startY, [
+          { icon: "fa-window-minimize", label: "Minimize", action: `hideContextMenu(); setTimeout(() => minimizeWindowByAppName('${appName}'), 50)` },
+          { icon: "fa-window-maximize", label: isMaximized ? "Restore" : "Maximize", action: `hideContextMenu(); setTimeout(() => maximizeWindowByAppName('${appName}'), 50)` },
+          { divider: true },
+          { icon: "fa-times", label: "Close Window", action: `hideContextMenu(); setTimeout(() => closeWindowByAppName('${appName}'), 50)` },
+        ]);
+        if (navigator.vibrate) navigator.vibrate(50);
+      }
+
+      longPressTimer = null;
+    }, LONG_PRESS_DURATION);
+  }, { passive: true });
+
+  document.addEventListener("touchmove", (e) => {
+    if (!longPressTimer) return;
+    
+    const touch = e.touches[0];
+    const dx = Math.abs(touch.clientX - startX);
+    const dy = Math.abs(touch.clientY - startY);
+    
+    if (dx > MOVE_THRESHOLD || dy > MOVE_THRESHOLD) {
+      clearTimeout(longPressTimer);
+      longPressTimer = null;
+    }
+  }, { passive: true });
+
+  document.addEventListener("touchend", () => {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      longPressTimer = null;
+    }
+  }, { passive: true });
+
+  document.addEventListener("touchcancel", () => {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      longPressTimer = null;
+    }
+  }, { passive: true });
 }
 
 let currentSlide = 0;
@@ -7719,7 +9197,7 @@ function switchAppStoreSection(section, element) {
       {
         name: "Dark Theme",
         author: "dinguschan",
-        desc: "The default NautilusOS theme. Sleek dark interface with teal accents, perfect for extended use and reducing eye strain.",
+        desc: "The default Veltra theme. Sleek dark interface with teal accents, perfect for extended use and reducing eye strain.",
         customPreviewHtml: `<div class="illustration-dark-theme"><div class="illustration-dark-window"><div class="illustration-dark-header"></div><div class="illustration-dark-content"><div class="illustration-dark-line" style="width: 80%;"></div><div class="illustration-dark-line" style="width: 60%;"></div><div class="illustration-dark-line" style="width: 90%;"></div></div></div></div>`,
         isInstalled: true,
         installButtonText: "Installed (Default)",
@@ -7738,7 +9216,7 @@ function switchAppStoreSection(section, element) {
     mainContent.innerHTML = `
         <div class="appstore-header">
             <h2>Themes</h2>
-            <p>Customize your NautilusOS experience</p>
+            <p>Customize your Veltra experience</p>
         </div>
         <div class="appstore-grid">
             ${items.map(item => renderAppItem(item)).join('')}
@@ -7800,7 +9278,7 @@ function switchAppStoreSection(section, element) {
       {
         name: "Visual Studio Code",
         author: "Microsoft",
-        desc: "The developer's choice for text editing, now on NautilusOS.",
+        desc: "The developer's choice for text editing, now on Veltra.",
         customPreviewHtml: `<div class="illustration-vscode"> <div class="illustration-vscode-header"></div> <div class="illustration-vscode-content"> <div class="illustration-vscode-line"></div> <div class="illustration-vscode-line" style="width: 80%;"></div> <div class="illustration-vscode-line" style="width: 60%;"></div> </div> </div>`,
         isInstalled: installedApps.includes("vsc"),
         installAction: "installApp('vsc')",
@@ -7810,7 +9288,7 @@ function switchAppStoreSection(section, element) {
       {
         name: "V86 Emulator",
         author: "lanefiedler-731",
-        desc: "Run x86 operating systems and software within NautilusOS. Experience virtualized computing with full system emulation.",
+        desc: "Run x86 operating systems and software within Veltra. Experience virtualized computing with full system emulation.",
         customPreviewHtml: `<div class="illustration-v86"> <div class="illustration-v86-line"></div> <div class="illustration-v86-line" style="width: 60%;"></div> <div class="illustration-v86-cursor"></div> </div>`,
         isInstalled: installedApps.includes("v86-emulator"),
         installAction: "installApp('v86-emulator')",
@@ -7818,19 +9296,19 @@ function switchAppStoreSection(section, element) {
         type: "app"
       },
       {
-        name: "Nautilus AI Assistant",
+        name: "Veltra AI Assistant",
         author: "lanefiedler-731",
-        desc: "Your personal AI assistant powered by WebLLM. Get instant help with NautilusOS features, apps, settings, and more. Runs entirely in your browser with no server required!",
-        customPreviewHtml: `<div class="illustration-nautilus-ai"> <div class="illustration-nautilus-ai-header"> <div class="illustration-nautilus-ai-icon"><i class="fas fa-robot"></i></div> <div class="illustration-nautilus-ai-title">Nautilus AI</div> </div> <div class="illustration-nautilus-ai-content"> <div class="illustration-nautilus-ai-msg-ai"> <div class="illustration-nautilus-ai-line" style="width: 90%;"></div> <div class="illustration-nautilus-ai-line" style="width: 60%;"></div> </div> <div class="illustration-nautilus-ai-msg-user"> <div class="illustration-nautilus-ai-line" style="width: 80%;"></div> </div> </div> </div>`,
+        desc: "Your personal AI assistant powered by WebLLM. Get instant help with Veltra features, apps, settings, and more. Runs entirely in your browser with no server required!",
+        customPreviewHtml: `<div class="illustration-veltra-ai"> <div class="illustration-veltra-ai-header"> <div class="illustration-veltra-ai-icon"><i class="fas fa-robot"></i></div> <div class="illustration-veltra-ai-title">Veltra AI</div> </div> <div class="illustration-veltra-ai-content"> <div class="illustration-veltra-ai-msg-ai"> <div class="illustration-veltra-ai-line" style="width: 90%;"></div> <div class="illustration-veltra-ai-line" style="width: 60%;"></div> </div> <div class="illustration-veltra-ai-msg-user"> <div class="illustration-veltra-ai-line" style="width: 80%;"></div> </div> </div> </div>`,
         isInstalled: true,
         installButtonText: "Open",
-        installAction: "openApp('nautilus-ai')",
+        installAction: "openApp('veltra-ai')",
         uninstallAction: "",
         type: "app"
       },
       {
         name: "Text Editor",
-        author: "dinguschan and Nautilus Labs",
+        author: "dinguschan and Veltra Labs",
         desc: "A simple text editor for creating and editing text files.",
         isInstalled: installedApps.includes("editor"),
         installAction: "installApp('editor')",
@@ -7839,7 +9317,7 @@ function switchAppStoreSection(section, element) {
       },
       {
         name: "Files",
-        author: "dinguschan and Nautilus Labs",
+        author: "dinguschan and Veltra Labs",
         desc: "File manager for browsing and managing your files.",
         isInstalled: installedApps.includes("files"),
         installAction: "installApp('files')",
@@ -7847,9 +9325,9 @@ function switchAppStoreSection(section, element) {
         type: "app"
       },
       {
-        name: "About NautilusOS",
-        author: "dinguschan and Nautilus Labs",
-        desc: "Learn more about NautilusOS and its features.",
+        name: "About Veltra",
+        author: "dinguschan and Veltra Labs",
+        desc: "Learn more about Veltra and its features.",
         isInstalled: installedApps.includes("about"),
         installAction: "installApp('about')",
         uninstallAction: "uninstallApp('about')",
@@ -7857,8 +9335,8 @@ function switchAppStoreSection(section, element) {
       },
       {
         name: "Settings",
-        author: "dinguschan and Nautilus Labs",
-        desc: "Customize your NautilusOS experience.",
+        author: "dinguschan and Veltra Labs",
+        desc: "Customize your Veltra experience.",
         isInstalled: installedApps.includes("settings"),
         installAction: "installApp('settings')",
         uninstallAction: "uninstallApp('settings')",
@@ -7866,7 +9344,7 @@ function switchAppStoreSection(section, element) {
       },
       {
         name: "App Store",
-        author: "dinguschan and Nautilus Labs",
+        author: "dinguschan and Veltra Labs",
         desc: "Discover and install new apps and themes.",
         isInstalled: installedApps.includes("appstore"),
         installAction: "installApp('appstore')",
@@ -7875,7 +9353,7 @@ function switchAppStoreSection(section, element) {
       },
       {
         name: "Calculator",
-        author: "dinguschan and Nautilus Labs",
+        author: "dinguschan and Veltra Labs",
         desc: "A simple calculator for basic math operations.",
         isInstalled: installedApps.includes("calculator"),
         installAction: "installApp('calculator')",
@@ -7883,8 +9361,8 @@ function switchAppStoreSection(section, element) {
         type: "app"
       },
       {
-        name: "Nautilus Browser",
-        author: "dinguschan and Nautilus Labs",
+        name: "Veltra Browser",
+        author: "dinguschan and Veltra Labs",
         desc: "Browse the web with this built-in browser.",
         isInstalled: installedApps.includes("browser"),
         installAction: "installApp('browser')",
@@ -7892,17 +9370,19 @@ function switchAppStoreSection(section, element) {
         type: "app"
       },
       {
-        name: "Music",
-        author: "dinguschan and Nautilus Labs",
-        desc: "Play and manage your music files.",
-        isInstalled: installedApps.includes("music"),
-        installAction: "installApp('music')",
-        uninstallAction: "uninstallApp('music')",
+        name: "Melodify",
+        author: "Veltra Labs",
+        desc: "A Spotify-inspired music player. Search, stream, and download your favorite songs. Features YouTube integration and local file playback.",
+        customPreviewHtml: `<div style="background: linear-gradient(135deg, #1DB954, #191414); width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; border-radius: 8px;"><i class="fas fa-music" style="font-size: 2.5rem; color: white;"></i></div>`,
+        isInstalled: true,
+        installButtonText: "Open",
+        installAction: "openApp('melodify')",
+        uninstallAction: "",
         type: "app"
       },
       {
         name: "Photos",
-        author: "dinguschan and Nautilus Labs",
+        author: "dinguschan and Veltra Labs",
         desc: "View and manage your photos.",
         isInstalled: installedApps.includes("photos"),
         installAction: "installApp('photos')",
@@ -7911,7 +9391,7 @@ function switchAppStoreSection(section, element) {
       },
       {
         name: "Terminal",
-        author: "dinguschan and Nautilus Labs",
+        author: "dinguschan and Veltra Labs",
         desc: "Command line interface for advanced users.",
         isInstalled: installedApps.includes("terminal"),
         installAction: "installApp('terminal')",
@@ -7920,7 +9400,7 @@ function switchAppStoreSection(section, element) {
       },
       {
         name: "Python Interpreter",
-        author: "dinguschan and Nautilus Labs",
+        author: "dinguschan and Veltra Labs",
         desc: "Run Python code interactively.",
         isInstalled: installedApps.includes("python"),
         installAction: "installApp('python')",
@@ -7929,7 +9409,7 @@ function switchAppStoreSection(section, element) {
       },
       {
         name: "Achievements",
-        author: "dinguschan and Nautilus Labs",
+        author: "dinguschan and Veltra Labs",
         desc: "Track your progress and unlock achievements.",
         isInstalled: installedApps.includes("achievements"),
         installAction: "installApp('achievements')",
@@ -8000,14 +9480,394 @@ function switchAppStoreSection(section, element) {
     mainContent.innerHTML = `
           <div class="appstore-header">
               <h2>Games</h2>
-              <p>Play and enjoy games on NautilusOS</p>
+              <p>Play and enjoy games on Veltra</p>
           </div>
           <div class="appstore-grid">
               ${items.map(item => renderAppItem(item)).join('')}
           </div>
       `;
+  } else if (section === 'gemtra') {
+    // Gemtra Games - ALL 190+ games from Gemtra database
+    // Performance optimized with lazy loading for iPad
+    const gemtraGames = [
+      // === RHYTHM GAMES ===
+      { name: "Geometry Dash", url: "https://lolygames.github.io/gd-lit/", icon: "https://geodash.org/images/geodash-game-image.webp", category: "Rhythm", featured: true },
+      { name: "Geometry Dash Meltdown", url: "https://lolygames.github.io/gd-melt/", icon: "https://geodash.org/images/geometry-dash-meltdown-og.jpg", category: "Rhythm" },
+      { name: "Geometry Dash Subzero", url: "https://lolygames.github.io/gd-zubero/", icon: "https://geodash.org/images/geometry-dash-subzero-og.jpg", category: "Rhythm" },
+      { name: "Geometry Dash World", url: "https://lolygames.github.io/gd-world/", icon: "https://geodash.org/images/geometry-dash-world-og.jpg", category: "Rhythm" },
+      { name: "Geometry Dash Scratch", url: "https://lolygames.github.io/geometry-dash/", icon: "https://geodash.org/images/geometry-dash-scratch-og.jpg", category: "Rhythm" },
+      { name: "Wavedash", url: "https://mojhehh.github.io/wavedash/", icon: "https://quickimagetools.com/uploads/image_696f140c4451c4.62263413.png", category: "Rhythm", featured: true },
+      { name: "Space Waves", url: "https://marblerun-3d.github.io/game/spacewave/", icon: "https://geodash.org/games/thumbs/space-waves-small-thumb-1.webp", category: "Rhythm" },
+      
+      // === FNAF / HORROR GAMES ===
+      { name: "Five Nights at Freddy's", url: "https://fngames.io/fnaf.embed", icon: "https://fngames.io/cache/data/image/game/fnaf-five-nights-at-freddys-m174x170.jpg", category: "Horror", featured: true },
+      { name: "Five Nights at Freddy's 2", url: "https://run3.io/popgame/fnaf/fnaf2.html", icon: "https://fngames.io/cache/data/image/game/fnaf-2-m174x170.jpg", category: "Horror", featured: true },
+      { name: "Five Nights at Freddy's 3", url: "https://run3.io/popgame/fnaf/fnaf3.html", icon: "https://fngames.io/cache/data/image/game/fnaf-3-m174x170.jpg", category: "Horror", featured: true },
+      { name: "Five Nights at Freddy's 4", url: "https://mojhehh.github.io/gemtra/fnaf/fnaf4.html", icon: "https://fngames.io/cache/data/image/game/fnaf-4-m174x170.jpg", category: "Horror", featured: true },
+      { name: "FNAF Sister Location", url: "https://run3.io/popgame/fnaf/fnafsl.html", icon: "https://fngames.io/cache/data/image/game/fnaf-sister-location-m174x170.jpg", category: "Horror" },
+      { name: "FNAF 6: Pizzeria Simulator", url: "https://fngames.io/fnaf-6.embed", icon: "https://fngames.io/cache/data/image/game/fnaf-6-five-nights-at-freddys-6-1-m174x170.jpg", category: "Horror" },
+      { name: "FNAF Ultimate Custom Night", url: "https://fngames.io/fnaf-ultimate-custom-night.embed", icon: "https://fngames.io/cache/data/image/game/fnaf-ultimate-custom-night-1-m174x170.jpg", category: "Horror" },
+      { name: "FNAF World", url: "https://scratch.mit.edu/projects/embed/96095372/", icon: "https://fngames.io/cache/data/image/game/fnaf-world-m174x170.jpg", category: "Adventure" },
+      { name: "FNAF Plus", url: "https://b.gamesdizi.com/ed/fnaf-plus/", icon: "https://fngames.io/cache/data/image/game/fnaf-plus-1-m174x170.jpg", category: "Horror" },
+      { name: "FNAF Free Roam", url: "https://gg.storytellergame.io/fnaf-free-roam-game/", icon: "https://fngames.io/cache/data/image/game/fnaf-free-roam-1-m174x170.jpg", category: "Horror" },
+      { name: "FNAF Shooter", url: "https://html5.gamedistribution.com/eb8346d4739e40eda6e4196dfc9166b7/", icon: "https://fngames.io/cache/data/image/game/fnaf-shooter-1-m174x170.jpg", category: "Horror" },
+      { name: "Five Nights at Candy's", url: "https://fngames.io/five-nights-at-candys.embed", icon: "https://fngames.io/cache/data/image/game/five-nights-at-candys-1-m174x170.jpg", category: "Horror" },
+      { name: "Backrooms", url: "https://st.8games.net/7/igra-zakulise-1/", icon: "https://fngames.io/data/image/game/backrooms.png", category: "Horror" },
+      { name: "Granny", url: "https://sz-games.github.io/Games8/GRANNY/", icon: "https://fngames.io/data/image/game/granny.jpeg", category: "Horror", featured: true },
+      { name: "Baldi's Basics", url: "https://en.gameslol.net/data/baldis-basics/index.html", icon: "https://fngames.io/cache/data/image/game/baldis-basics-1-m174x170.jpg", category: "Horror", featured: true },
+      { name: "Granny 4", url: "https://st.8games.net/7/8g/igra-grenni-4/", icon: "https://static.8games.net/flash/all/1/igra-grenni-4.jpg", category: "Horror" },
+      { name: "Hawkins RP", url: "https://st.8games.net/7/8g/igra-khokins-rp/", icon: "https://static.8games.net/flash/all/1/igra-khokins-rp.jpg", category: "Horror" },
+      { name: "Light Through Fog", url: "https://st.8games.net/7/8g/igra-svet-skvoz-tuman/", icon: "https://static.8games.net/flash/all/1/igra-svet-skvoz-tuman.jpg", category: "Horror" },
+      { name: "Scary Shawarma: The Anomaly", url: "https://st.8games.net/7/8g/igra-zhutkij-shaverma-kiosk-anomaliya/", icon: "https://static.8games.net/flash/all/1/igra-zhutkij-shaverma-kiosk-anomaliya.jpg", category: "Horror" },
+      { name: "The Baby in Yellow", url: "https://gnhustgames.github.io/babyinyellow/", icon: "https://newunblockedgames.gitlab.io/assets/thumb/the-baby-in-yellow.png", category: "Horror" },
+      { name: "That's Not My Neighbor", url: "https://genizymath.github.io/iframe/216.html", icon: "https://newunblockedgames.gitlab.io/assets/thumb/thats-not-my-neighbour.png", category: "Horror" },
+      
+      // === IO GAMES / MULTIPLAYER ===
+      { name: "Agar.io", url: "https://www.agar.io/#ffa", icon: "https://quickimagetools.com/uploads/image_6972836cb635f6.74980523.png", category: "Multiplayer", featured: true },
+      { name: "Slither.io", url: "https://slither.io/", icon: "https://newunblockedgames.gitlab.io/assets/thumb/slitherio.png", category: "Multiplayer" },
+      { name: "Bloxd.io", url: "https://block-blast-puzzle.github.io/bloxd-io.html", icon: "https://block-blast-puzzle.github.io/images/icon/bloxd-io.jpg", category: "Multiplayer", featured: true },
+      { name: "Krunker.io", url: "https://block-blast-puzzle.github.io/krunker-io.html", icon: "https://block-blast-puzzle.github.io/images/icon/krunker-io.jpg", category: "Shooter", featured: true },
+      { name: "Venge.io", url: "https://block-blast-puzzle.github.io/venge-io.html", icon: "https://block-blast-puzzle.github.io/images/icon/venge-io.jpg", category: "Shooter", featured: true },
+      { name: "Shell Shockers", url: "https://gameinclassroom.github.io/shell-shockers/", icon: "https://newunblockedgames.gitlab.io/assets/thumb/shell-shockers.png", category: "Multiplayer" },
+      { name: "Zombs Royale", url: "https://block-blast-puzzle.github.io/zombs-royale.html", icon: "https://block-blast-puzzle.github.io/images/icon/zombs-royale.jpg", category: "Shooter" },
+      { name: "Ev.io", url: "https://block-blast-puzzle.github.io/ev-io.html", icon: "https://block-blast-puzzle.github.io/images/icon/ev-io.jpeg", category: "Shooter" },
+      { name: "Hole.io", url: "https://block-blast-puzzle.github.io/hole-io.html", icon: "https://block-blast-puzzle.github.io/images/icon/hole-io.jpg", category: "Casual" },
+      { name: "StarBlast", url: "https://block-blast-puzzle.github.io/star-blast.html", icon: "https://block-blast-puzzle.github.io/images/icon/star-blast.jpg", category: "Shooter" },
+      { name: "Build Royale", url: "https://block-blast-puzzle.github.io/build-royale.html", icon: "https://block-blast-puzzle.github.io/images/icon/build-royale.png", category: "Shooter" },
+      { name: "BattleDudes.io", url: "https://block-blast-puzzle.github.io/battle-dudes-io.html", icon: "https://block-blast-puzzle.github.io/images/icon/battle-dudes-io.jpg", category: "Shooter" },
+      { name: "Craftnite.io", url: "https://block-blast-puzzle.github.io/craftnite-io.html", icon: "https://block-blast-puzzle.github.io/images/icon/craftnite-io.jpg", category: "Shooter" },
+      { name: "Little Big Snake", url: "https://block-blast-puzzle.github.io/little-big-snake.html", icon: "https://block-blast-puzzle.github.io/images/icon/little-big-snake.jpg", category: "Multiplayer" },
+      { name: "Paper.io 2", url: "https://paperio-2.github.io/a9/paper-io-2/", icon: "https://newunblockedgames.gitlab.io/assets/thumb/paperio-2.png", category: "Multiplayer" },
+      { name: "Kour.io", url: "https://kour.io/", icon: "https://geodash.org/games/thumbs/kour-io_2.webp", category: "Action" },
+      { name: "Rivals", url: "https://veck.io/", icon: "https://geodash.org/games/thumbs/veckio_2.webp", category: "Action" },
+      
+      // === ACTION & SHOOTERS ===
+      { name: "1v1 LOL", url: "https://iframe.unblocked-76-games.org/1v1-lol-main/", icon: "https://pokigamez.github.io/images/1v1-lol.png", category: "Action" },
+      { name: "Bullet Force", url: "https://classroom8.github.io/bullet-force/", icon: "https://geodash.org/games/thumbs/bullet-force_2.webp", category: "Action" },
+      { name: "Fortzone: Battle Royale", url: "https://st.8games.net/10/8g/igra-fortzone-korolevskaya-bitva/", icon: "https://static.8games.net/flash/all/1/igra-fortzone-korolevskaya-bitva.jpg", category: "Action" },
+      { name: "3D Tanks 1990", url: "https://st.8games.net/7/8g/igra-3d-tanki-1990-boevoj-gorod/", icon: "https://static.8games.net/flash/all/1/igra-3d-tanki-1990-boevoj-gorod.jpg", category: "Action" },
+      { name: "Range Master: Sniper", url: "https://st.8games.net/9/8g/igra-master-strelbishcha-snajperskaya-akademiya/", icon: "https://static.8games.net/flash/all/1/igra-master-strelbishcha-snajperskaya-akademiya.jpg", category: "Action" },
+      { name: "Gunner Master", url: "https://st.8games.net/9/8g/igra-master-artillerist/", icon: "https://static.8games.net/flash/all/1/igra-master-artillerist.jpg", category: "Action" },
+      { name: "Sticky Slaughter", url: "https://st.8games.net/12/8g/igra-lipkaya-bojnya", icon: "https://static.8games.net/flash/all/1/igra-lipkaya-bojnya.jpg", category: "Action" },
+      { name: "Masked Forces", url: "https://iframe.unblocked-76-games.org/masked-forces-main/", icon: "https://pokigamez.github.io/images/masked-forces.png", category: "Action" },
+      { name: "Funny Shooter 2", url: "https://iframe.unblocked-76-games.org/funny-shooter-2-main/", icon: "https://pokigamez.github.io/images/funny-shooter-2.png", category: "Action" },
+      { name: "Awesome Tanks 2", url: "https://iframe.unblocked-76-games.org/awesome-tanks-2-main/", icon: "https://pokigamez.github.io/images/awesome-tanks-2.png", category: "Action" },
+      { name: "10 Minutes Till Dawn", url: "https://iframe.unblocked-76-games.org/10-minutes-till-dawn-main/", icon: "https://pokigamez.github.io/images/10-minutes-till-dawn.png", category: "Action" },
+      { name: "Raft Wars", url: "https://iframe.unblocked-76-games.org/raft-wars-main/", icon: "https://pokigamez.github.io/images/raft-wars.png", category: "Action" },
+      { name: "Battle Wheels", url: "https://iframe.unblocked-76-games.org/battle-wheels-main/", icon: "https://pokigamez.github.io/images/battle-wheels.png", category: "Action" },
+      { name: "Flip Bros", url: "https://iframe.unblocked-76-games.org/flip-bros-main/", icon: "https://pokigamez.github.io/images/flip-bros.png", category: "Action" },
+      { name: "Bacon May Die", url: "https://iframe.unblocked-76-games.org/bacon-may-die-main/", icon: "https://pokigamez.github.io/images/bacon-may-die.png", category: "Action" },
+      { name: "Super Hot", url: "https://scrap-metal.github.io/s8/super-hot/", icon: "https://newunblockedgames.gitlab.io/assets/thumb/super-hot.png", category: "Action" },
+      { name: "Getaway Shootout", url: "https://unblockedgames76.gitlab.io/getaway-shootout/", icon: "https://newunblockedgames.gitlab.io/assets/thumb/getaway-shootout.png", category: "Action" },
+      { name: "Half Life", url: "https://genizymath.github.io/iframe/262.html", icon: "https://newunblockedgames.gitlab.io/assets/thumb/half-life.png", category: "Action" },
+      { name: "Rooftop Snipers", url: "https://jasongamesdev.github.io/rooftop-sniper/", icon: "https://newunblockedgames.gitlab.io/assets/thumb/rooftop-snipers.png", category: "Action" },
+      { name: "Pocket Army Battle", url: "https://st.8games.net/12/8g/igra-bitva-karmannoj-armii", icon: "https://static.8games.net/flash/all/1/igra-bitva-karmannoj-armii.jpg", category: "Action" },
+      { name: "Hills Of Steel", url: "https://iframe.unblocked-76-games.org/hills-of-steel-main/", icon: "https://pokigamez.github.io/images/hills-of-steel.png", category: "Action" },
+      { name: "Clash Royale", url: "https://newunblockedgames.gitlab.io/assets/game/clash-royale.html", icon: "https://newunblockedgames.gitlab.io/assets/thumb/clash-royale.png", category: "Action" },
+      
+      // === FIGHTING ===
+      { name: "JuJutsu Battleground", url: "https://st.8games.net/7/8g/igra-magicheskaya-bitva-plejgraund/", icon: "https://static.8games.net/flash/all/1/igra-magicheskaya-bitva-plejgraund.jpg", category: "Fighting" },
+      { name: "Ragdoll Arena", url: "https://st.8games.net/12/8g/igra-regdol-plejgraund-arena-shou", icon: "https://static.8games.net/flash/all/1/igra-regdol-plejgraund-arena-shou.jpg", category: "Fighting" },
+      { name: "Thumb Fighter Halloween", url: "https://lolygames.github.io/thumb-fighter-halloween/", icon: "https://geodash.org/games/thumbs/thumb-fighter-halloween_2.webp", category: "Fighting" },
+      { name: "Drunken Duel", url: "https://lolygames.github.io/drunken-duel/", icon: "https://geodash.org/games/thumbs/drunken-duel_2.webp", category: "Fighting" },
+      { name: "Electric Man 2", url: "https://ultimatemen.github.io/games/em2/index.html", icon: "https://newunblockedgames.gitlab.io/assets/thumb/electric-man-2.png", category: "Fighting" },
+      { name: "Bad Time Simulator", url: "https://jcw87.github.io/c2-sans-fight/", icon: "https://newunblockedgames.gitlab.io/assets/thumb/bad-time-simulator.png", category: "Fighting" },
+      { name: "Street Fighter 2", url: "https://unblockedgames200.github.io/games3/fighter2", icon: "https://newunblockedgames.gitlab.io/assets/thumb/street-fighter-2.png", category: "Fighting" },
+      { name: "Big Shot Boxing", url: "https://iframe.unblocked-76-games.org/big-shot-boxing-main/", icon: "https://pokigamez.github.io/images/big-shot-boxing.png", category: "Fighting" },
+      
+      // === RACING ===
+      { name: "Moto X3M", url: "https://iframe.unblocked-76-games.org/moto-x3m-main/", icon: "https://pokigamez.github.io/images/moto-x3m.png", category: "Racing" },
+      { name: "Drift Hunters", url: "https://iframe.unblocked-76-games.org/drift-hunters-main/", icon: "https://pokigamez.github.io/images/drift-hunters.png", category: "Racing" },
+      { name: "Drift Boss", url: "https://iframe.unblocked-76-games.org/drift-boss-main/", icon: "https://pokigamez.github.io/images/drift-boss.png", category: "Racing" },
+      { name: "Jelly Truck", url: "https://iframe.unblocked-76-games.org/jelly-truck-main/", icon: "https://pokigamez.github.io/images/jelly-truck.png", category: "Racing" },
+      { name: "3D Moto Simulator 2", url: "https://iframe.unblocked-76-games.org/3d-moto-simulator-2-main/", icon: "https://pokigamez.github.io/images/3d-moto-simulator-2.png", category: "Racing" },
+      { name: "Car Stunt Mega Ramps", url: "https://st.8games.net/9/8g/igra-gonki-na-avto-s-tryukami-mega-trampliny/", icon: "https://static.8games.net/flash/all/1/igra-gonki-na-avto-s-tryukami-mega-trampliny.jpg", category: "Racing" },
+      { name: "Ace Moto Rider", url: "https://st.8games.net/9/8g/igra-luchshij-motogonshchik/", icon: "https://static.8games.net/flash/all/1/igra-luchshij-motogonshchik.jpg", category: "Racing" },
+      { name: "Earn To Die", url: "https://iframe.unblocked-76-games.org/earn-to-die-main/", icon: "https://pokigamez.github.io/images/earn-to-die.png", category: "Racing" },
+      { name: "Smash Karts", url: "https://smash-karts.gitlab.io/file/", icon: "https://newunblockedgames.gitlab.io/assets/thumb/smash-karts.png", category: "Racing" },
+      { name: "Madalin Stunt Cars 3", url: "https://unblockedgames66.gitlab.io/madalin-stunt-cars-3/", icon: "https://newunblockedgames.gitlab.io/assets/thumb/madalin-stunt-cars-3.png", category: "Racing" },
+      { name: "Snow Rider 3D", url: "https://tylerpalko.github.io/gamehub/snowrider3d/", icon: "https://newunblockedgames.gitlab.io/assets/thumb/snow-rider-3d.png", category: "Racing" },
+      { name: "Moto X3M Spooky", url: "https://games-site.github.io/projects/moto-x3m-spooky-land/index.html", icon: "https://newunblockedgames.gitlab.io/assets/thumb/moto-x3m-spooky-land.png", category: "Racing" },
+      { name: "Kart Bros", url: "https://iframe.unblocked-76-games.org/kart-bros-main/", icon: "https://pokigamez.github.io/images/kart-bros.png", category: "Racing" },
+      { name: "Poly Track", url: "https://polytrack-online.github.io/file/", icon: "https://newunblockedgames.gitlab.io/assets/thumb/poly-track.png", category: "Racing" },
+      
+      // === SPORTS ===
+      { name: "Retro Bowl", url: "https://iframe.unblocked-76-games.org/retro-bowl-main/", icon: "https://pokigamez.github.io/images/retro-bowl.png", category: "Sports", featured: true },
+      { name: "8 Ball Pool", url: "https://iframe.unblocked-76-games.org/8-ball-pool-main/", icon: "https://pokigamez.github.io/images/8-ball-pool.png", category: "Sports" },
+      { name: "Basket Bros", url: "https://iframe.unblocked-76-games.org/basket-bros-main/", icon: "https://pokigamez.github.io/images/basket-bros.png", category: "Sports" },
+      { name: "Basket Random", url: "https://tylerpalko.github.io/gamehub/basketrandom/", icon: "https://newunblockedgames.gitlab.io/assets/thumb/basket-random.png", category: "Sports" },
+      { name: "4th and Goal 2022", url: "https://iframe.unblocked-76-games.org/4th-and-goal-2022-main/", icon: "https://pokigamez.github.io/images/4th-and-goal-2022.png", category: "Sports" },
+      { name: "Football Legends", url: "https://footballlegends-online.github.io/file/", icon: "https://newunblockedgames.gitlab.io/assets/thumb/football-legends.png", category: "Sports" },
+      { name: "A Small World Cup", url: "./a-small-world-cup/index.html", icon: "./a-small-world-cup/icon-256.png", category: "Sports", featured: true },
+      { name: "Snowballs: Blue vs Red", url: "https://st.8games.net/7/8g/igra-snezhki-sinie-protiv-krasnykh/", icon: "https://static.8games.net/flash/all/1/igra-snezhki-sinie-protiv-krasnykh.jpg", category: "Sports" },
+      
+      // === ARCADE ===
+      { name: "Slope", url: "https://iframe.unblocked-76-games.org/slope-main/", icon: "https://pokigamez.github.io/images/slope.png", category: "Arcade", featured: true },
+      { name: "Run 3", url: "https://ubgwtf.gitlab.io/run-3/", icon: "https://newunblockedgames.gitlab.io/assets/thumb/run-3.png", category: "Arcade" },
+      { name: "Tunnel Rush", url: "https://iframe.unblocked-76-games.org/tunnel-rush-main/", icon: "https://pokigamez.github.io/images/tunnel-rush.png", category: "Arcade" },
+      { name: "Subway Surfers SF", url: "https://nb-ga.github.io/games-site/projects/subway-surfers-san-francisco/index.html", icon: "https://newunblockedgames.gitlab.io/assets/thumb/subway-surfers-san-francisco.png", category: "Arcade" },
+      { name: "Temple Run 2", url: "https://iframe.unblocked-76-games.org/temple-run-2-main/", icon: "https://pokigamez.github.io/images/temple-run-2.png", category: "Arcade" },
+      { name: "Flappy Bird", url: "https://iframe.unblocked-76-games.org/flappy-bird-main/", icon: "https://pokigamez.github.io/images/flappy-bird.png", category: "Arcade" },
+      { name: "Stickman Hook", url: "https://iframe.unblocked-76-games.org/stickman-hook-main/", icon: "https://pokigamez.github.io/images/stickman-hook.png", category: "Arcade" },
+      { name: "Monkey Mart", url: "https://iframe.unblocked-76-games.org/monkey-mart-main/", icon: "https://pokigamez.github.io/images/monkey-mart.png", category: "Arcade" },
+      { name: "Red Ball 4", url: "https://iframe.unblocked-76-games.org/red-ball-4-main/", icon: "https://pokigamez.github.io/images/red-ball-4.png", category: "Arcade" },
+      { name: "Dreadhead Parkour", url: "https://iframe.unblocked-76-games.org/dreadhead-parkour-main/", icon: "https://pokigamez.github.io/images/dreadhead-parkour.png", category: "Arcade" },
+      { name: "OvO", url: "https://iframe.unblocked-76-games.org/ovo-main/", icon: "https://pokigamez.github.io/images/ovo.png", category: "Arcade" },
+      { name: "Stick Merge", url: "https://iframe.unblocked-76-games.org/stick-merge-main/", icon: "https://pokigamez.github.io/images/stick-merge.png", category: "Arcade" },
+      { name: "G-Switch 3", url: "https://lolygames.github.io/g-switch-3/", icon: "https://geodash.org/games/thumbs/g-switch-3_2.webp", category: "Arcade" },
+      { name: "Google Snake", url: "https://googlesnake-online.github.io/file/", icon: "https://newunblockedgames.gitlab.io/assets/thumb/google-snake.png", category: "Arcade" },
+      { name: "Only Up!", url: "https://sz-games.github.io/Games8/only-up/", icon: "https://newunblockedgames.gitlab.io/assets/thumb/only-up.png", category: "Arcade" },
+      { name: "Grindcraft Remastered", url: "https://hypackel.github.io/projects/grindcraft/index.html", icon: "https://newunblockedgames.gitlab.io/assets/thumb/grindcraft-remastered.png", category: "Arcade" },
+      { name: "Cluster Rush", url: "https://ubgwtf.gitlab.io/cluster-rush/", icon: "https://newunblockedgames.gitlab.io/assets/thumb/cluster-rush.png", category: "Arcade" },
+      { name: "Tiny Fishing", url: "https://unblocked-76-77.github.io/_games/tiny-fishing/", icon: "https://newunblockedgames.gitlab.io/assets/thumb/tiny-fishing.png", category: "Arcade" },
+      { name: "Jetpack Joyride", url: "https://abinbins.github.io/a7/jetpack-joyride/", icon: "https://newunblockedgames.gitlab.io/assets/thumb/jetpack-joyride.png", category: "Arcade" },
+      { name: "Crossy Road", url: "https://genizymath.github.io/iframe/24.html", icon: "https://newunblockedgames.gitlab.io/assets/thumb/crossy-road.png", category: "Arcade" },
+      { name: "Tomb of the Mask", url: "https://genizymath.github.io/iframe/109.html", icon: "https://newunblockedgames.gitlab.io/assets/thumb/tomb-of-the-mask.png", category: "Arcade" },
+      { name: "Tetro Tower 3D", url: "https://st.8games.net/12/8g/igra-tetro-bashnya-3d", icon: "https://static.8games.net/flash/all/1/igra-tetro-bashnya-3d.jpg", category: "Arcade" },
+      { name: "Tetricraft", url: "https://st.8games.net/12/8g/igra-tetrikraft", icon: "https://static.8games.net/flash/all/1/igra-tetrikraft.jpg", category: "Arcade" },
+      { name: "Billy the Archer", url: "https://st.8games.net/12/8g/igra-billi-luchnik", icon: "https://static.8games.net/flash/all/1/igra-billi-luchnik.jpg", category: "Arcade" },
+      { name: "Frost Defense", url: "https://st.8games.net/12/8g/igra-moroznaya-zashchita", icon: "https://static.8games.net/flash/all/1/igra-moroznaya-zashchita.jpg", category: "Arcade" },
+      { name: "Super Mario Bros", url: "https://iframe.unblocked-76-games.org/super-mario-bros-main/", icon: "https://pokigamez.github.io/images/super-mario-bros.png", category: "Arcade" },
+      { name: "Blumgi Castle", url: "https://iframe.unblocked-76-games.org/blumgi-castle-main/", icon: "https://pokigamez.github.io/images/blumgi-castle.png", category: "Arcade" },
+      
+      // === PUZZLE ===
+      { name: "2048", url: "https://block-blast-puzzle.github.io/2048.html", icon: "https://block-blast-puzzle.github.io/images/icon/2048.jpg", category: "Puzzle" },
+      { name: "2048 Ultimate", url: "https://st.8games.net/12/8g/igra-absolyutnyj-2048", icon: "https://static.8games.net/flash/all/1/igra-absolyutnyj-2048.jpg", category: "Puzzle" },
+      { name: "Level Devil", url: "https://iframe.unblocked-76-games.org/level-devil-main/", icon: "https://pokigamez.github.io/images/level-devil.png", category: "Puzzle" },
+      { name: "Bubble Shooter", url: "https://iframe.unblocked-76-games.org/bubble-shooter-main/", icon: "https://pokigamez.github.io/images/bubble-shooter.png", category: "Puzzle" },
+      { name: "Master Chess", url: "https://iframe.unblocked-76-games.org/master-chess-main/", icon: "https://pokigamez.github.io/images/master-chess.png", category: "Puzzle" },
+      { name: "Bloxorz", url: "https://iframe.unblocked-76-games.org/bloxorz-main/", icon: "https://pokigamez.github.io/images/bloxorz.png", category: "Puzzle" },
+      { name: "Block Blast", url: "https://block-blast-puzzle.github.io/file", icon: "https://block-blast-puzzle.github.io/images/icon_game.png", category: "Puzzle", featured: true },
+      { name: "Infinite Craft", url: "https://infinite-craft.modmojheh.workers.dev/infinite-craft/", icon: "https://mojhehh.github.io/gemtra/infinite-craft.svg", category: "Puzzle", featured: true },
+      { name: "The Password Game", url: "https://neal.fun/password-game/", icon: "https://neal.fun/link-images/password-game.svg", category: "Puzzle", featured: true },
+      { name: "Escape Room: Memories", url: "https://st.8games.net/7/8g/igra-pobeg-iz-komnaty-tajna-vospominanij/", icon: "https://static.8games.net/flash/all/1/igra-pobeg-iz-komnaty-tajna-vospominanij.jpg", category: "Puzzle" },
+      { name: "Ice Castle Escape", url: "https://st.8games.net/7/8g/igra-pobeg-iz-ledyanogo-zamka/", icon: "https://static.8games.net/flash/all/1/igra-pobeg-iz-ledyanogo-zamka.jpg", category: "Puzzle" },
+      { name: "Prison Master: Escape", url: "https://st.8games.net/9/8g/igra-tyuremnyj-nadziratel-puteshestvie-k-pobegu/", icon: "https://static.8games.net/flash/all/1/igra-tyuremnyj-nadziratel-puteshestvie-k-pobegu.jpg", category: "Puzzle" },
+      { name: "The Legendary Plumber", url: "https://st.8games.net/12/8g/igra-legendarnyj-santekhnik", icon: "https://static.8games.net/flash/all/1/igra-legendarnyj-santekhnik.jpg", category: "Puzzle" },
+      { name: "Chess Merge", url: "https://st.8games.net/12/8g/igra-shakhmatnoe-sliyanie", icon: "https://static.8games.net/flash/all/1/igra-shakhmatnoe-sliyanie.jpg", category: "Puzzle" },
+      { name: "Absurd Trolley Problems", url: "https://neal.fun/absurd-trolley-problems/", icon: "https://neal.fun/link-images/absurd-trolley-problems.svg", category: "Puzzle" },
+      { name: "Not a Robot", url: "https://neal.fun/not-a-robot/", icon: "https://neal.fun/link-images/not-a-robot.svg", category: "Puzzle" },
+      
+      // === CASUAL ===
+      { name: "Cookie Clicker", url: "https://iframe.unblocked-76-games.org/cookie-clicker-main", icon: "https://pokigamez.github.io/images/cookie-clicker.png", category: "Casual", featured: true },
+      { name: "BitLife", url: "https://gameinclassroom.github.io/bitlife", icon: "https://pokigamez.github.io/images/bitlife.png", category: "Casual", featured: true },
+      { name: "Mahjong Zodiac", url: "https://st.8games.net/9/8g/igra-madzhong-zodiak/", icon: "https://static.8games.net/flash/all/1/igra-madzhong-zodiak.jpg", category: "Casual" },
+      { name: "Solitaire Holiday", url: "https://st.8games.net/9/8g/igra-prazdnichnyj-pasyans/", icon: "https://static.8games.net/flash/all/1/igra-prazdnichnyj-pasyans.jpg", category: "Casual" },
+      { name: "Tic Tac Toe Evolution", url: "https://st.8games.net/12/8g/igra-krestiki-noliki-evolyutsiya", icon: "https://static.8games.net/flash/all/1/igra-krestiki-noliki-evolyutsiya.jpg", category: "Casual" },
+      { name: "Perfect Circle", url: "https://neal.fun/perfect-circle/", icon: "https://neal.fun/link-images/perfect-circle.svg", category: "Casual" },
+      { name: "Stimulation Clicker", url: "https://neal.fun/stimulation-clicker/", icon: "https://neal.fun/link-images/stimulation-clicker.svg", category: "Casual" },
+      { name: "Sell Sell Sell", url: "https://neal.fun/sell-sell-sell/", icon: "https://neal.fun/link-images/sell-sell-sell.svg", category: "Casual" },
+      { name: "Life Checklist", url: "https://neal.fun/life-checklist/", icon: "https://neal.fun/link-images/life-checklist.svg", category: "Casual" },
+      
+      // === ADVENTURE / SURVIVAL ===
+      { name: "Minecraft 1.8.8", url: "https://genizymath.github.io/iframe/181.html", icon: "https://newunblockedgames.gitlab.io/assets/thumb/minecraft-188.png", category: "Adventure", featured: true },
+      { name: "Survival: Mini Craft", url: "https://st.8games.net/12/8g/igra-vyzhivaniya-mini-kraft", icon: "https://static.8games.net/flash/all/1/igra-vyzhivaniya-mini-kraft.jpg", category: "Adventure" },
+      { name: "Mine: Techno Islands 3D", url: "https://st.8games.net/14/igra-majn-tekhno-ostrova-3d/", icon: "https://static.8games.net/flash/all/1/igra-majn-tekhno-ostrova-3d.jpg", category: "Adventure" },
+      { name: "Robbi: Island Survival", url: "https://st.8games.net/14/igra-robbi-vyzhivanie-na-ostrove/", icon: "https://static.8games.net/flash/all/1/igra-robbi-vyzhivanie-na-ostrove.jpg", category: "Adventure" },
+      { name: "Stranded Island Tycoon", url: "https://st.8games.net/14/igra-zastryavshij-na-ostrove-tajkun-kraft-i-vyzhivanie/", icon: "https://static.8games.net/flash/all/1/igra-zastryavshij-na-ostrove-tajkun-kraft-i-vyzhivanie.jpg", category: "Adventure" },
+      { name: "Jurassic World Simulator", url: "https://st.8games.net/7/8g/igra-simulyator-yurskogo-mira/", icon: "https://static.8games.net/flash/all/1/igra-simulyator-yurskogo-mira.jpg", category: "Adventure" },
+      { name: "99 Nights Survival", url: "https://st.8games.net/7/8g/igra-99-nochej-vyzhivaniya-pesochnitsa/", icon: "https://static.8games.net/flash/all/1/igra-99-nochej-vyzhivaniya-pesochnitsa.jpg", category: "Adventure" },
+      { name: "Runic Curse", url: "https://st.8games.net/14/igra-runicheskoe-proklyatie/", icon: "https://static.8games.net/flash/all/1/igra-runicheskoe-proklyatie.jpg", category: "Adventure" },
+      { name: "Pokemon Emerald", url: "https://bobzgames.github.io/GBA/launcher.html#pokemonemerald", icon: "https://newunblockedgames.gitlab.io/assets/thumb/pokemon-emerald.png", category: "Adventure" },
+      { name: "Hollow Knight", url: "https://gnhustgames.github.io/hollow-knight/", icon: "https://newunblockedgames.gitlab.io/assets/thumb/hollow-knight.png", category: "Adventure" },
+      
+      // === MULTIPLAYER ===
+      { name: "Among Us", url: "https://iframe.unblocked-76-games.org/among-us-main", icon: "https://pokigamez.github.io/images/among-us.png", category: "Multiplayer", featured: true },
+      { name: "12 MiniBattles", url: "https://rebemanae.github.io/12-minibattles/", icon: "https://newunblockedgames.gitlab.io/assets/thumb/12-minibattles.png", category: "Multiplayer" },
+      { name: "House of Hazards", url: "https://genizymath.github.io/iframe/339.html", icon: "https://newunblockedgames.gitlab.io/assets/thumb/house-of-hazards.png", category: "Multiplayer" },
+      
+      // === NEAL.FUN GAMES (Simulation/Educational) ===
+      { name: "Asteroid Launcher", url: "https://neal.fun/asteroid-launcher/", icon: "https://neal.fun/link-images/asteroid-launcher.svg", category: "Simulation" },
+      { name: "Spend Bill Gates Money", url: "https://neal.fun/spend/", icon: "https://neal.fun/link-images/spend.svg", category: "Simulation" },
+      { name: "Internet Roadtrip", url: "https://neal.fun/internet-roadtrip/", icon: "https://neal.fun/link-images/internet-roadtrip.svg", category: "Simulation" },
+      { name: "Deep Sea", url: "https://neal.fun/deep-sea/", icon: "https://neal.fun/link-images/deep-sea.svg", category: "Educational" },
+      { name: "Size of Space", url: "https://neal.fun/size-of-space/", icon: "https://neal.fun/link-images/size-of-space.svg", category: "Educational" },
+      { name: "Auction Game", url: "https://neal.fun/auction-game/", icon: "https://neal.fun/link-images/auction-game.svg", category: "Trivia" },
+      { name: "Space Elevator", url: "https://neal.fun/space-elevator/", icon: "https://neal.fun/link-images/space-elevator.svg", category: "Educational" },
+      { name: "Printing Money", url: "https://neal.fun/printing-money/", icon: "https://neal.fun/link-images/printing-money.svg", category: "Simulation" },
+      { name: "Design the Next iPhone", url: "https://neal.fun/design-the-next-iphone/", icon: "https://neal.fun/link-images/design-the-next-iphone.svg", category: "Creative" },
+      { name: "Dark Patterns", url: "https://neal.fun/dark-patterns/", icon: "https://neal.fun/link-images/dark-patterns.svg", category: "Educational" },
+      { name: "Earth Reviews", url: "https://neal.fun/earth-reviews/", icon: "https://neal.fun/link-images/earth-reviews.svg", category: "Casual" },
+      { name: "Let's Settle This", url: "https://neal.fun/lets-settle-this/", icon: "https://neal.fun/link-images/lets-settle-this.svg", category: "Trivia" },
+      { name: "Ambient Chaos", url: "https://neal.fun/ambient-chaos/", icon: "https://neal.fun/link-images/ambient-chaos.svg", category: "Creative" },
+      { name: "Universe Forecast", url: "https://neal.fun/universe-forecast/", icon: "https://neal.fun/link-images/universe-forecast.svg", category: "Educational" },
+      { name: "Life Stats", url: "https://neal.fun/life-stats/", icon: "https://neal.fun/link-images/life-stats.svg", category: "Simulation" },
+      { name: "Who Was Alive", url: "https://neal.fun/who-was-alive/", icon: "https://neal.fun/link-images/who-was-alive.svg", category: "Educational" },
+      { name: "Size of Life", url: "https://neal.fun/size-of-life/", icon: "https://neal.fun/link-images/size-of-life.svg", category: "Educational" },
+      { name: "Internet Artifacts", url: "https://neal.fun/internet-artifacts/", icon: "https://neal.fun/link-images/internet-artifacts.svg", category: "Educational" },
+      { name: "Wonders of Street View", url: "https://neal.fun/wonders-of-street-view/", icon: "https://neal.fun/link-images/wonders-of-street-view.svg", category: "Educational" },
+      { name: "Logos From Memory", url: "https://neal.fun/logos-from-memory/", icon: "https://neal.fun/link-images/logos-from-memory.svg", category: "Trivia" },
+      { name: "Baby Map", url: "https://neal.fun/baby-map/", icon: "https://neal.fun/link-images/baby-map.svg", category: "Simulation" },
+      { name: "Paper", url: "https://neal.fun/paper/", icon: "https://neal.fun/link-images/paper.svg", category: "Simulation" },
+      { name: "Speed", url: "https://neal.fun/speed/", icon: "https://neal.fun/link-images/speed.svg", category: "Educational" },
+      { name: "Progress", url: "https://neal.fun/progress/", icon: "https://neal.fun/link-images/progress.svg", category: "Casual" },
+    ];
+
+    // Get unique categories for filtering
+    const categories = [...new Set(gemtraGames.map(g => g.category))].sort();
+    
+    // Store games for filtering/searching (global)
+    window.gemtraAllGames = gemtraGames;
+    window.gemtraFilteredGames = [...gemtraGames];
+    window.gemtraCurrentCategory = 'All';
+    window.gemtraSearchQuery = '';
+    
+    // Render Gemtra section with lazy loading support
+    mainContent.innerHTML = `
+          <div class="appstore-header">
+              <h2>Gemtra Games</h2>
+              <p>190+ games - opens through Ultraviolet proxy</p>
+          </div>
+          <div class="gemtra-controls" style="display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem; padding: 0 0.5rem;">
+            <input type="text" id="gemtraSearch" placeholder="Search games..." 
+              style="flex: 1; min-width: 200px; padding: 0.5rem 1rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-secondary); color: var(--text);"
+              oninput="filterGemtraGames()">
+            <select id="gemtraCategoryFilter" onchange="filterGemtraGames()"
+              style="padding: 0.5rem 1rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-secondary); color: var(--text);">
+              <option value="All">All Categories</option>
+              ${categories.map(c => `<option value="${c}">${c}</option>`).join('')}
+            </select>
+            <span id="gemtraGameCount" style="color: var(--text-muted); align-self: center;">${gemtraGames.length} games</span>
+          </div>
+          <div id="gemtraGamesGrid" class="appstore-grid" style="max-height: 500px; overflow-y: auto;">
+            <!-- Games rendered via lazy loading -->
+          </div>
+      `;
+    
+    // Initialize lazy-loaded game rendering
+    renderGemtraGamesLazy();
   }
 }
+
+// Filter Gemtra games by search and category
+function filterGemtraGames() {
+  const searchInput = document.getElementById('gemtraSearch');
+  const categorySelect = document.getElementById('gemtraCategoryFilter');
+  const countSpan = document.getElementById('gemtraGameCount');
+  
+  const query = (searchInput?.value || '').toLowerCase();
+  const category = categorySelect?.value || 'All';
+  
+  window.gemtraSearchQuery = query;
+  window.gemtraCurrentCategory = category;
+  
+  window.gemtraFilteredGames = window.gemtraAllGames.filter(game => {
+    const matchesSearch = !query || game.name.toLowerCase().includes(query) || game.category.toLowerCase().includes(query);
+    const matchesCategory = category === 'All' || game.category === category;
+    return matchesSearch && matchesCategory;
+  });
+  
+  if (countSpan) {
+    countSpan.textContent = `${window.gemtraFilteredGames.length} games`;
+  }
+  
+  renderGemtraGamesLazy();
+}
+
+// Lazy-load game cards for performance (especially on iPad)
+function renderGemtraGamesLazy() {
+  const grid = document.getElementById('gemtraGamesGrid');
+  if (!grid) return;
+  
+  const games = window.gemtraFilteredGames || [];
+  
+  // Only render visible games + buffer for smooth scrolling
+  const batchSize = 30; // Render 30 games at a time
+  let renderedCount = 0;
+  
+  // Clear and render initial batch
+  grid.innerHTML = '';
+  
+  function renderBatch() {
+    const fragment = document.createDocumentFragment();
+    const end = Math.min(renderedCount + batchSize, games.length);
+    
+    for (let i = renderedCount; i < end; i++) {
+      const game = games[i];
+      const div = document.createElement('div');
+      div.className = 'appstore-item';
+      div.innerHTML = `
+        <div class="appstore-item-preview" style="background: linear-gradient(135deg, rgba(26, 163, 163, 0.1), rgba(138, 43, 226, 0.1)); display: flex; align-items: center; justify-content: center; padding: 1rem;">
+          <img src="${game.icon}" alt="${game.name}" loading="lazy" style="max-width: 80px; max-height: 80px; border-radius: 12px; object-fit: contain;" onerror="this.style.display='none'; this.parentElement.innerHTML='<i class=\\'fas fa-gamepad\\' style=\\'font-size: 3rem; color: var(--accent);\\'></i>';">
+        </div>
+        <div class="appstore-item-info">
+          <div class="appstore-item-name">${game.name}${game.featured ? ' <i class="fas fa-star" style="color: gold; font-size: 0.7rem;"></i>' : ''}</div>
+          <div class="appstore-item-author"><span class="appstore-item-category">${game.category}</span></div>
+          <div class="appstore-item-desc">Play ${game.name} through Ultraviolet proxy</div>
+          <button class="appstore-item-btn" onclick="openGemtraGame('${game.url.replace(/'/g, "\\'")}')">
+            <i class="fas fa-play"></i> Play
+          </button>
+        </div>
+      `;
+      fragment.appendChild(div);
+    }
+    
+    grid.appendChild(fragment);
+    renderedCount = end;
+    
+    // If more games to load, add a "Load More" trigger or use intersection observer
+    if (renderedCount < games.length) {
+      const loadMoreDiv = document.createElement('div');
+      loadMoreDiv.id = 'gemtraLoadMore';
+      loadMoreDiv.style.cssText = 'text-align: center; padding: 1rem; grid-column: 1/-1;';
+      loadMoreDiv.innerHTML = `<button class="appstore-item-btn" onclick="loadMoreGemtraGames()" style="background: var(--accent);">Load More (${games.length - renderedCount} remaining)</button>`;
+      grid.appendChild(loadMoreDiv);
+    }
+  }
+  
+  // Store render function globally for "Load More"
+  window.loadMoreGemtraGames = function() {
+    const loadMoreBtn = document.getElementById('gemtraLoadMore');
+    if (loadMoreBtn) loadMoreBtn.remove();
+    renderBatch();
+  };
+  
+  renderBatch();
+}
+
+// Open a Gemtra game through Ultraviolet proxy
+function openGemtraGame(gameUrl) {
+  if (!checkFileProtocol("Gemtra Games")) {
+    showToast("Ultraviolet doesn't work on file:// protocol. Run Veltra on a local server!", "fa-exclamation-triangle");
+    return;
+  }
+  
+  // Create a window with an iframe pointing to Ultraviolet with the game URL
+  try {
+    const encodedUrl = __uv$config.prefix + __uv$config.encodeUrl(gameUrl);
+    const iframeId = 'game-iframe-' + Date.now();
+    
+    // createWindow expects: title, icon, content, width, height, appName, noPadding
+    createWindow(
+      "Gemtra Game",
+      "fas fa-gamepad",
+      `<div style="width: 100%; height: 100%; overflow: hidden; background: #1a1a2e;">
+        <iframe id="${iframeId}" src="${encodedUrl}" style="width: 100%; height: 100%; border: none;" allowfullscreen allow="accelerometer; gyroscope; autoplay; fullscreen" sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-pointer-lock allow-modals"></iframe>
+      </div>`,
+      1000,
+      700,
+      null,
+      true
+    );
+    
+    // Suppress alerts from game iframe after it loads
+    setTimeout(() => {
+      try {
+        const iframe = document.getElementById(iframeId);
+        if (iframe && iframe.contentWindow) {
+          iframe.contentWindow.alert = () => {};
+          iframe.contentWindow.confirm = () => true;
+        }
+      } catch (e) {
+        // Cross-origin, can't suppress - that's okay
+      }
+    }, 2000);
+  } catch (err) {
+    console.error('Error opening Gemtra game:', err);
+    showToast("Failed to load game through proxy.", "fa-exclamation-triangle");
+  }
+}
+
 function installTheme(themeName) {
   if (installedThemes.includes(themeName)) {
     showToast("Theme already installed", "fa-info-circle");
@@ -8016,7 +9876,7 @@ function installTheme(themeName) {
 
   installedThemes.push(themeName);
   localStorage.setItem(
-    "nautilusOS_installedThemes",
+    "Veltra_installedThemes",
     JSON.stringify(installedThemes)
   );
   showToast("Theme installed! Go to Settings to apply it.", "fa-check-circle");
@@ -8031,7 +9891,7 @@ function uninstallTheme(themeName) {
   if (index > -1) {
     installedThemes.splice(index, 1);
     localStorage.setItem(
-      "nautilusOS_installedThemes",
+      "Veltra_installedThemes",
       JSON.stringify(installedThemes)
     );
     showToast("Theme uninstalled", "fa-trash");
@@ -8057,7 +9917,7 @@ function applyTheme(themeName) {
   if (!theme) { console.warn("Theme not found:", themeName); return; }
   console.log(themeLink)
   themeLink.href = theme.url
-  localStorage.setItem("nautilusOS_currentTheme", themeName);
+  localStorage.setItem("Veltra_currentTheme", themeName);
   appliedThemeName = themeName;
 }
 
@@ -8391,7 +10251,7 @@ function navigateBrowser(input) {
   let url = input.trim();
 
   if (!url.includes(".") || url.includes(" ")) {
-    const searchEngine = localStorage.getItem('nOS_searchEngine') || 'https://search.brave.com/search?q=';
+    const searchEngine = localStorage.getItem('veltra_searchEngine') || 'https://search.brave.com/search?q=';
     url = searchEngine + encodeURIComponent(url);
   } else {
     if (!url.startsWith("http://") && !url.startsWith("https://")) {
@@ -8432,12 +10292,17 @@ async function loadBrowserPage(url) {
   const loading = document.getElementById("browserLoading");
   if (loading) loading.classList.add("active");
 
+  // Add timeout for slow devices (iPad etc)
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
   try {
     viewEl.innerHTML = "";
 
     const proxiedUrl =
       "https://api.codetabs.com/v1/proxy/?quest=" + encodeURIComponent(url);
-    const response = await fetch(proxiedUrl);
+    const response = await fetch(proxiedUrl, { signal: controller.signal });
+    clearTimeout(timeoutId);
     if (!response.ok) throw new Error("Failed to load page");
     const rawHtml = await response.text();
     const urlObj = new URL(url);
@@ -8479,12 +10344,15 @@ async function loadBrowserPage(url) {
       if (titleEl) titleEl.textContent = currentTab.title;
     }
     viewEl.scrollTop = 0;
-    viewEl.onclick = (event) => {
+    
+    // Handle link clicks - use both click and touchend for iPad/Safari compatibility
+    const handleLinkNavigation = (event) => {
       const link = event.target.closest("a[href]");
       if (!link) return;
       const href = link.getAttribute("href");
       if (!href || href.startsWith("javascript:")) return;
       event.preventDefault();
+      event.stopPropagation();
       let targetUrl;
       try {
         targetUrl = new URL(href, url).toString();
@@ -8493,6 +10361,14 @@ async function loadBrowserPage(url) {
       }
       navigateBrowser(targetUrl);
     };
+    
+    // Use both click and touchend for better touch device support
+    viewEl.onclick = handleLinkNavigation;
+    viewEl.addEventListener('touchend', (event) => {
+      // Small delay to let Safari process the touch
+      setTimeout(() => handleLinkNavigation(event), 50);
+    }, { passive: false });
+    
     viewEl.addEventListener(
       "submit",
       (event) => {
@@ -8561,12 +10437,21 @@ async function loadBrowserPage(url) {
     }, 500);
   } catch (error) {
     console.error("Browser error:", error);
+    const isTimeout = error.name === 'AbortError';
+    const errorTitle = isTimeout ? 'Page Load Timed Out' : 'Unable to Load Page';
+    const errorMsg = isTimeout 
+      ? 'The page took too long to load. This might be due to slow connection or the website being unavailable. Try again or visit the site directly.'
+      : 'The page could not be loaded. Some websites prevent embedding for security reasons. Try visiting the site directly.';
+    
     viewEl.innerHTML = `
                   <div class="browser-error">
-                      <i class="fas fa-exclamation-triangle browser-error-icon"></i>
-                      <h2 class="browser-error-title">Unable to Load Page</h2>
-                      <p class="browser-error-message">The page could not be loaded. Some websites prevent embedding for security reasons. Try visiting the site directly.</p>
-                      <button class="browser-error-btn" onclick="window.open('${url}', '_blank')">Open in New Tab</button>
+                      <i class="fas ${isTimeout ? 'fa-clock' : 'fa-exclamation-triangle'} browser-error-icon"></i>
+                      <h2 class="browser-error-title">${errorTitle}</h2>
+                      <p class="browser-error-message">${errorMsg}</p>
+                      <div style="display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center;">
+                        <button class="browser-error-btn" onclick="navigateBrowser('${url}')">Try Again</button>
+                        <button class="browser-error-btn" onclick="window.open('${url}', '_blank')">Open in New Tab</button>
+                      </div>
                   </div>
               `;
   } finally {
@@ -8648,7 +10533,7 @@ function calcInput(value) {
     calcCurrentValue = "";
 
     if (history) {
-      const opSymbol = value === "*" ? "×" : value === "/" ? "÷" : value;
+      const opSymbol = value === "*" ? "Ã—" : value === "/" ? "Ã·" : value;
       history.textContent = `${calcPreviousValue} ${opSymbol}`;
     }
 
@@ -8668,7 +10553,7 @@ function calcInput(value) {
 
   if (history && calcOperation && calcPreviousValue) {
     const opSymbol =
-      calcOperation === "*" ? "×" : calcOperation === "/" ? "÷" : calcOperation;
+      calcOperation === "*" ? "Ã—" : calcOperation === "/" ? "Ã·" : calcOperation;
     history.textContent = `${calcPreviousValue} ${opSymbol} ${calcCurrentValue}`;
   }
 }
@@ -8716,7 +10601,7 @@ function calcEquals() {
 
   if (history) {
     const opSymbol =
-      calcOperation === "*" ? "×" : calcOperation === "/" ? "÷" : calcOperation;
+      calcOperation === "*" ? "Ã—" : calcOperation === "/" ? "Ã·" : calcOperation;
     history.textContent = `${calcPreviousValue} ${opSymbol} ${calcCurrentValue} =`;
   }
 
@@ -8882,12 +10767,6 @@ function runPythonCode() {
   } catch (error) {
     output.innerHTML = `<div style="color: var(--error-red);"><i class="fas fa-exclamation-circle"></i> Error: ${escapeHtml(error.message)}</div>`;
   }
-}
-
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
 }
 
 function clearPythonOutput() {
@@ -9336,26 +11215,26 @@ function setupComplete() {
     }
   });
 
-  localStorage.setItem("nautilusOS_username", username);
+  localStorage.setItem("Veltra_username", username);
   if (isPasswordless) {
-    localStorage.setItem("nautilusOS_password", "");
-    localStorage.setItem("nautilusOS_isPasswordless", "true");
+    localStorage.setItem("Veltra_password", "");
+    localStorage.setItem("Veltra_isPasswordless", "true");
   } else {
-    localStorage.setItem("nautilusOS_password", hashPassword(password));
-    localStorage.setItem("nautilusOS_isPasswordless", "false");
+    localStorage.setItem("Veltra_password", hashPassword(password));
+    localStorage.setItem("Veltra_isPasswordless", "false");
   }
-  localStorage.setItem("nautilusOS_setupComplete", "true");
-  localStorage.setItem("nautilusOS_bloatlessMode", isBloatless ? "true" : "false");
+  localStorage.setItem("Veltra_setupComplete", "true");
+  localStorage.setItem("Veltra_bloatlessMode", isBloatless ? "true" : "false");
   localStorage.setItem(
-    "nautilusOS_installedThemes",
+    "Veltra_installedThemes",
     JSON.stringify(installedThemes)
   );
   localStorage.setItem(
-    "nautilusOS_installedApps",
+    "Veltra_installedApps",
     JSON.stringify(installedApps)
   );
   localStorage.setItem(
-    "nautilusOS_startupApps",
+    "Veltra_startupApps",
     JSON.stringify(startupApps)
   );
   saveSettingsToLocalStorage();
@@ -9412,7 +11291,7 @@ function setupComplete() {
     }, 100);
   }
 
-  let welcomeMessage = "Setup complete! Welcome to NautilusOS";
+  let welcomeMessage = "Setup complete! Welcome to Veltra";
   let toastIcon = "fa-check-circle";
   if (username.toLowerCase() === "dinguschan") {
     welcomeMessage = "Welcome back, developer! Is it really you?!";
@@ -9438,7 +11317,7 @@ function setupComplete() {
 }
 async function forgotPassword() {
   const isPasswordless =
-    localStorage.getItem("nautilusOS_isPasswordless") === "true";
+    localStorage.getItem("Veltra_isPasswordless") === "true";
   const message = isPasswordless
     ? "This will reset your passwordless account and return you to setup. All data will be preserved. Continue?"
     : "This will reset your account and return you to setup. All data will be preserved. Continue?";
@@ -9446,10 +11325,10 @@ async function forgotPassword() {
   const confirmed = await confirm(message);
   if (!confirmed) return;
 
-  localStorage.removeItem("nautilusOS_username");
-  localStorage.removeItem("nautilusOS_password");
-  localStorage.removeItem("nautilusOS_isPasswordless");
-  localStorage.removeItem("nautilusOS_setupComplete");
+  localStorage.removeItem("Veltra_username");
+  localStorage.removeItem("Veltra_password");
+  localStorage.removeItem("Veltra_isPasswordless");
+  localStorage.removeItem("Veltra_setupComplete");
 
   const usernameInput = document.getElementById("username");
   if (usernameInput) usernameInput.value = "";
@@ -9516,11 +11395,11 @@ function setupStep3Back() {
 }
 
 function saveSettingsToLocalStorage() {
-  localStorage.setItem("nautilusOS_settings", JSON.stringify(settings));
+  localStorage.setItem("Veltra_settings", JSON.stringify(settings));
 }
 
 function loadSettingsFromLocalStorage() {
-  const saved = localStorage.getItem("nautilusOS_settings");
+  const saved = localStorage.getItem("Veltra_settings");
   if (saved) {
     try {
       const parsed = JSON.parse(saved);
@@ -9532,13 +11411,13 @@ function loadSettingsFromLocalStorage() {
 }
 
 function loadAndApplyTheme() {
-  const saved = localStorage.getItem("nautilusOS_currentTheme");
+  const saved = localStorage.getItem("Veltra_currentTheme");
   const themeToApply = (saved && themeDefinitions[saved]) ? saved : "dark";
   applyTheme(themeToApply);
 }
 
 function loadInstalledThemes() {
-  const saved = localStorage.getItem("nautilusOS_installedThemes");
+  const saved = localStorage.getItem("Veltra_installedThemes");
   if (saved) {
     try {
       installedThemes = JSON.parse(saved);
@@ -9578,7 +11457,7 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   // Restore Community Apps
-  const savedCommunityApps = JSON.parse(localStorage.getItem('nautilusOS_communityApps') || '{}');
+  const savedCommunityApps = JSON.parse(localStorage.getItem('Veltra_communityApps') || '{}');
   Object.keys(savedCommunityApps).forEach(appId => {
     const appData = savedCommunityApps[appId];
     createDesktopIcon(appId, appData.name, appData.icon || 'fas fa-box');
@@ -9633,7 +11512,7 @@ async function signOutToLogin() {
     if (password) password.value = "";
 
     const username = document.getElementById("username");
-    const savedUsername = localStorage.getItem("nautilusOS_username");
+    const savedUsername = localStorage.getItem("Veltra_username");
     if (username && savedUsername) {
       username.value = savedUsername;
     }
@@ -9648,7 +11527,7 @@ async function signOutToLogin() {
       login.style.opacity = "1";
 
       const isPasswordless =
-        localStorage.getItem("nautilusOS_isPasswordless") === "true";
+        localStorage.getItem("Veltra_isPasswordless") === "true";
       if (isPasswordless) {
         const usernameInput = document.getElementById("username");
         if (usernameInput) {
@@ -9664,7 +11543,7 @@ async function signOutToLogin() {
 }
 async function resetAllData() {
   const confirmed = await confirm(
-    '<i class="fa-solid fa-triangle-exclamation"></i> WARNING: This will permanently delete ALL your data including:</br></br>• Your account (username & password)</br>• All settings and preferences</br>• All files and folders</br>• Installed themes and apps</br>• Boot preferences</br></br>This action CANNOT be undone! Are you absolutely sure you want to continue?'
+    '<i class="fa-solid fa-triangle-exclamation"></i> WARNING: This will permanently delete ALL your data including:</br></br>â€¢ Your account (username & password)</br>â€¢ All settings and preferences</br>â€¢ All files and folders</br>â€¢ Installed themes and apps</br>â€¢ Boot preferences</br></br>This action CANNOT be undone! Are you absolutely sure you want to continue?'
   );
   if (!confirmed) return;
 
@@ -9674,12 +11553,12 @@ async function resetAllData() {
     return;
   }
 
-  const achievements = localStorage.getItem("nautilusOS_achievements");
+  const achievements = localStorage.getItem("Veltra_achievements");
 
   localStorage.clear();
 
   if (achievements) {
-    localStorage.setItem("nautilusOS_achievements", achievements);
+    localStorage.setItem("Veltra_achievements", achievements);
   }
 
   showToast("All data has been erased. Reloading...", "fa-trash-alt");
@@ -9704,7 +11583,7 @@ async function changeuser() {
   };
 
   showToast("Username changed successfully. Reloading...", "fa-check-circle");
-  localStorage.setItem("nautilusOS_username", newUsername);
+  localStorage.setItem("Veltra_username", newUsername);
 
   setTimeout(() => {
     location.reload();
@@ -9810,7 +11689,7 @@ let installedGames = [];
 let bloatlessMode = false;
 
 function hashPassword(password) {
-  const salt = "NautilusOS_Salt_2024"; // Simple salt for demo
+  const salt = "Veltra_Salt_2024"; // Simple salt for demo
   let hash = 0;
   const combined = password + salt;
   for (let i = 0; i < combined.length; i++) {
@@ -9822,7 +11701,7 @@ function hashPassword(password) {
 }
 
 function loadInstalledApps() {
-  const saved = localStorage.getItem("nautilusOS_installedApps");
+  const saved = localStorage.getItem("Veltra_installedApps");
   if (saved) {
     try {
       installedApps = JSON.parse(saved);
@@ -9831,7 +11710,7 @@ function loadInstalledApps() {
     }
   }
 
-  const savedStartup = localStorage.getItem("nautilusOS_startupApps");
+  const savedStartup = localStorage.getItem("Veltra_startupApps");
   if (savedStartup) {
     try {
       startupApps = JSON.parse(savedStartup);
@@ -9841,7 +11720,7 @@ function loadInstalledApps() {
   }
 
   // Load bloatless mode setting
-  bloatlessMode = localStorage.getItem("nautilusOS_bloatlessMode") === "true";
+  bloatlessMode = localStorage.getItem("Veltra_bloatlessMode") === "true";
 }
 
 function installApp(appName) {
@@ -9852,7 +11731,7 @@ function installApp(appName) {
 
   installedApps.push(appName);
   localStorage.setItem(
-    "nautilusOS_installedApps",
+    "Veltra_installedApps",
     JSON.stringify(installedApps)
   );
 
@@ -9882,7 +11761,7 @@ function uninstallApp(appName) {
   if (index > -1) {
     installedApps.splice(index, 1);
     localStorage.setItem(
-      "nautilusOS_installedApps",
+      "Veltra_installedApps",
       JSON.stringify(installedApps)
     );
 
@@ -9919,7 +11798,7 @@ function installGame(gameName) {
 
   installedGames.push(gameName);
   localStorage.setItem(
-    "nautilusOS_installedGames",
+    "Veltra_installedGames",
     JSON.stringify(installedGames)
   );
 
@@ -9938,7 +11817,7 @@ function uninstallGame(gameName) {
   if (index > -1) {
     installedGames.splice(index, 1);
     localStorage.setItem(
-      "nautilusOS_installedGames",
+      "Veltra_installedGames",
       JSON.stringify(installedGames)
     );
 
@@ -9955,7 +11834,7 @@ function uninstallGame(gameName) {
 }
 
 function loadInstalledGames() {
-  const saved = localStorage.getItem("nautilusOS_installedGames");
+  const saved = localStorage.getItem("Veltra_installedGames");
   if (saved) {
     try {
       installedGames = JSON.parse(saved);
@@ -10220,9 +12099,17 @@ let aiSnake = {
 
 // Initialize AI Snake App
 async function initializeAISnakeApp() {
+  // Reset model state first
+  aiSnake.model = null;
+  aiSnake.targetModel = null;
+  
   if (typeof tf === 'undefined') {
     updateAITrainingStatus('Loading TensorFlow.js...');
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Wait longer for TensorFlow to load
+    for (let i = 0; i < 10; i++) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      if (typeof tf !== 'undefined') break;
+    }
     if (typeof tf === 'undefined') {
       updateAITrainingStatus('Error: TensorFlow.js failed to load. Please refresh the page.');
       return;
@@ -10230,7 +12117,10 @@ async function initializeAISnakeApp() {
   }
 
   aiSnake.canvas = document.getElementById('aiSnakeCanvas');
-  if (!aiSnake.canvas) return;
+  if (!aiSnake.canvas) {
+    updateAITrainingStatus('Error: Canvas not found.');
+    return;
+  }
 
   aiSnake.ctx = aiSnake.canvas.getContext('2d');
 
@@ -10239,6 +12129,8 @@ async function initializeAISnakeApp() {
     await tf.ready();
     aiSnake.deviceInfo = tf.getBackend();
     const useGPU = document.getElementById('aiUseGPU');
+    const gpuStatusEl = document.getElementById('aiGPUStatus');
+    
     if (useGPU) {
       const useGPUValue = localStorage.getItem('aiSnakeUseGPU');
       if (useGPUValue !== null) {
@@ -10246,20 +12138,26 @@ async function initializeAISnakeApp() {
       }
       aiSnake.useGPU = useGPU.checked;
 
-      if (aiSnake.useGPU && aiSnake.deviceInfo === 'webgl') {
-        document.getElementById('aiGPUStatus').textContent = 'GPU: WebGL Active';
-        document.getElementById('aiGPUStatus').style.color = '#4ade80';
-      } else if (aiSnake.useGPU && aiSnake.deviceInfo === 'webgpu') {
-        document.getElementById('aiGPUStatus').textContent = 'GPU: WebGPU Active';
-        document.getElementById('aiGPUStatus').style.color = '#4ade80';
-      } else {
-        document.getElementById('aiGPUStatus').textContent = `GPU: ${aiSnake.deviceInfo} (CPU Fallback)`;
-        document.getElementById('aiGPUStatus').style.color = '#ffaa00';
+      if (gpuStatusEl) {
+        if (aiSnake.useGPU && aiSnake.deviceInfo === 'webgl') {
+          gpuStatusEl.textContent = 'GPU: WebGL Active';
+          gpuStatusEl.style.color = '#4ade80';
+        } else if (aiSnake.useGPU && aiSnake.deviceInfo === 'webgpu') {
+          gpuStatusEl.textContent = 'GPU: WebGPU Active';
+          gpuStatusEl.style.color = '#4ade80';
+        } else {
+          gpuStatusEl.textContent = `GPU: ${aiSnake.deviceInfo} (CPU Fallback)`;
+          gpuStatusEl.style.color = '#ffaa00';
+        }
       }
     }
   } catch (e) {
-    document.getElementById('aiGPUStatus').textContent = 'GPU: CPU Only';
-    document.getElementById('aiGPUStatus').style.color = '#ef4444';
+    console.error('GPU check error:', e);
+    const gpuStatusEl = document.getElementById('aiGPUStatus');
+    if (gpuStatusEl) {
+      gpuStatusEl.textContent = 'GPU: CPU Only';
+      gpuStatusEl.style.color = '#ef4444';
+    }
   }
 
   // Load saved state
@@ -10269,9 +12167,16 @@ async function initializeAISnakeApp() {
   setupAISnakeUIHandlers();
 
   // Create neural network model
-  await createAISnakeModel();
-
-  updateAITrainingStatus('Ready to start training. Click "Start Training" to begin.');
+  try {
+    await createAISnakeModel();
+    if (!aiSnake.model) {
+      throw new Error('Model creation failed');
+    }
+    updateAITrainingStatus('Ready to start training. Click "Start Training" to begin.');
+  } catch (e) {
+    console.error('Model creation error:', e);
+    updateAITrainingStatus('Error creating model: ' + e.message);
+  }
 }
 
 // Setup UI event handlers
@@ -10333,6 +12238,36 @@ function setupAISnakeUIHandlers() {
   }
 }
 
+// Clone a TensorFlow.js model (since tf.Model doesn't have a built-in clone method)
+async function cloneTFModel(sourceModel) {
+  // Create a new model with the same architecture
+  const modelConfig = sourceModel.getConfig();
+  const clonedModel = tf.sequential();
+  
+  // Recreate each layer
+  for (let i = 0; i < sourceModel.layers.length; i++) {
+    const layer = sourceModel.layers[i];
+    const layerConfig = layer.getConfig();
+    const layerClass = layer.getClassName();
+    
+    if (layerClass === 'Dense') {
+      clonedModel.add(tf.layers.dense(layerConfig));
+    }
+  }
+  
+  // Copy the weights
+  const weights = sourceModel.getWeights();
+  clonedModel.setWeights(weights.map(w => w.clone()));
+  
+  // Compile with same optimizer settings
+  clonedModel.compile({
+    optimizer: tf.train.adam(aiSnake.learningRate),
+    loss: 'meanSquaredError'
+  });
+  
+  return clonedModel;
+}
+
 // Create Deep Q-Network model
 async function createAISnakeModel() {
   if (aiSnake.model) {
@@ -10359,7 +12294,7 @@ async function createAISnakeModel() {
   });
 
   aiSnake.model = model;
-  aiSnake.targetModel = model.clone();
+  aiSnake.targetModel = await cloneTFModel(model);
 
   updateAITrainingStatus('Neural network model created successfully.');
 }
@@ -10424,31 +12359,51 @@ function getGameState(game) {
   return features.slice(0, 24); // Ensure exactly 24 features
 }
 
-// Create a new game instance
+// Create a new game instance with multiple apples
 function createAIGame() {
-  return {
+  const game = {
     snake: [{ x: 10, y: 10 }],
-    food: { x: 15, y: 15 },
+    foods: [], // Multiple apples!
+    food: null, // Keep for compatibility
     direction: { x: 1, y: 0 },
     score: 0,
     steps: 0,
     gameOver: false,
-    lastFoodDistance: Infinity
+    lastFoodDistance: Infinity,
+    appleCount: 5 // Number of apples on screen
   };
+  // Generate initial apples
+  for (let i = 0; i < game.appleCount; i++) {
+    game.foods.push(generateAIFoodPosition(game));
+  }
+  // Set first food for compatibility with existing code
+  game.food = game.foods[0];
+  return game;
 }
 
-// Generate food position
-function generateAIFood(game) {
+// Generate food position that doesn't overlap with snake or existing food
+function generateAIFoodPosition(game) {
   let newFood;
   let foodOnSnake = true;
-  while (foodOnSnake) {
+  let attempts = 0;
+  while (foodOnSnake && attempts < 100) {
     newFood = {
       x: Math.floor(Math.random() * aiSnake.tileCount),
       y: Math.floor(Math.random() * aiSnake.tileCount)
     };
     foodOnSnake = game.snake.some(segment => segment.x === newFood.x && segment.y === newFood.y);
+    // Also check it doesn't overlap with existing foods
+    if (!foodOnSnake && game.foods) {
+      foodOnSnake = game.foods.some(f => f.x === newFood.x && f.y === newFood.y);
+    }
+    attempts++;
   }
   return newFood;
+}
+
+// Keep old name for compatibility
+function generateAIFood(game) {
+  return generateAIFoodPosition(game);
 }
 
 // Perform action in game
@@ -10485,10 +12440,28 @@ function performAIAction(game, action) {
   game.snake.unshift(newHead);
   game.steps++;
 
-  // Check food
-  if (newHead.x === game.food.x && newHead.y === game.food.y) {
+  // Check if snake ate any food (multiple apples support)
+  let ateFood = false;
+  if (game.foods && game.foods.length > 0) {
+    for (let i = 0; i < game.foods.length; i++) {
+      if (newHead.x === game.foods[i].x && newHead.y === game.foods[i].y) {
+        game.score += 10;
+        // Replace eaten apple with new one
+        game.foods[i] = generateAIFoodPosition(game);
+        ateFood = true;
+        break;
+      }
+    }
+    // Update food reference to closest apple for AI state calculation
+    game.food = findClosestFood(game);
+  } else if (newHead.x === game.food.x && newHead.y === game.food.y) {
+    // Fallback for single food
     game.score += 10;
     game.food = generateAIFood(game);
+    ateFood = true;
+  }
+
+  if (ateFood) {
     game.lastFoodDistance = Infinity;
   } else {
     game.snake.pop();
@@ -10496,22 +12469,46 @@ function performAIAction(game, action) {
     game.lastFoodDistance = foodDist;
   }
 
-  // Penalty for too many steps without eating
-  if (game.steps > 200 && game.score === 0) {
+  // Penalty for too many steps without eating (increased limit with more apples)
+  if (game.steps > 300 && game.score === 0) {
     game.gameOver = true;
   }
 }
 
+// Find the closest food to the snake head
+function findClosestFood(game) {
+  if (!game.foods || game.foods.length === 0) return game.food;
+  const head = game.snake[0];
+  let closest = game.foods[0];
+  let minDist = Math.abs(head.x - closest.x) + Math.abs(head.y - closest.y);
+  for (let i = 1; i < game.foods.length; i++) {
+    const dist = Math.abs(head.x - game.foods[i].x) + Math.abs(head.y - game.foods[i].y);
+    if (dist < minDist) {
+      minDist = dist;
+      closest = game.foods[i];
+    }
+  }
+  return closest;
+}
+
 // Predict action using model
 async function predictAction(game) {
+  // Check if model exists before predicting
+  if (!aiSnake.model) {
+    console.warn('AI Snake model not initialized, using random action');
+    return Math.floor(Math.random() * 4);
+  }
+
   const state = getGameState(game);
-  const stateTensor = tf.tensor2d([state]);
+  let stateTensor = null;
 
   try {
-    const prediction = await aiSnake.model.predict(stateTensor);
+    stateTensor = tf.tensor2d([state]);
+    const prediction = aiSnake.model.predict(stateTensor);
     const qValues = await prediction.data();
     prediction.dispose();
     stateTensor.dispose();
+    stateTensor = null;
 
     // Epsilon-greedy exploration
     if (Math.random() < aiSnake.epsilon) {
@@ -10520,18 +12517,31 @@ async function predictAction(game) {
 
     return qValues.indexOf(Math.max(...qValues));
   } catch (e) {
-    stateTensor.dispose();
+    console.error('Prediction error:', e);
+    if (stateTensor) stateTensor.dispose();
     return Math.floor(Math.random() * 4);
   }
 }
 
 // Train the model
 async function trainAIModel() {
+  // Prevent concurrent training calls
+  if (aiSnake.isTraining) {
+    return;
+  }
+
+  // Check if models exist before training
+  if (!aiSnake.model || !aiSnake.targetModel) {
+    console.warn('AI Snake models not initialized, skipping training');
+    return;
+  }
+
   if (aiSnake.memory.length < aiSnake.batchSize) {
     return;
   }
 
-  const batch = [];
+  aiSnake.isTraining = true;
+
   const sampleIndices = [];
   for (let i = 0; i < aiSnake.batchSize; i++) {
     sampleIndices.push(Math.floor(Math.random() * aiSnake.memory.length));
@@ -10540,44 +12550,51 @@ async function trainAIModel() {
   const states = [];
   const targets = [];
 
-  for (const idx of sampleIndices) {
-    const { state, action, reward, nextState, done } = aiSnake.memory[idx];
+  try {
+    for (const idx of sampleIndices) {
+      const { state, action, reward, nextState, done } = aiSnake.memory[idx];
 
-    const stateTensor = tf.tensor2d([state]);
-    const currentQ = await aiSnake.model.predict(stateTensor);
-    const currentQValues = await currentQ.data();
-    currentQ.dispose();
-    stateTensor.dispose();
+      const stateTensor = tf.tensor2d([state]);
+      const currentQ = aiSnake.model.predict(stateTensor);
+      const currentQValues = await currentQ.data();
+      currentQ.dispose();
+      stateTensor.dispose();
 
-    let targetQ = [...currentQValues];
+      let targetQ = [...currentQValues];
 
-    if (done) {
-      targetQ[action] = reward;
-    } else {
-      const nextStateTensor = tf.tensor2d([nextState]);
-      const nextQ = await aiSnake.targetModel.predict(nextStateTensor);
-      const nextQValues = await nextQ.data();
-      nextQ.dispose();
-      nextStateTensor.dispose();
+      if (done) {
+        targetQ[action] = reward;
+      } else {
+        const nextStateTensor = tf.tensor2d([nextState]);
+        const nextQ = aiSnake.targetModel.predict(nextStateTensor);
+        const nextQValues = await nextQ.data();
+        nextQ.dispose();
+        nextStateTensor.dispose();
 
-      targetQ[action] = reward + 0.95 * Math.max(...nextQValues);
+        targetQ[action] = reward + 0.95 * Math.max(...nextQValues);
+      }
+
+      states.push(state);
+      targets.push(targetQ);
     }
 
-    states.push(state);
-    targets.push(targetQ);
+    const xs = tf.tensor2d(states);
+    const ys = tf.tensor2d(targets);
+
+    await aiSnake.model.fit(xs, ys, {
+      epochs: 1,
+      batchSize: aiSnake.batchSize,
+      verbose: 0
+    });
+
+    xs.dispose();
+    ys.dispose();
+  } catch (e) {
+    console.error('Training error:', e);
+    updateAITrainingStatus('Training error: ' + e.message);
+  } finally {
+    aiSnake.isTraining = false;
   }
-
-  const xs = tf.tensor2d(states);
-  const ys = tf.tensor2d(targets);
-
-  await aiSnake.model.fit(xs, ys, {
-    epochs: 1,
-    batchSize: aiSnake.batchSize,
-    verbose: 0
-  });
-
-  xs.dispose();
-  ys.dispose();
 }
 
 // Draw game on canvas
@@ -10616,14 +12633,26 @@ function drawAISnakeGame(game) {
     );
   });
 
-  // Draw food
+  // Draw all foods (multiple apples)
   ctx.fillStyle = '#ff4444';
-  ctx.fillRect(
-    game.food.x * gridSize + 1,
-    game.food.y * gridSize + 1,
-    gridSize - 2,
-    gridSize - 2
-  );
+  if (game.foods && game.foods.length > 0) {
+    game.foods.forEach(food => {
+      ctx.fillRect(
+        food.x * gridSize + 1,
+        food.y * gridSize + 1,
+        gridSize - 2,
+        gridSize - 2
+      );
+    });
+  } else if (game.food) {
+    // Fallback for single food
+    ctx.fillRect(
+      game.food.x * gridSize + 1,
+      game.food.y * gridSize + 1,
+      gridSize - 2,
+      gridSize - 2
+    );
+  }
 }
 
 // Main training loop
@@ -10681,15 +12710,23 @@ async function runAITrainingCycle() {
 
       if (!game.gameOver) {
         const nextState = getGameState(game);
-        const reward = (game.score > oldScore ? 10 : 0) - 0.1; // small penalty for each step
+        // Bigger reward for eating food, smaller step penalty
+        const ateFood = game.score > oldScore;
+        let reward = ateFood ? 20 : -0.05; // Bigger reward for eating, smaller penalty for moving
+        
+        // Distance-based reward: reward getting closer to nearest food
         const foodDist = Math.abs(game.food.x - game.snake[0].x) + Math.abs(game.food.y - game.snake[0].y);
         const oldFoodDist = game.lastFoodDistance || Infinity;
-        const distanceReward = (oldFoodDist - foodDist) * 0.1;
+        if (!ateFood) {
+          // Only apply distance reward if we didn't eat (since food reference changes)
+          const distanceReward = (oldFoodDist - foodDist) * 0.2; // Increased distance reward
+          reward += distanceReward;
+        }
 
         aiSnake.memory.push({
           state: state,
           action: action,
-          reward: reward + distanceReward,
+          reward: reward,
           nextState: nextState,
           done: false
         });
@@ -10717,7 +12754,7 @@ async function runAITrainingCycle() {
     if (aiSnake.targetModel) {
       aiSnake.targetModel.dispose();
     }
-    aiSnake.targetModel = aiSnake.model.clone();
+    aiSnake.targetModel = await cloneTFModel(aiSnake.model);
   }
 
   // Decay epsilon
@@ -10913,8 +12950,8 @@ function addDesktopIcon(appName) {
     iconConfig = { icon: "fa-microchip", label: "V86 Emulator" };
   } else if (appName === "ai-snake") {
     iconConfig = { icon: "fa-brain", label: "AI Snake Learning" };
-  } else if (appName === "nautilus-ai") {
-    iconConfig = { icon: "fa-robot", label: "Nautilus AI Assistant" };
+  } else if (appName === "veltra-ai") {
+    iconConfig = { icon: "fa-robot", label: "Veltra AI Assistant" };
   } else {
     // Try to get from appMetadata
     const metadata = appMetadata[appName];
@@ -10950,7 +12987,7 @@ function openStartupApps() {
   const preinstalledApps = [
     { id: "files", name: "Files", icon: "fa-folder" },
     { id: "terminal", name: "Terminal", icon: "fa-terminal" },
-    { id: "browser", name: "Nautilus Browser", icon: "fa-globe" },
+    { id: "browser", name: "Veltra Browser", icon: "fa-globe" },
     { id: "settings", name: "Settings", icon: "fa-cog" },
     { id: "editor", name: "Text Editor", icon: "fa-edit" },
     { id: "music", name: "Music", icon: "fa-music" },
@@ -11017,7 +13054,7 @@ function openStartupApps() {
     .join("");
 
   const whatsNewEnabled =
-    localStorage.getItem("nautilusOS_showWhatsNew") !== "false";
+    localStorage.getItem("Veltra_showWhatsNew") !== "false";
   const whatsNewHtml = `
               <div class="startup-item disabled">
                   <div class="startup-item-icon">
@@ -11064,7 +13101,7 @@ function toggleStartupApp(appId) {
     startupApps.push(appId);
   }
 
-  localStorage.setItem("nautilusOS_startupApps", JSON.stringify(startupApps));
+  localStorage.setItem("Veltra_startupApps", JSON.stringify(startupApps));
 
   if (windows["startup-apps"]) {
     const content = windows["startup-apps"].querySelector(".window-content");
@@ -11072,7 +13109,7 @@ function toggleStartupApp(appId) {
       const preinstalledApps = [
         { id: "files", name: "Files", icon: "fa-folder" },
         { id: "terminal", name: "Terminal", icon: "fa-terminal" },
-        { id: "browser", name: "Nautilus Browser", icon: "fa-globe" },
+        { id: "browser", name: "Veltra Browser", icon: "fa-globe" },
         { id: "settings", name: "Settings", icon: "fa-cog" },
         { id: "editor", name: "Text Editor", icon: "fa-edit" },
         { id: "music", name: "Music", icon: "fa-music" },
@@ -11117,7 +13154,7 @@ function toggleStartupApp(appId) {
         .join("");
 
       const whatsNewEnabled =
-        localStorage.getItem("nautilusOS_showWhatsNew") !== "false";
+        localStorage.getItem("Veltra_showWhatsNew") !== "false";
       const whatsNewHtml = `
                       <div class="startup-item disabled">
                           <div class="startup-item-icon">
@@ -11165,7 +13202,7 @@ function openTaskManager() {
                       </div>
                       <div class="taskmanager-process-info">
                           <div class="taskmanager-process-name">${title}</div>
-                          <div class="taskmanager-process-details">Window • Running</div>
+                          <div class="taskmanager-process-details">Window â€¢ Running</div>
                       </div>
                       <button class="taskmanager-process-action" onclick="closeWindowByAppName('${appName}'); refreshTaskManager();">
                           Close
@@ -11242,7 +13279,7 @@ function refreshTaskManager() {
                 </div>
                 <div class="taskmanager-process-info">
                     <div class="taskmanager-process-name">${title}</div>
-                    <div class="taskmanager-process-details">Window • Running</div>
+                    <div class="taskmanager-process-details">Window â€¢ Running</div>
                 </div>
                 <button class="taskmanager-process-action" onclick="closeWindowByAppName('${appName}'); refreshTaskManager();">
                     Close
@@ -11435,7 +13472,7 @@ function updateStartMenu() {
   }
 
   // Restore Community Apps in Start Menu
-  const savedCommunityApps = JSON.parse(localStorage.getItem('nautilusOS_communityApps') || '{}');
+  const savedCommunityApps = JSON.parse(localStorage.getItem('Veltra_communityApps') || '{}');
   Object.keys(savedCommunityApps).forEach(appId => {
     const appData = savedCommunityApps[appId];
     const appItem = document.createElement("div");
@@ -11496,22 +13533,22 @@ function updateStartMenu() {
 async function exportProfile() {
   const profile = {
     version: "1.0",
-    username: localStorage.getItem("nautilusOS_username"),
-    password: localStorage.getItem("nautilusOS_password"),
-    isPasswordless: localStorage.getItem("nautilusOS_isPasswordless") === "true",
-    bloatlessMode: localStorage.getItem("nautilusOS_bloatlessMode") === "true",
+    username: localStorage.getItem("Veltra_username"),
+    password: localStorage.getItem("Veltra_password"),
+    isPasswordless: localStorage.getItem("Veltra_isPasswordless") === "true",
+    bloatlessMode: localStorage.getItem("Veltra_bloatlessMode") === "true",
     settings: settings,
     installedThemes: installedThemes,
     installedApps: installedApps,
     startupApps: startupApps,
     fileSystem: fileSystem,
-    showWhatsNew: localStorage.getItem("nautilusOS_showWhatsNew"),
+    showWhatsNew: localStorage.getItem("Veltra_showWhatsNew"),
     exportDate: new Date().toISOString(),
   };
-  const wallpaper = localStorage.getItem("nautilusOS_wallpaper");
-  const loginWallpaper = localStorage.getItem("nautilusOS_loginBackground");
-  const useSame = localStorage.getItem("nautilusOS_useSameBackground");
-  const profilePicture = localStorage.getItem("nautilusOS_profilePicture");
+  const wallpaper = localStorage.getItem("Veltra_wallpaper");
+  const loginWallpaper = localStorage.getItem("Veltra_loginBackground");
+  const useSame = localStorage.getItem("Veltra_useSameBackground");
+  const profilePicture = localStorage.getItem("Veltra_profilePicture");
   profile.wallpaper = wallpaper || null;
   profile.loginWallpaper = loginWallpaper || null;
   profile.useSameBackground = useSame === null ? "true" : useSame;
@@ -11523,7 +13560,7 @@ async function exportProfile() {
 
   const username = currentUsername || "user";
   const date = new Date().toISOString().split("T")[0];
-  const filename = `NautilusOS_${username}_${date}.nautilusprofile`;
+  const filename = `Veltra_${username}_${date}.veltraprofile`;
 
   const a = document.createElement("a");
   a.href = url;
@@ -11549,7 +13586,7 @@ function openAccountManager() {
             ${acc.role === "superuser" ? '<span style="background: var(--accent); color: var(--bg-primary); padding: 0.15rem 0.5rem; border-radius: 5px; font-size: 0.75rem; margin-left: 0.5rem;">SUPER USER</span>' : ''}
           </div>
           <div style="color: var(--text-secondary); font-size: 0.85rem;">
-            ${acc.isPasswordless ? 'Passwordless Account' : 'Password Protected'} • Created ${new Date(acc.createdAt).toLocaleDateString()}
+            ${acc.isPasswordless ? 'Passwordless Account' : 'Password Protected'} â€¢ Created ${new Date(acc.createdAt).toLocaleDateString()}
           </div>
         </div>
         <div style="display: flex; gap: 0.5rem;">
@@ -11726,9 +13763,9 @@ async function importProfile(event) {
   const file = event.target.files[0];
   if (!file) return;
 
-  if (!file.name.endsWith(".nautilusprofile")) {
+  if (!file.name.endsWith(".veltraprofile")) {
     showToast(
-      "Invalid file format. Please select a .nautilusprofile file.",
+      "Invalid file format. Please select a .veltraprofile file.",
       "fa-exclamation-circle"
     );
     return;
@@ -11747,12 +13784,12 @@ async function importProfile(event) {
         `Import profile for user "${profile.username}"?<br><br>` +
         `This will replace your current settings and data.<br><br>` +
         `<strong>Profile Details:</strong><br>` +
-        `• Username: ${profile.username}<br>` +
-        `• Exported: ${new Date(
+        `â€¢ Username: ${profile.username}<br>` +
+        `â€¢ Exported: ${new Date(
           profile.exportDate
         ).toLocaleDateString()}<br>` +
-        `• Installed Apps: ${(profile.installedApps || []).length}<br>` +
-        `• Installed Themes: ${(profile.installedThemes || []).length}`
+        `â€¢ Installed Apps: ${(profile.installedApps || []).length}<br>` +
+        `â€¢ Installed Themes: ${(profile.installedThemes || []).length}`
       );
 
       if (!confirmed) {
@@ -11760,19 +13797,19 @@ async function importProfile(event) {
         return;
       }
 
-      localStorage.setItem("nautilusOS_username", profile.username);
-      localStorage.setItem("nautilusOS_password", profile.password || "");
+      localStorage.setItem("Veltra_username", profile.username);
+      localStorage.setItem("Veltra_password", profile.password || "");
 
       const isPasswordless = profile.isPasswordless !== undefined
         ? String(profile.isPasswordless)
         : (profile.password === "" ? "true" : "false");
-      localStorage.setItem("nautilusOS_isPasswordless", isPasswordless);
+      localStorage.setItem("Veltra_isPasswordless", isPasswordless);
 
       // Restore bloatless mode setting
       bloatlessMode = profile.bloatlessMode || false;
-      localStorage.setItem("nautilusOS_bloatlessMode", bloatlessMode ? "true" : "false");
+      localStorage.setItem("Veltra_bloatlessMode", bloatlessMode ? "true" : "false");
 
-      localStorage.setItem("nautilusOS_setupComplete", "true");
+      localStorage.setItem("Veltra_setupComplete", "true");
 
       settings = profile.settings || settings;
       installedThemes = profile.installedThemes || [];
@@ -11780,54 +13817,54 @@ async function importProfile(event) {
       startupApps = profile.startupApps || [];
 
       localStorage.setItem(
-        "nautilusOS_settings",
+        "Veltra_settings",
         JSON.stringify(settings)
       );
       localStorage.setItem(
-        "nautilusOS_installedThemes",
+        "Veltra_installedThemes",
         JSON.stringify(installedThemes)
       );
       localStorage.setItem(
-        "nautilusOS_installedApps",
+        "Veltra_installedApps",
         JSON.stringify(installedApps)
       );
       localStorage.setItem(
-        "nautilusOS_startupApps",
+        "Veltra_startupApps",
         JSON.stringify(startupApps)
       );
 
       if (profile.useSameBackground !== null && profile.useSameBackground !== undefined) {
         localStorage.setItem(
-          "nautilusOS_useSameBackground",
+          "Veltra_useSameBackground",
           String(profile.useSameBackground)
         );
       } else {
-        localStorage.removeItem("nautilusOS_useSameBackground");
+        localStorage.removeItem("Veltra_useSameBackground");
       }
 
       if (profile.wallpaper) {
-        localStorage.setItem("nautilusOS_wallpaper", profile.wallpaper);
+        localStorage.setItem("Veltra_wallpaper", profile.wallpaper);
       } else {
-        localStorage.removeItem("nautilusOS_wallpaper");
+        localStorage.removeItem("Veltra_wallpaper");
       }
 
       if (profile.loginWallpaper) {
         localStorage.setItem(
-          "nautilusOS_loginBackground",
+          "Veltra_loginBackground",
           profile.loginWallpaper
         );
       } else {
-        localStorage.removeItem("nautilusOS_loginBackground");
+        localStorage.removeItem("Veltra_loginBackground");
       }
 
       if (profile.profilePicture) {
-        localStorage.setItem("nautilusOS_profilePicture", profile.profilePicture);
+        localStorage.setItem("Veltra_profilePicture", profile.profilePicture);
       } else {
-        localStorage.removeItem("nautilusOS_profilePicture");
+        localStorage.removeItem("Veltra_profilePicture");
       }
 
       if (profile.showWhatsNew !== null && profile.showWhatsNew !== undefined) {
-        localStorage.setItem("nautilusOS_showWhatsNew", profile.showWhatsNew);
+        localStorage.setItem("Veltra_showWhatsNew", profile.showWhatsNew);
       }
 
       if (profile.fileSystem) {
@@ -11898,9 +13935,20 @@ let cloakingConfig = {
   antiMonitorDelay: 1000,
   useAntiMonitorDelay: false,
   confirmPageClosing: true,
+  bypassLeaveConfirmation: true, // Bypass the 'are you sure you want to leave' when using panic
   cloakOnClickoff: false,
   clickoffTitle: "",
   clickoffFavicon: "",
+  // NEW: Touch/iPad panic button settings
+  showTouchPanicButton: true,
+  touchPanicButtonPosition: 'bottom-right', // top-left, top-right, bottom-left, bottom-right
+  touchPanicButtonSize: 50,
+  // NEW: Default coverup presets for unsafe pages
+  defaultCoverup: 'classroom', // classroom, blank, google, custom
+  customCoverupTitle: '',
+  customCoverupFavicon: '',
+  // NEW: about:blank redirection mode
+  useAboutBlank: false,
 };
 let rotationInterval = null;
 const originalTitle = document.title;
@@ -11910,7 +13958,7 @@ let achievementsData = {
     "first-login": {
       id: "first-login",
       name: "Welcome Aboard!",
-      description: "Successfully log in to NautilusOS for the first time",
+      description: "Successfully log in to Veltra for the first time",
       icon: "fa-fish",
       unlocked: false,
       unlockedDate: null,
@@ -11918,7 +13966,7 @@ let achievementsData = {
     "uptime-1h": {
       id: "uptime-1h",
       name: "Time Traveler",
-      description: "Keep NautilusOS running for 1 hour of total uptime",
+      description: "Keep Veltra running for 1 hour of total uptime",
       icon: "fa-clock",
       unlocked: false,
       unlockedDate: null,
@@ -11976,7 +14024,7 @@ let achievementsData = {
     "power-user": {
       id: "power-user",
       name: "Power User",
-      description: "Access the NautilusOS BIOS setup utility",
+      description: "Access the Veltra BIOS setup utility",
       icon: "fa-microchip",
       unlocked: false,
       unlockedDate: null,
@@ -12051,7 +14099,7 @@ let achievementsData = {
       id: "night-owl",
       name: "Night Owl",
       lockedName: "???",
-      description: "You used NautilusOS at an ungodly hour (12-3 AM)",
+      description: "You used Veltra at an ungodly hour (12-3 AM)",
       icon: "fa-moon",
       unlocked: false,
       unlockedDate: null,
@@ -12081,7 +14129,7 @@ let achievementsData = {
 };
 
 function loadAchievements() {
-  const saved = localStorage.getItem("nautilusOS_achievements");
+  const saved = localStorage.getItem("Veltra_achievements");
   if (saved) {
     try {
       const parsed = JSON.parse(saved);
@@ -12110,7 +14158,7 @@ function saveAchievements() {
     settingsChanged: Array.from(achievementsData.settingsChanged),
     totalUptime: achievementsData.totalUptime,
   };
-  localStorage.setItem("nautilusOS_achievements", JSON.stringify(toSave));
+  localStorage.setItem("Veltra_achievements", JSON.stringify(toSave));
 }
 
 function unlockAchievement(achievementId) {
@@ -12173,7 +14221,7 @@ function refreshAchievementsWindow() {
                 <div class="achievement-icon">
                     <i class="fas ${achievement.icon}"></i>
                     ${achievement.unlocked
-          ? '<div class="achievement-badge">✓</div>'
+          ? '<div class="achievement-badge">âœ“</div>'
           : ""
         }
                 </div>
@@ -12357,7 +14405,7 @@ function openAchievements() {
                 <div class="achievement-icon">
                     <i class="fas ${achievement.icon}"></i>
                     ${achievement.unlocked
-          ? '<div class="achievement-badge">✓</div>'
+          ? '<div class="achievement-badge">âœ“</div>'
           : ""
         }
                 </div>
@@ -12498,7 +14546,7 @@ function checkNightOwl() {
 const originalFavicon = document.querySelector('link[rel="icon"]')?.href || "";
 
 function loadCloakingConfig() {
-  const saved = localStorage.getItem("nautilusOS_cloaking");
+  const saved = localStorage.getItem("Veltra_cloaking");
   if (saved) {
     try {
       const parsed = JSON.parse(saved);
@@ -12520,7 +14568,7 @@ function loadCloakingConfig() {
 }
 
 function saveCloakingConfig() {
-  localStorage.setItem("nautilusOS_cloaking", JSON.stringify(cloakingConfig));
+  localStorage.setItem("Veltra_cloaking", JSON.stringify(cloakingConfig));
 }
 
 function applyCloaking() {
@@ -12534,12 +14582,12 @@ function applyCloaking() {
 
   if (title) {
     document.title = title;
-    localStorage.setItem("nautilusOS_cloakTitle", title);
+    localStorage.setItem("Veltra_cloakTitle", title);
   }
 
   if (faviconUrl) {
     setFavicon(faviconUrl);
-    localStorage.setItem("nautilusOS_cloakFavicon", faviconUrl);
+    localStorage.setItem("Veltra_cloakFavicon", faviconUrl);
   }
 
   showToast("Cloaking applied!", "fa-check-circle");
@@ -12637,7 +14685,7 @@ function resetClickoffCloak() {
 }
 
 function updateClickoffPreview() {
-  const title = document.getElementById("clickoffTitle").value.trim() || "NautilusOS";
+  const title = document.getElementById("clickoffTitle").value.trim() || "Veltra";
   const faviconUrl = document.getElementById("clickoffFavicon").value.trim();
   const previewTitle = document.getElementById("clickoffPreviewTitle");
   const previewFavicon = document.getElementById("clickoffPreviewFavicon");
@@ -12647,7 +14695,7 @@ function updateClickoffPreview() {
     if (faviconUrl) {
       previewFavicon.src = faviconUrl;
     } else {
-      previewFavicon.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='75' font-size='85' fill='white'%3E🌐︎%3C/text%3E%3C/svg%3E";
+      previewFavicon.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='75' font-size='85' fill='white'%3EðŸŒï¸Ž%3C/text%3E%3C/svg%3E";
     }
   }
 }
@@ -12812,6 +14860,237 @@ function saveRotationSettings() {
   showToast("Rotation settings saved!", "fa-save");
 }
 
+// ==================== TOUCH & DEVICE DETECTION ====================
+// Detect touch devices (iPad, Chromebook touchscreen, mobile)
+function isTouchDevice() {
+  return (
+    'ontouchstart' in window ||
+    navigator.maxTouchPoints > 0 ||
+    navigator.msMaxTouchPoints > 0 ||
+    window.matchMedia('(pointer: coarse)').matches
+  );
+}
+
+function isIPadOrIOS() {
+  const ua = navigator.userAgent;
+  const isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+  const isIPadOS = (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  return isIOS || isIPadOS;
+}
+
+function isChromebook() {
+  const ua = navigator.userAgent.toLowerCase();
+  return ua.includes('cros') || (ua.includes('chrome') && isTouchDevice() && window.screen.width <= 1920);
+}
+
+function isMobileDevice() {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+
+// ==================== FLOATING PANIC BUTTON (Touch Devices) ====================
+let panicButton = null;
+
+function createTouchPanicButton() {
+  // Remove existing button if any
+  if (panicButton) {
+    panicButton.remove();
+    panicButton = null;
+  }
+
+  // Only create if enabled and on a touch device
+  if (!cloakingConfig.showTouchPanicButton) return;
+  if (!isTouchDevice() && !isIPadOrIOS() && !isChromebook()) return;
+
+  panicButton = document.createElement('button');
+  panicButton.id = 'touchPanicButton';
+  panicButton.innerHTML = '<i class="fas fa-shield-alt"></i>';
+  
+  // Position mapping
+  const positions = {
+    'top-left': { top: '20px', left: '20px', right: 'auto', bottom: 'auto' },
+    'top-right': { top: '20px', right: '20px', left: 'auto', bottom: 'auto' },
+    'bottom-left': { bottom: '80px', left: '20px', right: 'auto', top: 'auto' },
+    'bottom-right': { bottom: '80px', right: '20px', left: 'auto', top: 'auto' }
+  };
+  
+  const pos = positions[cloakingConfig.touchPanicButtonPosition] || positions['bottom-right'];
+  const size = cloakingConfig.touchPanicButtonSize || 50;
+  
+  Object.assign(panicButton.style, {
+    position: 'fixed',
+    width: `${size}px`,
+    height: `${size}px`,
+    borderRadius: '50%',
+    background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.9), rgba(220, 38, 38, 0.9))',
+    border: '2px solid rgba(255, 255, 255, 0.2)',
+    color: 'white',
+    fontSize: `${size * 0.4}px`,
+    cursor: 'pointer',
+    zIndex: '999998',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '0 4px 15px rgba(239, 68, 68, 0.4), 0 0 0 3px rgba(0,0,0,0.1)',
+    transition: 'transform 0.2s ease, opacity 0.2s ease',
+    opacity: '0.8',
+    touchAction: 'manipulation',
+    WebkitTapHighlightColor: 'transparent',
+    ...pos
+  });
+
+  // Touch/click handler
+  panicButton.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    triggerPanicMode();
+  });
+
+  panicButton.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    panicButton.style.transform = 'scale(0.9)';
+    panicButton.style.opacity = '1';
+  });
+
+  panicButton.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    panicButton.style.transform = 'scale(1)';
+    panicButton.style.opacity = '0.8';
+    triggerPanicMode();
+  });
+
+  // Long press to show settings hint
+  let longPressTimer;
+  panicButton.addEventListener('touchstart', () => {
+    longPressTimer = setTimeout(() => {
+      showToast('Long-tap panic button. Configure in Cloaking settings.', 'fa-info-circle');
+    }, 1000);
+  });
+  panicButton.addEventListener('touchend', () => clearTimeout(longPressTimer));
+  panicButton.addEventListener('touchmove', () => clearTimeout(longPressTimer));
+
+  document.body.appendChild(panicButton);
+}
+
+function removeTouchPanicButton() {
+  if (panicButton) {
+    panicButton.remove();
+    panicButton = null;
+  }
+}
+
+function toggleTouchPanicButton() {
+  cloakingConfig.showTouchPanicButton = !cloakingConfig.showTouchPanicButton;
+  saveCloakingConfig();
+  
+  if (cloakingConfig.showTouchPanicButton) {
+    createTouchPanicButton();
+    showToast('Touch panic button enabled', 'fa-shield-alt');
+  } else {
+    removeTouchPanicButton();
+    showToast('Touch panic button disabled', 'fa-shield');
+  }
+}
+
+// ==================== ABOUT:BLANK REDIRECTION ====================
+function openInAboutBlank() {
+  const currentUrl = window.location.href;
+  const newWindow = window.open('about:blank', '_blank');
+  if (newWindow) {
+    newWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>${cloakingConfig.defaultCoverup === 'classroom' ? 'Google Classroom' : 'Google'}</title>
+        <style>
+          body { margin: 0; overflow: hidden; }
+          iframe { width: 100%; height: 100vh; border: none; }
+        </style>
+      </head>
+      <body>
+        <iframe src="${currentUrl}"></iframe>
+      </body>
+      </html>
+    `);
+    newWindow.document.close();
+    
+    // Apply cloaking to the about:blank window
+    let domain = 'https://classroom.google.com';
+    if (cloakingConfig.defaultCoverup === 'google') domain = 'https://www.google.com';
+    else if (cloakingConfig.defaultCoverup === 'blank') domain = '';
+    
+    if (domain) {
+      const favicon = newWindow.document.createElement('link');
+      favicon.rel = 'icon';
+      favicon.href = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+      newWindow.document.head.appendChild(favicon);
+    }
+    
+    showToast('Opened in about:blank for extra stealth!', 'fa-user-secret');
+    unlockAchievement('stealth-mode');
+  }
+}
+
+// ==================== DEFAULT COVERUP SYSTEM ====================
+const defaultCoverups = {
+  classroom: {
+    title: 'Google Classroom',
+    favicon: 'https://classroom.google.com',
+    url: 'https://classroom.google.com'
+  },
+  google: {
+    title: 'Google',
+    favicon: 'https://www.google.com',
+    url: 'https://www.google.com'
+  },
+  docs: {
+    title: 'Google Docs',
+    favicon: 'https://docs.google.com',
+    url: 'https://docs.google.com'
+  },
+  drive: {
+    title: 'Google Drive', 
+    favicon: 'https://drive.google.com',
+    url: 'https://drive.google.com'
+  },
+  blank: {
+    title: 'â€Ž',
+    favicon: '',
+    url: ''
+  },
+  pageFailed: {
+    title: "This site can't be reached",
+    favicon: '',
+    url: ''
+  },
+  chromeUnsafe: {
+    title: 'Privacy error',
+    favicon: 'https://www.google.com/chrome',
+    url: ''
+  }
+};
+
+function applyDefaultCoverup(coverupType) {
+  const coverup = defaultCoverups[coverupType] || defaultCoverups.classroom;
+  
+  document.title = coverup.title;
+  
+  if (coverup.favicon) {
+    setFavicon(coverup.favicon);
+  } else {
+    // Set blank favicon
+    const existingFavicons = document.querySelectorAll('link[rel="icon"]');
+    existingFavicons.forEach(f => f.remove());
+    const link = document.createElement('link');
+    link.rel = 'icon';
+    link.href = 'data:image/x-icon;base64,AAABAAEAEBAQAAAAAAAoAQAAFgAAACgAAAAQAAAAIAAAAAEABAAAAAAAgAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA';
+    document.head.appendChild(link);
+  }
+  
+  saveCloakingConfig();
+  showToast(`Applied ${coverup.title} coverup`, 'fa-check-circle');
+  unlockAchievement('stealth-mode');
+}
+
 window.addEventListener("DOMContentLoaded", () => {
   loadCloakingConfig();
 
@@ -12824,7 +15103,74 @@ window.addEventListener("DOMContentLoaded", () => {
   if (cloakingConfig.panicKeyEnabled) {
     setupPanicKeyListener();
   }
+  
+  // DON'T create panic button here - wait for login
 });
+
+// Initialize panic button AFTER login
+window.addEventListener('Login Success', function() {
+  // Only create panic button after successful login
+  if (cloakingConfig.showTouchPanicButton && (isTouchDevice() || isIPadOrIOS() || isChromebook())) {
+    setTimeout(() => {
+      createTouchPanicButton();
+    }, 500);
+  }
+  
+  // Auto-enable Fast Mode for iPad/Safari/slow devices
+  const shouldAutoEnableFastMode = isIPadOrIOS() || 
+    /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent) ||
+    (navigator.deviceMemory && navigator.deviceMemory <= 4);
+  
+  const fastModeSaved = localStorage.getItem('veltra_fastMode');
+  
+  if (shouldAutoEnableFastMode && fastModeSaved === null) {
+    // First time on slow device - auto-enable
+    enableFastMode(true);
+    setTimeout(() => {
+      showToast('Fast Mode enabled for better performance', 'fa-bolt');
+    }, 1500);
+  } else if (fastModeSaved === 'true') {
+    enableFastMode(false); // Don't show toast on subsequent loads
+  }
+});
+
+// Fast Mode - reduces animations and effects for better performance
+function enableFastMode(showNotification = true) {
+  fastModeEnabled = true;
+  settings.fastMode = true;
+  localStorage.setItem('veltra_fastMode', 'true');
+  
+  // Add fast-mode class to body for CSS optimizations
+  document.body.classList.add('fast-mode');
+  
+  // Reduce animation durations
+  document.documentElement.style.setProperty('--animation-speed', '0.1s');
+  document.documentElement.style.setProperty('--transition-speed', '0.1s');
+  
+  if (showNotification) {
+    showToast('Fast Mode enabled', 'fa-bolt');
+  }
+}
+
+function disableFastMode() {
+  fastModeEnabled = false;
+  settings.fastMode = false;
+  localStorage.setItem('veltra_fastMode', 'false');
+  
+  document.body.classList.remove('fast-mode');
+  document.documentElement.style.removeProperty('--animation-speed');
+  document.documentElement.style.removeProperty('--transition-speed');
+  
+  showToast('Fast Mode disabled', 'fa-bolt');
+}
+
+function toggleFastMode() {
+  if (fastModeEnabled) {
+    disableFastMode();
+  } else {
+    enableFastMode();
+  }
+}
 
 const _originalOpenAppForAppStore = openApp;
 window.openApp = openApp = function (appName, ...args) {
@@ -12971,7 +15317,7 @@ function toggleAntiScreenMonitoring() {
   if (cloakingConfig.antiScreenMonitoring) {
     if (toggle) toggle.classList.add("active");
     if (indicator) indicator.classList.add("active");
-    if (statusDesc) statusDesc.textContent = "Enabled - NautilusOS will black out when you switch tabs";
+    if (statusDesc) statusDesc.textContent = "Enabled - Veltra will black out when you switch tabs";
     if (antiMonitorSettings) {
       antiMonitorSettings.style.opacity = "1";
       antiMonitorSettings.style.pointerEvents = "auto";
@@ -13020,7 +15366,7 @@ function toggleAntiMonitorDelay() {
   if (cloakingConfig.useAntiMonitorDelay) {
     if (toggle) toggle.classList.add("active");
     if (indicator) indicator.classList.add("active");
-    if (statusDesc) statusDesc.textContent = "Enabled - After switching back to Nautilus your screen will stay black briefly for the configured delay";
+    if (statusDesc) statusDesc.textContent = "Enabled - After switching back to Veltra your screen will stay black briefly for the configured delay";
     if (icon) {
       icon.className = "fas fa-check-circle";
     }
@@ -13080,6 +15426,30 @@ function toggleConfirmPageClosing() {
   }
 }
 
+function toggleBypassLeaveConfirmation() {
+  cloakingConfig.bypassLeaveConfirmation = !cloakingConfig.bypassLeaveConfirmation;
+  saveCloakingConfig();
+
+  const toggle = document.getElementById("bypassLeaveToggle");
+  const indicator = toggle?.closest('.cloaking-status-indicator');
+  const statusDesc = indicator?.querySelector('.cloaking-status-desc');
+  const icon = indicator?.querySelector('.cloaking-status-icon i');
+
+  if (cloakingConfig.bypassLeaveConfirmation) {
+    if (toggle) toggle.classList.add("active");
+    if (indicator) indicator.classList.add("active");
+    if (statusDesc) statusDesc.textContent = "Enabled - Panic will instantly redirect without 'Leave site?' confirmation";
+    if (icon) icon.className = "fas fa-bolt";
+    showToast("Bypass leave confirmation enabled!", "fa-bolt");
+  } else {
+    if (toggle) toggle.classList.remove("active");
+    if (indicator) indicator.classList.remove("active");
+    if (statusDesc) statusDesc.textContent = "Disabled - You may see a 'Leave site?' prompt when using panic";
+    if (icon) icon.className = "fas fa-hand-paper";
+    showToast("Bypass leave confirmation disabled", "fa-hand-paper");
+  }
+}
+
 let screenMonitoringListener = null;
 let pageClosingListener = null;
 let blackoutTimeout = null;
@@ -13104,7 +15474,7 @@ function setupScreenMonitoringListener() {
       return;
     }
 
-    // If an overlay already exists, a previous trigger is still active — keep it
+    // If an overlay already exists, a previous trigger is still active â€” keep it
     const existingOverlay = document.getElementById("screenMonitoringBlackout");
     if (existingOverlay) {
       // Do not recreate or remove it here; let the original timeout handle cleanup
@@ -13232,7 +15602,7 @@ function updateLoginScreen() {
   } else {
     // Old single-user system
     const isPasswordless =
-      localStorage.getItem("nautilusOS_isPasswordless") === "true";
+      localStorage.getItem("Veltra_isPasswordless") === "true";
     const passwordWrapper = document.getElementById("passwordWrapper");
     const loginSubtitle = document.getElementById("loginSubtitle");
     const loginContainer = document.querySelector(".login-container");
@@ -13318,7 +15688,7 @@ function selectLoginAccount(username) {
   if (loginSubtitle) {
     loginSubtitle.innerHTML = account.isPasswordless ?
       `<a href="#" onclick="event.preventDefault(); updateLoginScreen();" style="color: var(--accent); text-decoration: underline; cursor: pointer;"><i class="fa-solid fa-arrow-left"></i> Back to account list</a>` :
-      `Enter password for ${username} <a href="#" onclick="event.preventDefault(); updateLoginScreen();" style="color: var(--accent); text-decoration: underline; cursor: pointer; margin-left: 0.5rem;">← Back</a>`;
+      `Enter password for ${username} <a href="#" onclick="event.preventDefault(); updateLoginScreen();" style="color: var(--accent); text-decoration: underline; cursor: pointer; margin-left: 0.5rem;">â† Back</a>`;
   }
 
   // Focus password input if needed
@@ -13349,12 +15719,12 @@ function expandHelpTopic(topicId) {
 
   const topics = {
     welcome: {
-      title: "Welcome to NautilusOS",
+      title: "Welcome to Veltra",
       icon: "fa-info-circle",
       content: `
-                <h2><i class="fas fa-info-circle"></i> Welcome to NautilusOS</h2>
-                <p>NautilusOS is a fully-featured web-based operating system with a complete desktop environment, virtual file system, and productivity applications.</p>
-                <p>This help system will guide you through all the features and capabilities of NautilusOS. Select any topic from the main menu to learn more.</p>
+                <h2><i class="fas fa-info-circle"></i> Welcome to Veltra</h2>
+                <p>Veltra is a fully-featured web-based operating system with a complete desktop environment, virtual file system, and productivity applications.</p>
+                <p>This help system will guide you through all the features and capabilities of Veltra. Select any topic from the main menu to learn more.</p>
             `,
     },
     cloaking: {
@@ -13377,12 +15747,12 @@ function expandHelpTopic(topicId) {
       icon: "fa-power-off",
       content: `
                 <h2><i class="fas fa-power-off"></i> Boot Options</h2>
-                <p>NautilusOS offers two boot modes:</p>
+                <p>Veltra offers two boot modes:</p>
                 <ul>
-                    <li><strong>Nautilus OS (Graphical)</strong> - Full desktop environment with windows, icons, and applications</li>
-                    <li><strong>Nautilus OS (Command Line)</strong> - Terminal-only interface for command-line operations</li>
+                    <li><strong>Veltra (Graphical)</strong> - Full desktop environment with windows, icons, and applications</li>
+                    <li><strong>Veltra (Command Line)</strong> - Terminal-only interface for command-line operations</li>
                 </ul>
-                <p>Your boot choice is remembered automatically. To change it, open Settings → System → Reset Boot Preference.</p>
+                <p>Your boot choice is remembered automatically. To change it, open Settings â†’ System â†’ Reset Boot Preference.</p>
             `,
     },
     apps: {
@@ -13394,20 +15764,20 @@ function expandHelpTopic(topicId) {
                 <ul>
                     <li><strong>Files</strong> - Browse and manage your virtual file system with tree navigation</li>
                     <li><strong>Terminal</strong> - Access command-line interface with Unix commands</li>
-                    <li><strong>Nautilus Browser</strong> - Browse the web with multiple tabs and navigation</li>
+                    <li><strong>Veltra Browser</strong> - Browse the web with multiple tabs and navigation</li>
                     <li><strong>Text Editor</strong> - Create and edit text files with save options</li>
                     <li><strong>Music</strong> - Play audio files with playback controls</li>
                     <li><strong>Photos</strong> - View screenshots and images</li>
                     <li><strong>Calculator</strong> - Perform calculations with basic operations</li>
                     <li><strong>Settings</strong> - Customize clock format, desktop icons, and themes</li>
                     <li><strong>App Store</strong> - Browse and install themes and apps</li>
-                    <li><strong>About NautilusOS</strong> - Learn about the system and its features</li>
+                    <li><strong>About Veltra</strong> - Learn about the system and its features</li>
                     <li><strong>Python Interpreter</strong> - Run Python code interactively</li>
                     <li><strong>Achievements</strong> - Track your progress with achievements and Easter eggs</li>
                     <li><strong>Cloaking</strong> - Disguise your browser tab</li>
                     <li><strong>What's New</strong> - View latest features and updates</li>
                     <li><strong>AI Snake Learning</strong> - Watch AI learn to play Snake</li>
-                    <li><strong>Nautilus AI Assistant</strong> - Get help from an AI assistant</li>
+                    <li><strong>Veltra AI Assistant</strong> - Get help from an AI assistant</li>
                     <li><strong>Web App Creator</strong> - Create and customize web applications</li>
                     <li><strong>Help</strong> - System help and documentation</li>
                 </ul>
@@ -13460,7 +15830,7 @@ function expandHelpTopic(topicId) {
                     <li><strong>Screenshot</strong> - Capture your desktop instantly</li>
                     <li><strong>Close All</strong> - Close all open windows at once</li>
                     <li><strong>Sign Out</strong> - Return to login screen</li>
-                    <li><strong>Shut Down</strong> - Exit NautilusOS completely</li>
+                    <li><strong>Shut Down</strong> - Exit Veltra completely</li>
                 </ul>
                 <h3>Notification Center</h3>
                 <p>Click the <strong>bell icon</strong> to view your notification history. All system messages are stored here so you can review them later.</p>
@@ -13633,15 +16003,15 @@ function expandHelpTopic(topicId) {
             `,
     },
     'app-about': {
-      title: "About NautilusOS",
+      title: "About Veltra",
       icon: "fa-info-circle",
       content: `
-                <h2><i class="fas fa-info-circle"></i> About NautilusOS</h2>
-                <p>Learn more about NautilusOS, its features, and development.</p>
+                <h2><i class="fas fa-info-circle"></i> About Veltra</h2>
+                <p>Learn more about Veltra, its features, and development.</p>
                 <h3>Information</h3>
                 <ul>
                     <li><strong>Version</strong> - Current version information</li>
-                    <li><strong>Developer</strong> - dinguschan and Nautilus Labs</li>
+                    <li><strong>Developer</strong> - dinguschan and Veltra Labs</li>
                     <li><strong>Features</strong> - Complete overview of capabilities</li>
                     <li><strong>Credits</strong> - Contributors and acknowledgments</li>
                 </ul>
@@ -13652,7 +16022,7 @@ function expandHelpTopic(topicId) {
       icon: "fa-cog",
       content: `
                 <h2><i class="fas fa-cog"></i> Settings</h2>
-                <p>Customize your NautilusOS experience with various options.</p>
+                <p>Customize your Veltra experience with various options.</p>
                 <h3>Available Settings</h3>
                 <ul>
                     <li><strong>Clock Format</strong> - 12-hour or 24-hour time</li>
@@ -13669,7 +16039,7 @@ function expandHelpTopic(topicId) {
       icon: "fa-store",
       content: `
                 <h2><i class="fas fa-store"></i> App Store</h2>
-                <p>Browse and install additional apps and themes for NautilusOS.</p>
+                <p>Browse and install additional apps and themes for Veltra.</p>
                 <h3>Sections</h3>
                 <ul>
                     <li><strong>Themes</strong> - Custom color schemes and visual styles</li>
@@ -13704,10 +16074,10 @@ function expandHelpTopic(topicId) {
             `,
     },
     'app-browser': {
-      title: "Nautilus Browser",
+      title: "Veltra Browser",
       icon: "fa-globe",
       content: `
-                <h2><i class="fas fa-globe"></i> Nautilus Browser</h2>
+                <h2><i class="fas fa-globe"></i> Veltra Browser</h2>
                 <p>Browse the web with multiple tabs and full navigation controls.</p>
                 <h3>Features</h3>
                 <ul>
@@ -13754,7 +16124,7 @@ function expandHelpTopic(topicId) {
                     <li><strong>Image Upload</strong> - Load images from your device</li>
                     <li><strong>Gallery View</strong> - Browse all uploaded images</li>
                     <li><strong>Full View</strong> - View images in full size</li>
-                    <li><strong>Screenshot Capture</strong> - Take screenshots of NautilusOS</li>
+                    <li><strong>Screenshot Capture</strong> - Take screenshots of Veltra</li>
                     <li><strong>Delete</strong> - Remove unwanted images</li>
                 </ul>
                 <h3>Supported Formats</h3>
@@ -13778,7 +16148,7 @@ function expandHelpTopic(topicId) {
                     <li><strong>Clear Output</strong> - Reset the interpreter</li>
                 </ul>
                 <h3>Example Code</h3>
-                <pre><code>print('Hello from NautilusOS!')
+                <pre><code>print('Hello from Veltra!')
 x = 10
 y = 20
 result = x + y
@@ -13790,7 +16160,7 @@ print(f'Result: {result}')</code></pre>
       icon: "fa-trophy",
       content: `
                 <h2><i class="fas fa-trophy"></i> Achievements</h2>
-                <p>Track your progress and unlock achievements as you explore NautilusOS.</p>
+                <p>Track your progress and unlock achievements as you explore Veltra.</p>
                 <h3>Features</h3>
                 <ul>
                     <li><strong>Achievement List</strong> - View all available achievements</li>
@@ -13811,7 +16181,7 @@ print(f'Result: {result}')</code></pre>
       icon: "fa-star",
       content: `
                 <h2><i class="fas fa-star"></i> What's New</h2>
-                <p>Stay updated with the latest features and improvements in NautilusOS.</p>
+                <p>Stay updated with the latest features and improvements in Veltra.</p>
                 <h3>Features</h3>
                 <ul>
                     <li><strong>Feature Carousel</strong> - Interactive slideshow of new features</li>
@@ -13820,7 +16190,7 @@ print(f'Result: {result}')</code></pre>
                     <li><strong>Auto-play</strong> - Automatic progression through features</li>
                 </ul>
                 <h3>Current Version</h3>
-                <p>NautilusOS v1.5 includes AI Assistant, multiple browsers, more themes, VS Code integration, window snapping, games, and more!</p>
+                <p>Veltra v1.5 includes AI Assistant, multiple browsers, more themes, VS Code integration, window snapping, games, and more!</p>
             `,
     },
   };
@@ -13864,7 +16234,7 @@ function updateCloakPreview() {
 
   if (!titleInput || !previewTitle) return;
 
-  const title = titleInput.value.trim() || "NautilusOS";
+  const title = titleInput.value.trim() || "Veltra";
   previewTitle.textContent = title;
 
   if (faviconInput && previewFavicon) {
@@ -13880,7 +16250,7 @@ function updateCloakPreview() {
       previewFavicon.src = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
     } else {
       previewFavicon.src =
-        "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='75' font-size='75' fill='white'%3E🌐︎%3C/text%3E%3C/svg%3E";
+        "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='75' font-size='75' fill='white'%3EðŸŒï¸Ž%3C/text%3E%3C/svg%3E";
     }
   }
 }
@@ -14079,6 +16449,15 @@ function savePanicSettings() {
 }
 
 function triggerPanicMode() {
+  // Temporarily disable the beforeunload handler if bypass is enabled
+  if (cloakingConfig.bypassLeaveConfirmation) {
+    window.onbeforeunload = null;
+    // Also remove the event listener that was added with addEventListener
+    if (pageClosingListener) {
+      window.removeEventListener("beforeunload", pageClosingListener);
+    }
+  }
+  
   // If Image Overlay is enabled, prioritize it
   if (cloakingConfig.panicImageEnabled && cloakingConfig.panicImage) {
     togglePanicOverlay();
@@ -14150,14 +16529,14 @@ function togglePanicOverlay() {
 
 function changeSearchEngine(value) {
   console.log('[DEBUG] changeSearchEngine called with value:', value);
-  localStorage.setItem('nOS_searchEngine', value);
+  localStorage.setItem('veltra_searchEngine', value);
   showToast('Search engine updated!', 'fa-check-circle');
 }
 
 function applyPreset(presetName) {
   const presets = {
     blank: {
-      title: "‎",
+      title: "â€Ž",
       url: "",
     },
     google: {
@@ -14312,7 +16691,7 @@ function changeUsername() {
   }
 
   currentUsername = newUsername;
-  localStorage.setItem("nautilusOS_username", newUsername);
+  localStorage.setItem("Veltra_username", newUsername);
   document.getElementById("displayUsername").textContent = newUsername;
 
   showToast(`Username changed to "${newUsername}"`, "fa-check-circle");
@@ -15904,7 +18283,7 @@ function reinstallV86() {
   const index = installedApps.indexOf('v86-emulator');
   if (index > -1) {
     installedApps.splice(index, 1);
-    localStorage.setItem('nautilusOS_installedApps', JSON.stringify(installedApps));
+    localStorage.setItem('Veltra_installedApps', JSON.stringify(installedApps));
   }
 
   // Trigger reinstallation
@@ -15984,38 +18363,32 @@ function reportV86Issue(errorType, errorMessage) {
 
 // ==================== WebLLM AI Assistant ====================
 
-let nautilusAI = {
-  engine: null,
+let veltraAI = {
   messages: [],
-  isInitialized: false,
-  isInitializing: false,
+  isInitialized: true, // Always ready with cloud AI
   isGenerating: false,
   pendingTools: [],
   toolsEnabled: true,
   actionLog: [],
-  currentModel: 'smart' // 'fast' or 'smart' - default to smart (Qwen3 with thinking)
+  currentModel: 'auto',
+  workerUrl: 'https://veltra-ai.modmojheh.workers.dev'
 };
 
-const AI_MODELS = {
-  fast: {
-    name: 'SmolLM2-360M-Instruct-q4f16_1-MLC',
-    label: 'Dumb',
-    description: 'Quick responses, less accurate',
-    icon: 'fa-bolt'
-  },
-  smart: {
-    name: 'Qwen3-0.6B-q4f16_1-MLC',
-    label: 'Smarty',
-    description: 'Advanced reasoning with thinking mode',
-    icon: 'fa-brain'
-  }
-};
+// Cerebras AI Models (in order of preference)
+const CEREBRAS_MODELS = [
+  { id: 'qwen-3-235b-a22b-instruct-2507', name: 'Qwen 235B', description: 'Most powerful, best reasoning' },
+  { id: 'gpt-oss-120b', name: 'GPT-OSS 120B', description: 'Very capable, good fallback' },
+  { id: 'llama-3.3-70b', name: 'Llama 3.3 70B', description: 'Fast and smart' },
+  { id: 'qwen-3-32b', name: 'Qwen 32B', description: 'Good balance' },
+  { id: 'zai-glm-4.7', name: 'ZAI GLM 4.7', description: 'Preview model' },
+  { id: 'llama3.1-8b', name: 'Llama 3.1 8B', description: 'Fastest, basic tasks' }
+];
 
 // OS Automation Tools - Available for AI to control the OS
 const OS_AUTOMATION_TOOLS = {
   open_app: {
     name: "open_app",
-    description: "Open an application in NautilusOS",
+    description: "Open an application in Veltra",
     parameters: {
       app_name: "string - Name of the app (e.g., 'files', 'terminal', 'settings', 'browser', 'editor', 'music', 'photos', 'calculator', 'appstore', 'cloaking', 'achievements', 'ai-snake')",
       reason: "string - Why this app needs to be opened"
@@ -16031,7 +18404,7 @@ const OS_AUTOMATION_TOOLS = {
   },
   run_terminal_command: {
     name: "run_terminal_command",
-    description: "Execute a terminal command in NautilusOS",
+    description: "Execute a terminal command in Veltra",
     parameters: {
       command: "string - The terminal command to execute (e.g., 'ls', 'apps', 'help', 'date', 'whoami', 'clear')",
       reason: "string - Why this command needs to be executed"
@@ -16118,10 +18491,10 @@ const OS_AUTOMATION_TOOLS = {
   }
 };
 
-const NAUTILUS_SYSTEM_PROMPT = `You are the Nautilus AI Assistant, an expert guide for NautilusOS - a web-based operating system built entirely in HTML, CSS, and JavaScript.
+const VELTRA_SYSTEM_PROMPT = `You are the Veltra AI Assistant, an expert guide for Veltra - a web-based operating system built entirely in HTML, CSS, and JavaScript.
 
 <i class="fa-solid fa-robot"></i> OS AUTOMATION CAPABILITIES:
-You have the ability to control and automate NautilusOS! You can execute actions on behalf of the user with their approval.
+You have the ability to control and automate Veltra! You can execute actions on behalf of the user with their approval.
 
 IMPORTANT: When you want to perform an action, output a JSON object in your response with this structure:
 
@@ -16158,9 +18531,9 @@ TOOL USAGE GUIDELINES:
 8. Tool results will be provided to you in a follow-up message
 
 CRITICAL FOR SETTINGS:
-- Before changing theme → use get_available_options with category='themes' to see installed themes
-- Before changing search engine → use get_available_options with category='search_engines'
-- For other settings → use get_available_options with category='settings'
+- Before changing theme â†’ use get_available_options with category='themes' to see installed themes
+- Before changing search engine â†’ use get_available_options with category='search_engines'
+- For other settings â†’ use get_available_options with category='settings'
 - This prevents errors from using invalid values!
 
 EXAMPLE CONVERSATIONS:
@@ -16234,10 +18607,10 @@ You: "I'll open the terminal and run the date command!
 }
 </tool_call>"
 
-CORE KNOWLEDGE ABOUT NAUTILUSOS:
+CORE KNOWLEDGE ABOUT Veltra:
 
 ARCHITECTURE & TECHNOLOGY:
-- NautilusOS is a complete web-based OS running entirely in the browser
+- Veltra is a complete web-based OS running entirely in the browser
 - Built with vanilla HTML, CSS, and JavaScript (no frameworks)
 - Uses local storage for persistence (localStorage and sessionStorage)
 - File system is virtual and stored in browser memory/localStorage
@@ -16247,7 +18620,7 @@ ARCHITECTURE & TECHNOLOGY:
 AVAILABLE APPLICATIONS:
 1. Files - Full file explorer with folder navigation, tree sidebar, create/delete/rename operations
 2. Terminal - Command-line interface with bash-like commands
-3. Nautilus Browser - Built-in web browser with proxy support (Helios Browser embedded)
+3. Veltra Browser - Built-in web browser with proxy support (Helios Browser embedded)
 4. Text Editor - Create and edit text files with save/load functionality
 5. Music Player - Play music from URLs or uploaded files
 6. Photos - View, upload, and manage photos with screenshot capability
@@ -16263,7 +18636,7 @@ AVAILABLE APPLICATIONS:
 16. Startup Apps - Configure apps to launch on boot
 17. V86 Emulator - Run actual operating systems in the browser
 18. AI Snake Learning - Neural network that learns to play Snake (by lanefiedler-731)
-19. Nautilus AI Assistant - That's me! Your helpful AI guide (by lanefiedler-731)
+19. Veltra AI Assistant - That's me! Your helpful AI guide (by lanefiedler-731)
 
 WINDOW MANAGEMENT:
 - Fully draggable windows with title bar drag
@@ -16356,7 +18729,7 @@ TECHNICAL DETAILS:
 - Smooth animations and transitions
 - Responsive to different screen sizes
 - Service Worker registration for offline support
-- LocalStorage keys prefixed with "nautilusOS_"
+- LocalStorage keys prefixed with "Veltra_"
 - File protocol warning for features requiring web server
 
 APP STORE:
@@ -16380,11 +18753,11 @@ ADVANCED FEATURES:
 - Context menus for desktop and file operations
 
 DEVELOPER INFO:
-- NautilusOS created by lanefiedler-731, x8r, and dinguschan-owo
+- Veltra created by lanefiedler-731, x8r, and dinguschan-owo
 - Open source on GitHub
 - No external frameworks (vanilla JS)
 - Community contributions welcome
-- Apps can be created by community (Nautilus AI Assistant by lanefiedler-731)
+- Apps can be created by community (Veltra AI Assistant by lanefiedler-731)
 
 THINKING MODE (QWEN3 CAPABILITY):
 You have advanced reasoning capabilities! For complex tasks, you can use thinking mode to show your reasoning process:
@@ -16412,153 +18785,22 @@ When helping users:
 3. Reference exact app names and menu locations
 4. Explain both basic and advanced features
 5. Suggest related features users might find helpful
-6. Be enthusiastic about NautilusOS capabilities
+6. Be enthusiastic about Veltra capabilities
 7. If unsure about something, admit it honestly
 8. Use thinking mode for complex reasoning and problem-solving
 
-Your goal is to make users feel confident and excited about using NautilusOS!`;
+Your goal is to make users feel confident and excited about using Veltra!`;
 
-async function initializeNautilusAI(modelKey = null) {
-  if (nautilusAI.isInitializing) return;
-
-  // Allow re-initialization with different model
-  const isModelSwitch = nautilusAI.isInitialized && modelKey !== null;
-
-  if (nautilusAI.isInitialized && !isModelSwitch) return;
-
-  nautilusAI.isInitializing = true;
-  const statusEl = document.getElementById('aiStatus');
-  const sendBtn = document.getElementById('aiSendBtn');
-  const inputEl = document.getElementById('aiInput');
-
-  try {
-    // Use selected model or current model
-    const selectedModel = modelKey || nautilusAI.currentModel;
-    const modelConfig = AI_MODELS[selectedModel];
-
-    updateAiStatus(`Loading WebLLM library...`, true);
-
-    // Load WebLLM from CDN with ES modules support (only once)
-    if (!window.mlcai) {
-      await new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.type = 'module';
-        script.textContent = `
-          import * as webllm from "https://esm.run/@mlc-ai/web-llm";
-          window.mlcai = webllm;
-        `;
-        script.onload = resolve;
-        script.onerror = () => reject(new Error('Failed to load WebLLM library'));
-        document.head.appendChild(script);
-
-        // Wait for window.mlcai to be available
-        const checkInterval = setInterval(() => {
-          if (window.mlcai) {
-            clearInterval(checkInterval);
-            resolve();
-          }
-        }, 50); // Reduced from 100ms for faster check
-
-        // Timeout after 10 seconds
-        setTimeout(() => {
-          clearInterval(checkInterval);
-          if (!window.mlcai) {
-            reject(new Error('WebLLM library load timeout'));
-          }
-        }, 10000);
-      });
-    }
-
-    updateAiStatus(`Initializing ${modelConfig.label} model...`, true);
-
-    const { CreateMLCEngine } = window.mlcai;
-
-    // Check WebGPU toggle (default to true for speed)
-    const useWebGPU = document.getElementById('aiWebGPUToggle')?.checked !== false;
-
-    // Dispose old engine if switching models
-    if (isModelSwitch && nautilusAI.engine) {
-      try {
-        await nautilusAI.engine.unload();
-      } catch (e) {
-        console.warn('Error unloading previous model:', e);
-      }
-    }
-
-    // Create engine with optimizations for faster first token
-    nautilusAI.engine = await CreateMLCEngine(modelConfig.name, {
-      initProgressCallback: (progress) => {
-        updateAiStatus(`Loading ${modelConfig.label}: ${Math.round(progress.progress * 100)}%`, true);
-      },
-      useWebGPU: useWebGPU,
-      // Optimizations for faster initialization and TTFT
-      logLevel: 'ERROR', // Reduce logging overhead
-      temperature: 0.7, // Optimal for thinking mode
-      top_p: 0.95,
-      // Enable prompt caching for faster subsequent requests
-      caching: true
-    });
-
-    // Reset or preserve conversation history
-    if (isModelSwitch) {
-      // Keep conversation history when switching models
-      const oldMessages = nautilusAI.messages.filter(m => m.role !== 'system');
-      nautilusAI.messages = [
-        { role: "system", content: NAUTILUS_SYSTEM_PROMPT },
-        ...oldMessages
-      ];
-    } else {
-      // Fresh start
-      nautilusAI.messages = [
-        { role: "system", content: NAUTILUS_SYSTEM_PROMPT }
-      ];
-    }
-
-    nautilusAI.currentModel = selectedModel;
-    nautilusAI.isInitialized = true;
-    nautilusAI.isInitializing = false;
-    updateAiStatus(`${modelConfig.label} Ready`, false);
-
-    if (sendBtn) sendBtn.disabled = false;
-    if (inputEl) {
-      inputEl.disabled = false;
-      inputEl.focus();
-    }
-
-    if (isModelSwitch) {
-      showToast(`Switched to ${modelConfig.label}`, modelConfig.icon);
-    } else {
-      showToast(`${modelConfig.label} is ready!`, 'fa-robot');
-    }
-
-  } catch (error) {
-    console.error('Failed to initialize Nautilus AI:', error);
-    nautilusAI.isInitializing = false;
-    updateAiStatus(`Error: ${error.message}`, false, true);
-    showToast('Failed to load AI model. Check console for details.', 'fa-exclamation-triangle');
-
-    // Re-enable input so user can try again
-    if (sendBtn) sendBtn.disabled = false;
-    if (inputEl) inputEl.disabled = false;
+// Initialize Veltra AI (Cloud-based, instant ready)
+async function initializeveltraAI() {
+  // Cloud AI is always ready - just initialize messages
+  if (veltraAI.messages.length === 0) {
+    veltraAI.messages = [
+      { role: "system", content: VELTRA_SYSTEM_PROMPT }
+    ];
   }
-}
-
-async function switchAIModel(modelKey) {
-  if (nautilusAI.isGenerating) {
-    showToast('Cannot switch models while generating response', 'fa-exclamation-circle');
-    // Reset select to current model
-    const select = document.getElementById('aiModelSelect');
-    if (select) select.value = nautilusAI.currentModel;
-    return;
-  }
-
-  if (modelKey === nautilusAI.currentModel) return;
-
-  const modelConfig = AI_MODELS[modelKey];
-  updateAiStatus(`Switching to ${modelConfig.label}...`, true);
-
-  nautilusAI.isInitialized = false;
-  await initializeNautilusAI(modelKey);
+  veltraAI.isInitialized = true;
+  updateAiStatus('Ready - Cerebras Cloud AI', false);
 }
 
 function updateAiStatus(message, loading = false, error = false) {
@@ -16566,21 +18808,25 @@ function updateAiStatus(message, loading = false, error = false) {
   if (!statusEl) return;
 
   const color = error ? '#ef4444' : (loading ? '#64748b' : 'var(--accent)');
-  const spinner = loading ? `
-    <div class="multi-ring-spinner" style="position: relative; width: 40px; height: 40px;">
-      <div style="position: absolute; width: 100%; height: 100%; border: 3px solid transparent; border-top-color: #7dd3c0; border-radius: 50%; animation: spin 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;"></div>
-      <div style="position: absolute; width: 80%; height: 80%; top: 10%; left: 10%; border: 3px solid transparent; border-top-color: #66d9ef; border-radius: 50%; animation: spin 1s cubic-bezier(0.5, 0, 0.5, 1) infinite reverse;"></div>
-      <div style="position: absolute; width: 60%; height: 60%; top: 20%; left: 20%; border: 3px solid transparent; border-top-color: #a6e3a1; border-radius: 50%; animation: spin 0.8s cubic-bezier(0.5, 0, 0.5, 1) infinite;"></div>
-      <div style="position: absolute; width: 40%; height: 40%; top: 30%; left: 30%; border: 3px solid transparent; border-top-color: #f5c2e7; border-radius: 50%; animation: spin 0.6s cubic-bezier(0.5, 0, 0.5, 1) infinite reverse;"></div>
-    </div>
-  ` : '<i class="fas fa-check-circle"></i>';
+  const icon = loading ? 
+    '<div style="width: 14px; height: 14px; border: 2px solid rgba(125, 211, 192, 0.3); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite;"></div>' :
+    (error ? '<i class="fas fa-exclamation-circle"></i>' : '<i class="fas fa-check-circle"></i>');
 
   statusEl.innerHTML = `
-    <div style="display: flex; align-items: center; gap: 12px; font-size: 12px; color: ${color};">
-      ${spinner}
+    <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: ${color};">
+      ${icon}
       <span>${message}</span>
     </div>
   `;
+  
+  // Also update model display if available
+  const modelDisplay = document.getElementById('aiModelDisplay');
+  if (modelDisplay && veltraAI.lastUsedModel) {
+    const model = CEREBRAS_MODELS.find(m => m.id === veltraAI.lastUsedModel);
+    if (model) {
+      modelDisplay.textContent = `Model: ${model.name}`;
+    }
+  }
 }
 
 async function sendAiMessage() {
@@ -16592,12 +18838,12 @@ async function sendAiMessage() {
   const userMessage = inputEl.value.trim();
   if (!userMessage) return;
 
-  if (!nautilusAI.isInitialized) {
-    await initializeNautilusAI();
-    if (!nautilusAI.isInitialized) return;
+  if (!veltraAI.isInitialized) {
+    await initializeveltraAI();
+    if (!veltraAI.isInitialized) return;
   }
 
-  if (nautilusAI.isGenerating) {
+  if (veltraAI.isGenerating) {
     showToast('Please wait for the current response to complete', 'fa-hourglass-half');
     return;
   }
@@ -16608,14 +18854,19 @@ async function sendAiMessage() {
   inputEl.style.height = 'auto';
 
   // Disable input while generating
-  nautilusAI.isGenerating = true;
+  veltraAI.isGenerating = true;
   sendBtn.disabled = true;
   inputEl.disabled = true;
-  updateAiStatus('Thinking...', true);
+  updateAiStatus('Connecting to Cerebras AI...', true);
 
   try {
+    // Initialize messages if needed
+    if (veltraAI.messages.length === 0) {
+      veltraAI.messages = [{ role: "system", content: VELTRA_SYSTEM_PROMPT }];
+    }
+    
     // Add user message to conversation history
-    nautilusAI.messages.push({ role: "user", content: userMessage });
+    veltraAI.messages.push({ role: "user", content: userMessage });
 
     // Create placeholder message for streaming
     const chatContainer = document.getElementById('aiChatMessages');
@@ -16632,7 +18883,7 @@ async function sendAiMessage() {
     headerDiv.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-bottom: 8px;';
     headerDiv.innerHTML = `
       <i class="fas fa-robot" style="color: var(--accent); font-size: 18px;"></i>
-      <strong style="color: var(--accent);">Nautilus AI</strong>
+      <strong style="color: var(--accent);">Veltra AI</strong>
     `;
 
     const contentDiv = document.createElement('div');
@@ -16648,127 +18899,70 @@ async function sendAiMessage() {
     chatContainer.appendChild(messageDiv);
     chatContainer.scrollTop = chatContainer.scrollHeight;
 
-    // Generate response with streaming - optimized settings based on model
-    const isFastModel = nautilusAI.currentModel === 'fast';
-    const isSmartModel = nautilusAI.currentModel === 'smart';
+    // Call Cloudflare Worker for streaming response
+    const response = await fetch(`${veltraAI.workerUrl}/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: veltraAI.messages,
+        stream: true
+      })
+    });
 
-    const completionConfig = {
-      messages: nautilusAI.messages,
-      temperature: isFastModel ? 0.5 : 0.7, // Lower temp for faster model = more focused
-      max_tokens: isFastModel ? 2048 : 4096, // Fewer tokens for fast model
-      stream: true,
-      // Optimizations for faster first token
-      top_p: isFastModel ? 0.9 : 0.95,
-      frequency_penalty: 0,
-      presence_penalty: 0,
-      // Enable streaming for lower latency
-      stream_options: { include_usage: false }
-    };
-
-    // Enable thinking mode for smart model (Qwen3)
-    if (isSmartModel) {
-      completionConfig.extra_body = {
-        enable_thinking: true,
-        // Additional TTFT optimizations
-        use_beam_search: false,
-        early_stopping: false
-      };
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `API error: ${response.status}`);
     }
 
-    const completion = await nautilusAI.engine.chat.completions.create(completionConfig);
-
+    // Process streaming response
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
     let fullResponse = '';
-    let thinkingSection = null;
-    let thinkContentDiv = null;
-    let thinkingSummary = null;
+    let modelUsed = null;
+    let buffer = '';
 
-    for await (const chunk of completion) {
-      const delta = chunk.choices[0]?.delta?.content || '';
-      if (!delta) continue;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
 
-      fullResponse += delta;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
 
-      const thinkStartIndex = fullResponse.indexOf('<think>');
-      const thinkEndIndex = fullResponse.indexOf('</think>');
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const data = line.slice(6);
+        
+        if (data === '[DONE]') continue;
 
-      let visibleContent = fullResponse;
-      let currentThinking = '';
-
-      if (thinkStartIndex !== -1) {
-        if (!thinkingSection) {
-          thinkingSection = document.createElement('details');
-          thinkingSection.open = true;
-          thinkingSection.style.cssText = 'margin: 0 0 15px 0; padding: 12px; background: rgba(125, 211, 192, 0.08); border: 1px solid rgba(125, 211, 192, 0.25); border-radius: 8px; order: -1;';
-
-          thinkingSummary = document.createElement('summary');
-          thinkingSummary.style.cssText = 'cursor: pointer; color: var(--accent); font-weight: bold; user-select: none; list-style: none; display: flex; align-items: center; gap: 8px;';
-          thinkingSummary.innerHTML = '<i class="fas fa-brain"></i> Thinking<span class="thinking-dots"></span>';
-
-          thinkingSummary.addEventListener('click', (e) => {
-            e.preventDefault();
-            thinkingSection.open = !thinkingSection.open;
-          });
-
-          thinkContentDiv = document.createElement('div');
-          thinkContentDiv.style.cssText = 'margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(125, 211, 192, 0.15); color: #94a3b8; font-style: italic; white-space: pre-wrap; line-height: 1.6;';
-          thinkContentDiv.className = 'thinking-content';
-
-          thinkingSection.appendChild(thinkingSummary);
-          thinkingSection.appendChild(thinkContentDiv);
-
-          contentDiv.style.display = 'flex';
-          contentDiv.style.flexDirection = 'column';
-          contentDiv.insertBefore(thinkingSection, textDiv);
-
-          if (!document.getElementById('thinking-dots-style')) {
-            const style = document.createElement('style');
-            style.id = 'thinking-dots-style';
-            style.textContent = `
-              @keyframes thinkingDots {
-                0% { content: ''; }
-                25% { content: '.'; }
-                50% { content: '..'; }
-                75% { content: '...'; }
-                100% { content: ''; }
-              }
-              .thinking-dots::after {
-                content: '';
-                animation: thinkingDots 1.5s infinite;
-              }
-              summary::-webkit-details-marker {
-                display: none;
-              }
-            `;
-            document.head.appendChild(style);
+        try {
+          const parsed = JSON.parse(data);
+          
+          if (parsed.type === 'model_info') {
+            modelUsed = parsed.modelName || parsed.model;
+            veltraAI.lastUsedModel = parsed.model;
+            updateAiStatus(`Using ${modelUsed}...`, true);
+            continue;
           }
-        }
 
-        if (thinkEndIndex === -1) {
-          currentThinking = fullResponse.substring(thinkStartIndex + 7);
-          visibleContent = fullResponse.substring(0, thinkStartIndex);
-        } else {
-          currentThinking = fullResponse.substring(thinkStartIndex + 7, thinkEndIndex);
-          visibleContent = fullResponse.substring(0, thinkStartIndex) + fullResponse.substring(thinkEndIndex + 8);
-          if (thinkingSummary) {
-            thinkingSummary.innerHTML = '<i class="fas fa-lightbulb"></i> Thought';
+          const delta = parsed.choices?.[0]?.delta?.content;
+          if (delta) {
+            fullResponse += delta;
+            textDiv.textContent = fullResponse;
+            chatContainer.scrollTop = chatContainer.scrollHeight;
           }
-        }
-
-        if (thinkContentDiv) {
-          thinkContentDiv.textContent = currentThinking;
+        } catch (e) {
+          // Skip unparseable lines
         }
       }
-
-      textDiv.textContent = visibleContent;
-      chatContainer.scrollTop = chatContainer.scrollHeight;
     }
 
     // Add AI response to conversation history
-    nautilusAI.messages.push({ role: "assistant", content: fullResponse });
+    veltraAI.messages.push({ role: "assistant", content: fullResponse });
 
     // Process tool calls if any
     const toolCalls = parseToolCalls(fullResponse);
-    if (toolCalls.length > 0 && nautilusAI.toolsEnabled) {
+    if (toolCalls.length > 0 && veltraAI.toolsEnabled) {
       updateAiStatus('Processing tool calls...', true);
 
       // Remove tool call tags from visible text
@@ -16787,7 +18981,7 @@ async function sendAiMessage() {
               addToolFeedbackToChat(toolCall, result);
 
               // Add tool result to conversation for AI context
-              nautilusAI.messages.push({
+              veltraAI.messages.push({
                 role: "user",
                 content: `[Tool Execution Result]\nTool: ${toolCall.tool}\nSuccess: ${result.success}\nMessage: ${result.message}\n${result.details ? 'Details: ' + result.details : ''}`
               });
@@ -16798,12 +18992,12 @@ async function sendAiMessage() {
               // User rejected - show feedback
               addToolFeedbackToChat(toolCall, {
                 success: false,
-                message: `⛔ Action rejected by user`,
+                message: `â›” Action rejected by user`,
                 details: `The ${toolCall.tool} action was not executed.`
               });
 
               // Inform AI that tool was rejected
-              nautilusAI.messages.push({
+              veltraAI.messages.push({
                 role: "user",
                 content: `[Tool Execution Result]\nTool: ${toolCall.tool}\nSuccess: false\nMessage: User rejected this action`
               });
@@ -16822,7 +19016,7 @@ async function sendAiMessage() {
     addAiChatMessage('Sorry, I encountered an error while generating a response. Please try again.', false, true);
     updateAiStatus('Error occurred', false, true);
   } finally {
-    nautilusAI.isGenerating = false;
+    veltraAI.isGenerating = false;
     sendBtn.disabled = false;
     inputEl.disabled = false;
     inputEl.focus();
@@ -16846,7 +19040,7 @@ function addAiChatMessage(message, isUser = false, isError = false) {
   headerDiv.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-bottom: 8px;';
   headerDiv.innerHTML = `
     <i class="fas ${isUser ? 'fa-user' : 'fa-robot'}" style="color: ${isUser ? 'var(--accent)' : (isError ? '#ef4444' : 'var(--accent)')}; font-size: 18px;"></i>
-    <strong style="color: ${isUser ? 'var(--accent)' : (isError ? '#ef4444' : 'var(--accent)')}">${isUser ? 'You' : 'Nautilus AI'}</strong>
+    <strong style="color: ${isUser ? 'var(--accent)' : (isError ? '#ef4444' : 'var(--accent)')}">${isUser ? 'You' : 'Veltra AI'}</strong>
   `;
 
   const contentDiv = document.createElement('div');
@@ -16873,29 +19067,27 @@ function clearAiChat() {
   const chatContainer = document.getElementById('aiChatMessages');
   if (!chatContainer) return;
 
-  // Clear all messages except the welcome message
-  const currentModelConfig = AI_MODELS[nautilusAI.currentModel] || AI_MODELS['smart'];
+  // Clear all messages and show welcome message
   chatContainer.innerHTML = `
     <div style="background: rgba(125, 211, 192, 0.1); border: 1px solid rgba(125, 211, 192, 0.3); border-radius: 10px; padding: 15px;">
       <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
         <i class="fas fa-robot" style="color: var(--accent); font-size: 18px;"></i>
-        <strong style="color: var(--accent);">Nautilus AI</strong>
+        <strong style="color: var(--accent);">Veltra AI</strong>
       </div>
       <div style="color: #cbd5e1; line-height: 1.6;">
-        Hello! I'm your Nautilus AI Assistant. I can help you understand and navigate NautilusOS.<br><br>
-        <strong style="color: var(--accent);"><i class="fas ${currentModelConfig.icon}"></i> Using: ${currentModelConfig.label}</strong> - ${currentModelConfig.description}<br><br>
-        <strong style="color: var(--accent);"><i class="fa-solid fa-robot"></i>&nbsp;OS Automation Enabled!</strong><br>
-        I can control NautilusOS for you! Just ask me to do something and I'll request your approval before taking action.<br><br>
-        <strong style="color: var(--accent);"><i class="fa-solid fa-cloud"></i> Thinking Mode Active!</strong><br>
-        I can show my reasoning process for complex tasks. Watch for the collapsible "Thinking" section!<br><br>
-        Try: "Open calculator" or "List available themes"
+        Hello! I'm your Veltra AI Assistant powered by <strong style="color: var(--accent);">Cerebras Cloud AI</strong>.<br><br>
+        <strong style="color: var(--accent);"><i class="fas fa-bolt"></i> Lightning Fast</strong><br>
+        Using cloud-based models with automatic fallback: Qwen 235B -> GPT-OSS 120B -> Llama 3.3 70B -> more...<br><br>
+        <strong style="color: var(--accent);"><i class="fa-solid fa-robot"></i> OS Automation Enabled!</strong><br>
+        I can control Veltra for you! Open apps, run terminal commands, manage files, change settings, and more.<br><br>
+        Try: "Open calculator" or "Change theme to blue" or "Tell me a joke"
       </div>
     </div>
   `;
 
   // Reset conversation history (keep system prompt)
-  nautilusAI.messages = [
-    { role: "system", content: NAUTILUS_SYSTEM_PROMPT }
+  veltraAI.messages = [
+    { role: "system", content: VELTRA_SYSTEM_PROMPT }
   ];
 
   showToast('Chat cleared', 'fa-trash');
@@ -17066,7 +19258,7 @@ function executeTool_OpenApp(params) {
   openApp(app_name);
   return {
     success: true,
-    message: `✅ Opened ${app_name} application`,
+    message: `âœ… Opened ${app_name} application`,
     details: `The ${app_name} app is now open and visible on your screen.`
   };
 }
@@ -17087,13 +19279,13 @@ function executeTool_CloseApp(params) {
   if (closed) {
     return {
       success: true,
-      message: `✅ Closed ${app_name} application`,
+      message: `âœ… Closed ${app_name} application`,
       details: `The ${app_name} window has been closed.`
     };
   } else {
     return {
       success: false,
-      message: `⚠️ Could not find open ${app_name} window`,
+      message: `âš ï¸ Could not find open ${app_name} window`,
       details: `No window with that app name was found.`
     };
   }
@@ -17120,7 +19312,7 @@ function executeTool_RunTerminalCommand(params) {
       // Add command to terminal display
       const cmdLine = document.createElement('div');
       cmdLine.className = 'terminal-line';
-      cmdLine.innerHTML = `<span class="terminal-prompt">user@nautilusos:~$ </span>${command}`;
+      cmdLine.innerHTML = `<span class="terminal-prompt">${currentUsername}@veltra:~$ </span>${command}`;
       terminal.insertBefore(cmdLine, terminal.lastElementChild);
 
       // Execute the command logic (simplified version)
@@ -17132,7 +19324,7 @@ function executeTool_RunTerminalCommand(params) {
       } else if (command === 'date') {
         output.textContent = new Date().toString();
       } else if (command === 'whoami') {
-        output.textContent = localStorage.getItem('nOS_username') || 'user';
+        output.textContent = localStorage.getItem('veltra_username') || 'user';
       } else if (command === 'apps') {
         output.innerHTML = '<span style="color: var(--accent);">Installed Applications:</span><br>Files, Terminal, Browser, Settings, Text Editor, Music, Photos, Calculator, App Store';
       } else {
@@ -17146,7 +19338,7 @@ function executeTool_RunTerminalCommand(params) {
 
   return {
     success: true,
-    message: `✅ Executed terminal command: ${command}`,
+    message: `âœ… Executed terminal command: ${command}`,
     details: `Command "${command}" was executed in the terminal.`
   };
 }
@@ -17177,13 +19369,13 @@ function executeTool_CreateFile(params) {
 
     return {
       success: true,
-      message: `✅ Created file: ${path}`,
+      message: `âœ… Created file: ${path}`,
       details: `File created with ${content.length} characters of content.`
     };
   } catch (error) {
     return {
       success: false,
-      message: `❌ Failed to create file: ${error.message}`,
+      message: `âŒ Failed to create file: ${error.message}`,
       details: error.message
     };
   }
@@ -17214,13 +19406,13 @@ function executeTool_ReadFile(params) {
 
     return {
       success: true,
-      message: `✅ Read file: ${path}`,
+      message: `âœ… Read file: ${path}`,
       details: `File content:\n${currentLevel.content || '(empty file)'}`
     };
   } catch (error) {
     return {
       success: false,
-      message: `❌ Failed to read file: ${error.message}`,
+      message: `âŒ Failed to read file: ${error.message}`,
       details: error.message
     };
   }
@@ -17244,13 +19436,13 @@ function executeTool_CreateFolder(params) {
 
     return {
       success: true,
-      message: `✅ Created folder: ${path}`,
+      message: `âœ… Created folder: ${path}`,
       details: `Folder created successfully.`
     };
   } catch (error) {
     return {
       success: false,
-      message: `❌ Failed to create folder: ${error.message}`,
+      message: `âŒ Failed to create folder: ${error.message}`,
       details: error.message
     };
   }
@@ -17280,13 +19472,13 @@ function executeTool_DeleteItem(params) {
 
     return {
       success: true,
-      message: `✅ Deleted: ${path}`,
+      message: `âœ… Deleted: ${path}`,
       details: `Item deleted successfully.`
     };
   } catch (error) {
     return {
       success: false,
-      message: `❌ Failed to delete item: ${error.message}`,
+      message: `âŒ Failed to delete item: ${error.message}`,
       details: error.message
     };
   }
@@ -17296,7 +19488,7 @@ function executeTool_TakeScreenshot(params) {
   takeScreenshot();
   return {
     success: true,
-    message: `✅ Screenshot captured`,
+    message: `âœ… Screenshot captured`,
     details: `Screenshot has been saved to your downloads.`
   };
 }
@@ -17311,7 +19503,7 @@ function executeTool_ChangeSetting(params) {
       if (!installedThemes.includes(value) && value !== 'dark') {
         return {
           success: false,
-          message: `❌ Theme '${value}' is not installed`,
+          message: `âŒ Theme '${value}' is not installed`,
           details: `Available themes: dark, ${installedThemes.join(', ')}. Use get_available_options to see all themes.`
         };
       }
@@ -17319,10 +19511,10 @@ function executeTool_ChangeSetting(params) {
       const themeLink = document.getElementById('themeLink');
       if (themeLink) {
         themeLink.href = value === 'dark' ? '' : `/themes/${value}.css`;
-        localStorage.setItem('nOS_selectedTheme', value);
+        localStorage.setItem('veltra_selectedTheme', value);
         return {
           success: true,
-          message: `✅ Changed theme to: ${value}`,
+          message: `âœ… Changed theme to: ${value}`,
           details: `Theme has been applied successfully.`
         };
       }
@@ -17343,25 +19535,25 @@ function executeTool_ChangeSetting(params) {
       if (!engineUrl) {
         return {
           success: false,
-          message: `❌ Unknown search engine: ${value}`,
+          message: `âŒ Unknown search engine: ${value}`,
           details: `Available: ${Object.keys(searchEngines).join(', ')}`
         };
       }
 
-      localStorage.setItem('nOS_searchEngine', engineUrl);
+      localStorage.setItem('veltra_searchEngine', engineUrl);
       return {
         success: true,
-        message: `✅ Changed search engine to: ${value}`,
+        message: `âœ… Changed search engine to: ${value}`,
         details: `Default search engine updated.`
       };
     }
 
     // Boolean settings (use12Hour, showSeconds, showDesktopIcons, showWhatsNew)
     const booleanSettings = {
-      'use12Hour': 'nOS_use12Hour',
-      'showSeconds': 'nOS_showSeconds',
-      'showDesktopIcons': 'nOS_showDesktopIcons',
-      'showWhatsNew': 'nautilusOS_showWhatsNew'
+      'use12Hour': 'veltra_use12Hour',
+      'showSeconds': 'veltra_showSeconds',
+      'showDesktopIcons': 'veltra_showDesktopIcons',
+      'showWhatsNew': 'Veltra_showWhatsNew'
     };
 
     if (booleanSettings[setting]) {
@@ -17378,40 +19570,40 @@ function executeTool_ChangeSetting(params) {
 
       return {
         success: true,
-        message: `✅ Changed ${setting} to: ${boolValue}`,
+        message: `âœ… Changed ${setting} to: ${boolValue}`,
         details: `Setting updated. Some changes may require reopening apps.`
       };
     }
 
     // Wisp URL setting
     if (setting === 'wispUrl' || setting === 'wisp_url') {
-      localStorage.setItem('nOS_wispUrl', value);
+      localStorage.setItem('veltra_wispUrl', value);
       return {
         success: true,
-        message: `✅ Changed Wisp URL to: ${value}`,
+        message: `âœ… Changed Wisp URL to: ${value}`,
         details: `Proxy configuration updated.`
       };
     }
 
     // Bare URL setting
     if (setting === 'bareUrl' || setting === 'bare_url') {
-      localStorage.setItem('nOS_bareUrl', value);
+      localStorage.setItem('veltra_bareUrl', value);
       return {
         success: true,
-        message: `✅ Changed Bare URL to: ${value}`,
+        message: `âœ… Changed Bare URL to: ${value}`,
         details: `Proxy configuration updated.`
       };
     }
 
     return {
       success: false,
-      message: `❌ Unknown setting: ${setting}`,
+      message: `âŒ Unknown setting: ${setting}`,
       details: `Use get_available_options with category 'settings' to see all available settings.`
     };
   } catch (error) {
     return {
       success: false,
-      message: `❌ Failed to change setting: ${error.message}`,
+      message: `âŒ Failed to change setting: ${error.message}`,
       details: error.message
     };
   }
@@ -17425,7 +19617,7 @@ function executeTool_ListApps(params) {
 
   return {
     success: true,
-    message: `✅ Listed all applications`,
+    message: `âœ… Listed all applications`,
     details: `Available apps: ${apps}`
   };
 }
@@ -17451,22 +19643,22 @@ function executeTool_ListFiles(params) {
 
     return {
       success: true,
-      message: `✅ Listed contents of ${path}`,
+      message: `âœ… Listed contents of ${path}`,
       details: `Contents: ${items || '(empty)'}`
     };
   } catch (error) {
     return {
       success: false,
-      message: `❌ Failed to list files: ${error.message}`,
+      message: `âŒ Failed to list files: ${error.message}`,
       details: error.message
     };
   }
 }
 
 function executeTool_GetSystemInfo(params) {
-  const username = localStorage.getItem('nOS_username') || 'user';
+  const username = localStorage.getItem('veltra_username') || 'user';
   const openWindows = document.querySelectorAll('.window').length;
-  const theme = localStorage.getItem('nOS_selectedTheme') || 'default';
+  const theme = localStorage.getItem('veltra_selectedTheme') || 'default';
 
   const info = {
     username,
@@ -17478,7 +19670,7 @@ function executeTool_GetSystemInfo(params) {
 
   return {
     success: true,
-    message: `✅ Retrieved system information`,
+    message: `âœ… Retrieved system information`,
     details: `User: ${info.username}\nOpen windows: ${info.openWindows}\nTheme: ${info.theme}\nBrowser: ${info.browser}\nTime: ${info.timestamp}`
   };
 }
@@ -17490,46 +19682,46 @@ function executeTool_GetAvailableOptions(params) {
     themes: {
       installed: ['dark', ...installedThemes],
       available: ['dark', 'light', 'blue', 'red', 'purple', 'golden', 'green', 'liquidGlass'],
-      current: localStorage.getItem('nOS_selectedTheme') || 'dark',
-      description: 'Available color themes for NautilusOS. Themes must be installed from App Store before use.'
+      current: localStorage.getItem('veltra_selectedTheme') || 'dark',
+      description: 'Available color themes for Veltra. Themes must be installed from App Store before use.'
     },
 
     search_engines: {
       available: ['brave', 'duckduckgo', 'google', 'bing', 'startpage', 'qwant'],
-      current: localStorage.getItem('nOS_searchEngine') || 'https://search.brave.com/search?q=',
+      current: localStorage.getItem('veltra_searchEngine') || 'https://search.brave.com/search?q=',
       description: 'Available search engines for the browser'
     },
 
     settings: {
       boolean: {
         use12Hour: {
-          current: localStorage.getItem('nOS_use12Hour') === 'true',
+          current: localStorage.getItem('veltra_use12Hour') === 'true',
           description: 'Use 12-hour time format (true/false)',
           values: ['true', 'false']
         },
         showSeconds: {
-          current: localStorage.getItem('nOS_showSeconds') === 'true',
+          current: localStorage.getItem('veltra_showSeconds') === 'true',
           description: 'Show seconds in taskbar clock (true/false)',
           values: ['true', 'false']
         },
         showDesktopIcons: {
-          current: localStorage.getItem('nOS_showDesktopIcons') !== 'false',
+          current: localStorage.getItem('veltra_showDesktopIcons') !== 'false',
           description: 'Show icons on desktop (true/false)',
           values: ['true', 'false']
         },
         showWhatsNew: {
-          current: localStorage.getItem('nautilusOS_showWhatsNew') !== 'false',
+          current: localStorage.getItem('Veltra_showWhatsNew') !== 'false',
           description: 'Show What\'s New on startup (true/false)',
           values: ['true', 'false']
         }
       },
       urls: {
         wispUrl: {
-          current: localStorage.getItem('nOS_wispUrl') || 'wss://wisp.rhw.one/',
+          current: localStorage.getItem('veltra_wispUrl') || 'wss://wisp.rhw.one/',
           description: 'Wisp proxy URL for browser'
         },
         bareUrl: {
-          current: localStorage.getItem('nOS_bareUrl') || 'https://useclassplay.vercel.app/fq/',
+          current: localStorage.getItem('veltra_bareUrl') || 'https://useclassplay.vercel.app/fq/',
           description: 'Bare proxy URL for browser'
         }
       },
@@ -17542,7 +19734,7 @@ function executeTool_GetAvailableOptions(params) {
         name: appMetadata[key].name,
         preinstalled: appMetadata[key].preinstalled
       })),
-      description: 'All available applications in NautilusOS'
+      description: 'All available applications in Veltra'
     }
   };
 
@@ -17578,21 +19770,21 @@ function executeTool_GetAvailableOptions(params) {
   } else {
     return {
       success: false,
-      message: `❌ Unknown category: ${category}`,
+      message: `âŒ Unknown category: ${category}`,
       details: `Valid categories: themes, apps, search_engines, settings, all`
     };
   }
 
   return {
     success: true,
-    message: `✅ Retrieved available options for: ${category}`,
+    message: `âœ… Retrieved available options for: ${category}`,
     details: result
   };
 }
 
 function logAction(action, details) {
   const timestamp = new Date().toISOString();
-  nautilusAI.actionLog.push({ timestamp, action, details });
+  veltraAI.actionLog.push({ timestamp, action, details });
   console.log(`[AI Action] ${action}`, details);
 }
 
@@ -17722,7 +19914,7 @@ function addToolFeedbackToChat(toolCall, result) {
   chatContainer.scrollTop = chatContainer.scrollHeight;
 }
 
-// Note: Initialization happens in openApp when nautilus-ai is opened
+// Note: Initialization happens in openApp when veltra-ai is opened
 
 // Handle Enter key in textarea
 document.addEventListener('keydown', (e) => {
@@ -17793,34 +19985,60 @@ function toggleSearchDropdown(trigger) {
 }
 
 function selectSearchEngine(name, url) {
-  localStorage.setItem('nOS_searchEngine', url);
+  localStorage.setItem('veltra_searchEngine', url);
   const label = document.getElementById('currentSearchEngine');
   if (label) label.textContent = name;
   showToast('Search engine set to ' + name, 'fa-check');
 }
 
 function changeWispUrl(url) {
-  localStorage.setItem('nOS_wispUrl', url);
+  localStorage.setItem('veltra_wispUrl', url);
+  wispUrl = url; // Update global
   showToast('Wisp URL updated', 'fa-check');
 }
 
-function resetWispUrl() {
-  const defaultUrl = 'wss://wisp.rhw.one/';
-  localStorage.setItem('nOS_wispUrl', defaultUrl);
+async function resetWispUrl() {
+  // Try to fetch from Firebase first
+  showToast('Fetching Veltra backend...', 'fa-spinner fa-spin');
+  let defaultUrl = await fetchVeltraBackend();
+  let source = 'Firebase';
+  
+  // If Firebase fails, try NautilusOS official
+  if (!defaultUrl) {
+    showToast('Trying NautilusOS fallback...', 'fa-sync fa-spin');
+    try {
+      const testWs = new WebSocket(NAUTILUS_FALLBACK_URL);
+      await new Promise((resolve, reject) => {
+        testWs.onopen = () => { testWs.close(); resolve(); };
+        testWs.onerror = reject;
+        setTimeout(reject, 3000);
+      });
+      defaultUrl = NAUTILUS_FALLBACK_URL;
+      source = 'NautilusOS';
+    } catch (e) {
+      defaultUrl = FALLBACK_WISP_URL;
+      source = 'default';
+    }
+  }
+  
+  localStorage.setItem('veltra_wispUrl', defaultUrl);
+  wispUrl = defaultUrl; // Update global
   const input = document.getElementById('wispUrlInput');
   if (input) input.value = defaultUrl;
-  showToast('Wisp URL reset to default', 'fa-undo');
+  
+  const icons = { Firebase: 'fa-cloud-download-alt', NautilusOS: 'fa-fish', default: 'fa-undo' };
+  showToast(`Wisp URL synced from ${source}!`, icons[source]);
 }
 
 // ==================== WEB APP CREATOR FUNCTIONS ====================
 
 function getCustomWebApps() {
-  const appsJson = localStorage.getItem('nautilusOS_customWebApps');
+  const appsJson = localStorage.getItem('Veltra_customWebApps');
   return appsJson ? JSON.parse(appsJson) : [];
 }
 
 function saveCustomWebApps(apps) {
-  localStorage.setItem('nautilusOS_customWebApps', JSON.stringify(apps));
+  localStorage.setItem('Veltra_customWebApps', JSON.stringify(apps));
 }
 
 function createCustomWebApp() {
@@ -18127,8 +20345,8 @@ function renderCommunityApps(apps) {
   }
 
   // Check installed status
-  const installedCommunityApps = JSON.parse(localStorage.getItem('nautilusOS_communityApps') || '{}');
-  const installedThemesList = JSON.parse(localStorage.getItem('nautilusOS_installedThemes') || '[]');
+  const installedCommunityApps = JSON.parse(localStorage.getItem('Veltra_communityApps') || '{}');
+  const installedThemesList = JSON.parse(localStorage.getItem('Veltra_installedThemes') || '[]');
 
   const processedApps = apps.map(app => {
     const appId = app.name.toLowerCase().replace(/[^a-z0-9]/g, '-');
@@ -18259,7 +20477,7 @@ async function installCommunityApp(app) {
       showToast(`${app.name} installed!`, 'fa-check');
       if (!installedThemes.includes(app.name)) {
         installedThemes.push(app.name);
-        localStorage.setItem("nautilusOS_installedThemes", JSON.stringify(installedThemes));
+        localStorage.setItem("Veltra_installedThemes", JSON.stringify(installedThemes));
       }
       refreshAppStore();
       return;
@@ -18281,7 +20499,7 @@ async function installCommunityApp(app) {
     const appId = app.name.toLowerCase().replace(/[^a-z0-9]/g, '-');
 
     // Save to localStorage
-    const communityApps = JSON.parse(localStorage.getItem('nautilusOS_communityApps') || '{}');
+    const communityApps = JSON.parse(localStorage.getItem('Veltra_communityApps') || '{}');
     communityApps[appId] = {
       name: app.name,
       icon: app.icon || app.img || 'fas fa-box',
@@ -18289,15 +20507,15 @@ async function installCommunityApp(app) {
       author: app.author,
       type: 'community-app'
     };
-    localStorage.setItem('nautilusOS_communityApps', JSON.stringify(communityApps));
+    localStorage.setItem('Veltra_communityApps', JSON.stringify(communityApps));
 
     // Create desktop icon
     createDesktopIcon(appId, app.name, app.icon || app.img || 'fas fa-box');
 
     // Update global installedApps list just in case
     // Note: global installedApps array might not be persisted directly in all cases in this code base, 
-    // but usually checking `nautilusOS_installedApps`
-    // We'll rely on our custom registry `nautilusOS_communityApps`
+    // but usually checking `Veltra_installedApps`
+    // We'll rely on our custom registry `Veltra_communityApps`
 
     showToast(`${app.name} installed!`, 'fa-check');
 
@@ -18388,7 +20606,7 @@ function enableDesktopSelection() {
 // ================= TASKBAR SETTINGS =================
 
 function updateTaskbarStyle() {
-  const style = localStorage.getItem('nautilusOS_taskbarStyle') || 'floating';
+  const style = localStorage.getItem('Veltra_taskbarStyle') || 'floating';
   const taskbar = document.getElementById('taskbar');
   const startMenu = document.getElementById('startMenu');
   const desktop = document.getElementById('desktop');
@@ -18410,9 +20628,9 @@ function updateTaskbarStyle() {
 }
 
 function toggleTaskbarStyle() {
-  const current = localStorage.getItem('nautilusOS_taskbarStyle') || 'floating';
+  const current = localStorage.getItem('Veltra_taskbarStyle') || 'floating';
   const next = current === 'floating' ? 'full' : 'floating';
-  localStorage.setItem('nautilusOS_taskbarStyle', next);
+  localStorage.setItem('Veltra_taskbarStyle', next);
   updateTaskbarStyle();
   showToast(`Taskbar set to ${next}`, 'fa-cog');
 }
@@ -18427,7 +20645,7 @@ document.addEventListener('contextmenu', (e) => {
     menu.style.left = e.pageX + 'px';
     menu.style.top = (e.pageY - 100) + 'px';
 
-    const style = localStorage.getItem('nautilusOS_taskbarStyle') || 'floating';
+    const style = localStorage.getItem('Veltra_taskbarStyle') || 'floating';
     const nextLabel = style === 'floating' ? 'Switch to Full Mode' : 'Switch to Floating Mode';
 
     menu.innerHTML = `

@@ -20,7 +20,7 @@ class V86Frontend {
         this.lastMousePosition = { x: 0, y: 0 };
         this.mouseButtons = 0;
         this.inputFocused = false;
-        this.preventNautilusOSConflicts = true;
+        this.preventVeltraConflicts = true;
         
         // Screen update handling
         this.screenUpdateInterval = null;
@@ -800,8 +800,8 @@ class V86Frontend {
         // Show capture notification
         this.showInputCaptureNotification(true);
         
-        // Prevent NautilusOS shortcuts when input is captured
-        if (this.preventNautilusOSConflicts) {
+        // Prevent Veltra shortcuts when input is captured
+        if (this.preventVeltraConflicts) {
             document.body.classList.add('v86-input-active');
         }
         
@@ -826,8 +826,8 @@ class V86Frontend {
         // Hide capture notification
         this.showInputCaptureNotification(false);
         
-        // Re-enable NautilusOS shortcuts
-        if (this.preventNautilusOSConflicts) {
+        // Re-enable Veltra shortcuts
+        if (this.preventVeltraConflicts) {
             document.body.classList.remove('v86-input-active');
         }
         
@@ -885,9 +885,9 @@ class V86Frontend {
             return;
         }
         
-        // Prevent certain key combinations that might conflict with NautilusOS
-        if (this.preventNautilusOSConflicts) {
-            // Block common NautilusOS shortcuts when input is captured
+        // Prevent certain key combinations that might conflict with Veltra
+        if (this.preventVeltraConflicts) {
+            // Block common Veltra shortcuts when input is captured
             const blockedCombinations = [
                 // Alt+Tab (window switching)
                 event.altKey && event.key === 'Tab',

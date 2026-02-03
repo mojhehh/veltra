@@ -8,7 +8,7 @@ import shutil
 
 root = pathlib.Path(__file__).resolve().parent
 index_path = root / "index.html"
-output_dir = root / "NautilusOS-OneFile"
+output_dir = root / "Veltra-OneFile"
 output_path = output_dir / "index.html"
 placeholder_path = output_dir / "placeholder-deleteme"
 cache = {}

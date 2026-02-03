@@ -68,7 +68,7 @@ input {
     z-index: 10000;
     opacity: 1;
     transition: opacity 0.5s ease;
-    cursor: none;
+    cursor: default;
     font-family: "SUSE Mono" !important;
 }
 
@@ -116,7 +116,6 @@ input {
     display: flex;
     align-items: center;
     gap: 1rem;
-    cursor: none;
 }
 
 .boot-option i {

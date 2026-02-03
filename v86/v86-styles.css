@@ -362,7 +362,7 @@
     }
 }
 
-/* Prevent NautilusOS conflicts when input is active */
+/* Prevent Veltra conflicts when input is active */
 body.v86-input-active {
     /* Disable text selection */
     user-select: none;

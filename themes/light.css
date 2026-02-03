@@ -83,7 +83,7 @@ input {
     z-index: 10000;
     opacity: 1;
     transition: opacity 0.5s ease;
-    cursor: none;
+    cursor: default;
     font-family: "SUSE Mono" !important;
 }
 
@@ -131,7 +131,6 @@ input {
     display: flex;
     align-items: center;
     gap: 1rem;
-    cursor: none;
 }
 
 .boot-option i {
@@ -1051,12 +1050,12 @@ select:focus {
     transform: translateX(-50%) scale(0.95);
     width: 650px;
     height: 520px;
-    background: rgba(21, 25, 35, 0.9);
+    background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(50px) saturate(180%);
     border: 1px solid var(--border);
     border-radius: 20px;
     padding: 2rem;
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
     opacity: 0;
     pointer-events: none;
     transition: all 0.3s ease;
@@ -1252,11 +1251,11 @@ select:focus {
 
 .window {
     position: absolute;
-    background: rgba(21, 25, 35, var(--window-opacity, 0.85));
+    background: rgba(255, 255, 255, var(--window-opacity, 0.95));
     backdrop-filter: blur(40px) saturate(180%);
     border: 1px solid var(--border);
     border-radius: 12px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
     overflow: hidden;
     z-index: 100;
     animation: windowOpen 0.25s ease;
@@ -1657,7 +1656,7 @@ select:focus {
 }
 
 .window-header {
-    background: rgba(30, 35, 48, var(--window-opacity, 0.6));
+    background: rgba(241, 245, 249, var(--window-opacity, 0.9));
     padding: 0.625rem 1rem;
     display: flex;
     align-items: center;
@@ -1714,7 +1713,7 @@ select:focus {
     height: calc(100% - 48px);
     overflow: auto;
     color: var(--text-primary);
-    background: rgba(10, 14, 26, 0.6);
+    background: rgba(255, 255, 255, 0.85);
 }
 
 .window-content.has-padding {

@@ -1,28 +1,28 @@
 
 ### `WE NEED TO SEEK FUNDING FOR DOMAIN! SEE DOMAIN IDEAS FOR MORE DETAILS`
-## NautilusOS
+## Veltra
 
-NautilusOS is a web-based operating system built entirely in HTML, CSS, and JS.
+Veltra is a web-based operating system built entirely in HTML, CSS, and JS.
 Boot it up, log in, and mess around like it’s a real desktop with proxies, games, apps, an app store, windows, a file explorer, taskbar, and more.
 
-NAUTILUS BLOCKED BY YOUR SCHOOL?? DOWNLOAD "index.html" from the NautilusOS-OneFile folder! Open up index.html and you'll have (most*) of Nautilus's features!
+VELTRA BLOCKED BY YOUR SCHOOL?? DOWNLOAD "index.html" from the Veltra-OneFile folder! Open up index.html and you'll have (most*) of VELTRA's features!
 
-*Nautilus Browser is disabled by default in the file, but you may reenable it in the experimental settings under the BIOS (Left shift/F2 during boot), or in the experimental settings under Advanced. The Ultraviolet browser will not work in the file, unfortunately, due to service workers not working in file:/// or file:// url's :(
+*VELTRA Browser is disabled by default in the file, but you may reenable it in the experimental settings under the BIOS (Left shift/F2 during boot), or in the experimental settings under Advanced. The Ultraviolet browser will not work in the file, unfortunately, due to service workers not working in file:/// or file:// url's :(
 
 ---
 
 ## DEPLOY ME!!
 
-Make your own vercel.app instance of NautilusOS with this handy button!
+Make your own vercel.app instance of Veltra with this handy button!
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fnautilus-os%2FNautilusOS)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FVELTRA-os%2FVeltra)
 
 You can also do this with Netlify!
 
-[![Deploy with Netlify](https://netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/nautilus-os/nautilusos)
+[![Deploy with Netlify](https://netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/VELTRA-os/Veltra)
 
 
-You can also deploy NautilusOS in a Github Codespace:
+You can also deploy Veltra in a Github Codespace:
 
 1. click on the green code button in this repo
 2. click on the codespaces tab
@@ -45,19 +45,19 @@ There’s a ton of stuff to play with, but here’s a quick rundown (seriously, 
 - advanced cloaking options not seen in other proxies
 - allows creation of multiple accounts with different editable  permissions (superuser or standard users)
 - THREE built in proxy browsers, all using different technologies
-- tons of themes to customize Nautilus to your preference
+- tons of themes to customize VELTRA to your preference
 - fully animated desktop environment
 - BIOS for power users
 - draggable + resizable windows
 - notifications and a quick action menu
 - built in screenshotting, media viewing, music playing and more
 - taskbar to keep your apps organized
-- custom right-click menu to quickly perform tasks within Nautilus
+- custom right-click menu to quickly perform tasks within VELTRA
 - searchable start menu with user info and apps grid  
 - a multitude of preinstalled apps + an app store to discover more
 - tons of customization and settings
 - exportable/importable profiles
-- AI-powered OS automation - NautilusOS comes prepackaged with a built in AI assistant capable of both answering your questions AND controlling your OS! (with your approval ofc)
+- AI-powered OS automation - Veltra comes prepackaged with a built in AI assistant capable of both answering your questions AND controlling your OS! (with your approval ofc)
 
 Basically... a whole little OS in your browser :D
 
@@ -67,7 +67,7 @@ Basically... a whole little OS in your browser :D
 
 - [ ] RIGHT CLICK MEN U IS BROKEN :((((((
 - [ ] automaqitcally lower the margin bottom on desktop icons when switching to small icons and large icons. for medium and extra large it just looks fine idk
-- [ ] add swimmign fishes in setup screen from NautilusOS-Web insted of odd flaoting orbs (lane)
+- [ ] add swimmign fishes in setup screen from Veltra-Web insted of odd flaoting orbs (lane)
 - [ ] add pfps from github to contributers and devs in about app
 - [ ] fix light theme gosh it sucks
 - [ ] if u hit login in without choosing an existing accoutnit just picks the first one, should ask u to pick an acc
@@ -86,10 +86,10 @@ Basically... a whole little OS in your browser :D
 
 ## 🌐 domain ideas
 
-- `nautilusos.app` $14.20/year at cloudflare or
-- `nautilusos.me` $2.99/first year at dreamhost
+- `Veltra.app` $14.20/year at cloudflare or
+- `Veltra.me` $2.99/first year at dreamhost
 - `nautliusos.xyz` $2.00/year at namecheap (some 90% off deal)
-- `nautiluson.top` $4.63/year at porkbun
+- `VELTRAon.top` $4.63/year at porkbun
   
 Feel like donating? We accept Monero (XMR)!
 
@@ -121,7 +121,7 @@ Built with just HTML, CSS, and JS (no frameworks, no CDNs except icons/fonts)
 
 ## 🧠 try it
 
-Open the NautilusOS-OneFile/index.html file in your browser. That’s it. 
+Open the Veltra-OneFile/index.html file in your browser. That’s it. 
 
 ---
 
@@ -131,8 +131,8 @@ Developed by dinguschan, x8rr, and lanefiedler-731
 
 ## IF YOU ARE FORKING
 **License compliance notice (AGPL-3.0 §5):**
-If you fork or redistribute NautilusOS, you must:
+If you fork or redistribute Veltra, you must:
  - Keep our copyright & license files intact.
- - Add a **prominent** “Modified from NautilusOS” notice with the date of your change.
+ - Add a **prominent** “Modified from Veltra” notice with the date of your change.
  - Provide full source to any users over a network.
  Non-compliant forks will be reported under GitHub’s DMCA policy.

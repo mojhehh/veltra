@@ -510,7 +510,7 @@
         async function go(u) {
 
             if (!await connection.getTransport()) {
-                connection.setTransport("/libcurl/index.mjs", [{ websocket: wispUrl }])
+                connection.setTransport(basePath + "/libcurl/index.mjs", [{ websocket: wispUrl }])
             }
 
             console.log("a")

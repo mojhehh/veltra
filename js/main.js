@@ -9298,7 +9298,7 @@ function switchAppStoreSection(section, element) {
       {
         name: "Veltra AI Assistant",
         author: "lanefiedler-731",
-        desc: "Your personal AI assistant powered by WebLLM. Get instant help with Veltra features, apps, settings, and more. Runs entirely in your browser with no server required!",
+        desc: "Your personal AI assistant powered by Cerebras Cloud AI. Get instant help with Veltra features, apps, settings, and more. Control apps, run commands, and manage your OS with natural language!",
         customPreviewHtml: `<div class="illustration-veltra-ai"> <div class="illustration-veltra-ai-header"> <div class="illustration-veltra-ai-icon"><i class="fas fa-robot"></i></div> <div class="illustration-veltra-ai-title">Veltra AI</div> </div> <div class="illustration-veltra-ai-content"> <div class="illustration-veltra-ai-msg-ai"> <div class="illustration-veltra-ai-line" style="width: 90%;"></div> <div class="illustration-veltra-ai-line" style="width: 60%;"></div> </div> <div class="illustration-veltra-ai-msg-user"> <div class="illustration-veltra-ai-line" style="width: 80%;"></div> </div> </div> </div>`,
         isInstalled: true,
         installButtonText: "Open",
@@ -18361,7 +18361,7 @@ function reportV86Issue(errorType, errorMessage) {
   showToast("Issue details logged to console", "fa-bug");
 }
 
-// ==================== WebLLM AI Assistant ====================
+// ==================== Cerebras Cloud AI Assistant ====================
 
 let veltraAI = {
   messages: [],

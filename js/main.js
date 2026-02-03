@@ -9825,10 +9825,29 @@ function renderGemtraGamesLazy() {
   renderBatch();
 }
 
+// List of games known to have WebSocket/proxy compatibility issues
+const GAMES_NEEDING_NEW_TAB = [
+  'slither.io',
+  'agar.io',
+  'diep.io',
+  'surviv.io',
+  'krunker.io',
+  'shellshock.io',
+  'zombsroyale.io'
+];
+
 // Open a Gemtra game through Ultraviolet proxy
 function openGemtraGame(gameUrl) {
   if (!checkFileProtocol("Gemtra Games")) {
     showToast("Ultraviolet doesn't work on file:// protocol. Run Veltra on a local server!", "fa-exclamation-triangle");
+    return;
+  }
+  
+  // Check if this game needs to open in new tab due to WebSocket issues
+  const needsNewTab = GAMES_NEEDING_NEW_TAB.some(game => gameUrl.toLowerCase().includes(game));
+  if (needsNewTab) {
+    showToast("This game works better in a new tab due to WebSocket requirements", "fa-external-link-alt");
+    window.open(gameUrl, '_blank');
     return;
   }
   
@@ -9841,8 +9860,13 @@ function openGemtraGame(gameUrl) {
     createWindow(
       "Gemtra Game",
       "fas fa-gamepad",
-      `<div style="width: 100%; height: 100%; overflow: hidden; background: #1a1a2e;">
+      `<div style="width: 100%; height: 100%; overflow: hidden; background: #1a1a2e; position: relative;">
         <iframe id="${iframeId}" src="${encodedUrl}" style="width: 100%; height: 100%; border: none;" allowfullscreen allow="accelerometer; gyroscope; autoplay; fullscreen" sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-pointer-lock allow-modals"></iframe>
+        <button onclick="window.open('${gameUrl}', '_blank'); this.parentElement.querySelector('iframe').remove(); this.remove();" 
+          style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; border: 1px solid rgba(255,255,255,0.3); padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; z-index: 1000; display: flex; align-items: center; gap: 6px;"
+          title="If game doesn't load, click to open in new tab">
+          <i class="fas fa-external-link-alt"></i> Open in New Tab
+        </button>
       </div>`,
       1000,
       700,
@@ -10239,7 +10263,9 @@ function handleBrowserLandingInput(event) {
 
 async function transport() {
   if (!await connection.getTransport()) {
-    connection.setTransport("/libcurl/index.mjs", [{ websocket: wispUrl }])
+    // Use dynamic base path for GitHub Pages compatibility
+    const basePath = window.location.pathname.includes('/veltra') ? '/veltra' : '';
+    connection.setTransport(basePath + "/libcurl/index.mjs", [{ websocket: wispUrl }])
   }
 }
 

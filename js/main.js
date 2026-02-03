@@ -1504,6 +1504,11 @@ function loadMelodifyFile(event) {
   if (!file) return;
   
   const audio = document.getElementById('melodifyAudio');
+  if (!audio) return;
+  
+  // Initialize audio events if not already done
+  initMelodifyAudio();
+  
   const url = URL.createObjectURL(file);
   
   audio.src = url;
@@ -1617,6 +1622,9 @@ function playMelodifyTrack(index) {
   // Use direct audio streaming from server for best quality
   const audio = document.getElementById('melodifyAudio');
   if (audio) {
+    // Initialize audio events if not already done
+    initMelodifyAudio();
+    
     getMelodifyBackendUrl().then(serverUrl => {
       // Use the stream endpoint for direct audio playback
       audio.src = `${serverUrl}/api/stream/${videoId}`;
@@ -1953,28 +1961,40 @@ function toggleMelodifyQueue() {
   showToast('Queue feature coming soon', 'fa-list');
 }
 
-// Initialize melodify audio events
-document.addEventListener('DOMContentLoaded', () => {
+// Flag to track if audio events have been initialized
+let melodifyAudioInitialized = false;
+
+// Initialize melodify audio events - call this when audio element becomes available
+function initMelodifyAudio() {
   const audio = document.getElementById('melodifyAudio');
-  if (audio) {
-    audio.addEventListener('timeupdate', () => {
-      const current = document.getElementById('melodifyCurrentTime');
-      const total = document.getElementById('melodifyTotalTime');
-      const fill = document.getElementById('melodifyProgressFill');
-      
-      if (current) current.textContent = formatMusicTime(audio.currentTime);
-      if (total && audio.duration) total.textContent = formatMusicTime(audio.duration);
-      if (fill && audio.duration) fill.style.width = (audio.currentTime / audio.duration * 100) + '%';
-    });
+  if (!audio || melodifyAudioInitialized) return;
+  
+  melodifyAudioInitialized = true;
+  
+  audio.addEventListener('timeupdate', () => {
+    const current = document.getElementById('melodifyCurrentTime');
+    const total = document.getElementById('melodifyTotalTime');
+    const fill = document.getElementById('melodifyProgressFill');
     
-    audio.addEventListener('ended', () => {
-      melodifyState.isPlaying = false;
-      updateMelodifyPlayButton();
-    });
-    
-    audio.volume = 0.7;
-  }
-});
+    if (current) current.textContent = formatMusicTime(audio.currentTime);
+    if (total && audio.duration) total.textContent = formatMusicTime(audio.duration);
+    if (fill && audio.duration) fill.style.width = (audio.currentTime / audio.duration * 100) + '%';
+  });
+  
+  audio.addEventListener('ended', () => {
+    melodifyState.isPlaying = false;
+    updateMelodifyPlayButton();
+    // Auto play next track
+    if (melodifyState.queue.length > 0) {
+      melodifyNext();
+    }
+  });
+  
+  audio.volume = 0.7;
+}
+
+// Also try to init on DOMContentLoaded in case element exists
+document.addEventListener('DOMContentLoaded', initMelodifyAudio);
 
 function formatMusicTime(seconds) {
   if (!seconds || isNaN(seconds)) return '0:00';

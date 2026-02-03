@@ -5284,6 +5284,41 @@ alt="favicon">
                             </div>
                         </div>
                     </div>
+
+                    <!-- Touch/Mobile Panic Button Settings -->
+                    <div class="cloaking-form-card" style="margin-top: 1rem;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border);">
+                            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                <i class="fas fa-hand-pointer" style="color: var(--accent); font-size: 1.1rem;"></i>
+                                <span style="font-weight: bold; color: var(--text-primary);">Touch Panic Button</span>
+                            </div>
+                            <div class="toggle-switch ${cloakingConfig.showTouchPanicButton ? "active" : ""}" 
+                                 id="showTouchPanicToggle" 
+                                 onclick="toggleTouchPanicSetting('showTouchPanicButton')"></div>
+                        </div>
+                        
+                        <div class="cloaking-hint" style="margin-bottom: 1rem;">Shows a floating panic button on touch devices (iPad, Chromebook, mobile)</div>
+                        
+                        <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem; background: rgba(125, 211, 192, 0.1); border-radius: 8px; margin-bottom: 1rem;">
+                            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                <i class="fas fa-desktop" style="color: var(--accent); font-size: 0.9rem;"></i>
+                                <span style="color: var(--text-secondary); font-size: 0.85rem;">Force show on all devices (for testing)</span>
+                            </div>
+                            <div class="toggle-switch ${cloakingConfig.forceTouchPanicButton ? "active" : ""}" 
+                                 id="forceTouchPanicToggle" 
+                                 onclick="toggleTouchPanicSetting('forceTouchPanicButton')"></div>
+                        </div>
+                        
+                        <div class="cloaking-form-group">
+                            <label class="cloaking-label">Button Position</label>
+                            <select id="touchPanicPosition" class="cloaking-input" onchange="updateTouchPanicPosition(this.value)">
+                                <option value="top-left" ${cloakingConfig.touchPanicButtonPosition === 'top-left' ? 'selected' : ''}>Top Left</option>
+                                <option value="top-right" ${cloakingConfig.touchPanicButtonPosition === 'top-right' ? 'selected' : ''}>Top Right</option>
+                                <option value="bottom-left" ${cloakingConfig.touchPanicButtonPosition === 'bottom-left' ? 'selected' : ''}>Bottom Left</option>
+                                <option value="bottom-right" ${cloakingConfig.touchPanicButtonPosition === 'bottom-right' ? 'selected' : ''}>Bottom Right</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
                                 <div class="cloaking-tab" data-tab="anti-monitor">
                     <div class="cloaking-header">
@@ -7820,6 +7855,38 @@ print(f'Sum: {sum(numbers)}')
         refreshCustomWebAppsList();
       }, 50);
     }
+
+    if (appName === "uv") {
+      setTimeout(() => {
+        showToast(
+          "💡 Tip: Click the 'New Tab' button for better performance! Runs much faster in a separate tab.",
+          "fa-external-link-alt",
+          5000
+        );
+        // Highlight the new tab button inside the UV iframe
+        setTimeout(() => {
+          try {
+            const uvWindow = windows["uv"];
+            if (uvWindow) {
+              const iframe = uvWindow.querySelector('iframe');
+              if (iframe && iframe.contentDocument) {
+                const fullBtn = iframe.contentDocument.querySelector('button[onclick="full()"]');
+                if (fullBtn) {
+                  fullBtn.style.animation = 'uvButtonPulse 1s ease-in-out 3';
+                  fullBtn.style.boxShadow = '0 0 15px rgba(125, 211, 192, 0.8)';
+                  setTimeout(() => {
+                    fullBtn.style.animation = '';
+                    fullBtn.style.boxShadow = '';
+                  }, 4000);
+                }
+              }
+            }
+          } catch (e) {
+            // Cross-origin - can't access iframe content
+          }
+        }, 1500);
+      }, 800);
+    }
   }
 }
 
@@ -10071,6 +10138,32 @@ function openGemtraGame(gameUrl) {
   
   // Create a window with an iframe pointing to Ultraviolet with the game URL
   try {
+    // Check if UV config is available
+    if (typeof __uv$config === 'undefined' || !__uv$config) {
+      // UV not available in main context, use the UV HTML page as a wrapper
+      const basePath = window.location.pathname.includes('/veltra') ? '/veltra' : '';
+      const uvPageUrl = basePath + '/app/uv.html?url=' + encodeURIComponent(gameUrl);
+      const iframeId = 'game-iframe-' + Date.now();
+      
+      createWindow(
+        "Gemtra Game",
+        "fas fa-gamepad",
+        `<div style="width: 100%; height: 100%; overflow: hidden; background: #1a1a2e; position: relative;">
+          <iframe id="${iframeId}" src="${uvPageUrl}" style="width: 100%; height: 100%; border: none;" allowfullscreen allow="accelerometer; gyroscope; autoplay; fullscreen"></iframe>
+          <button onclick="window.open('${gameUrl}', '_blank'); this.parentElement.querySelector('iframe').remove(); this.remove();" 
+            style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; border: 1px solid rgba(255,255,255,0.3); padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; z-index: 1000; display: flex; align-items: center; gap: 6px;"
+            title="If game doesn't load, click to open in new tab">
+            <i class="fas fa-external-link-alt"></i> Open in New Tab
+          </button>
+        </div>`,
+        1000,
+        700,
+        null,
+        true
+      );
+      return;
+    }
+    
     const encodedUrl = __uv$config.prefix + __uv$config.encodeUrl(gameUrl);
     const iframeId = 'game-iframe-' + Date.now();
     
@@ -14185,6 +14278,7 @@ let cloakingConfig = {
   clickoffFavicon: "",
   // NEW: Touch/iPad panic button settings
   showTouchPanicButton: true,
+  forceTouchPanicButton: false, // Force show even on non-touch devices (for testing)
   touchPanicButtonPosition: 'bottom-right', // top-left, top-right, bottom-left, bottom-right
   touchPanicButtonSize: 50,
   // NEW: Default coverup presets for unsafe pages
@@ -15141,9 +15235,10 @@ function createTouchPanicButton() {
     panicButton = null;
   }
 
-  // Only create if enabled and on a touch device
+  // Only create if enabled and (on a touch device OR force enabled)
   if (!cloakingConfig.showTouchPanicButton) return;
-  if (!isTouchDevice() && !isIPadOrIOS() && !isChromebook()) return;
+  const isTouchOrForced = cloakingConfig.forceTouchPanicButton || isTouchDevice() || isIPadOrIOS() || isChromebook();
+  if (!isTouchOrForced) return;
 
   panicButton = document.createElement('button');
   panicButton.id = 'touchPanicButton';
@@ -15354,7 +15449,9 @@ window.addEventListener("DOMContentLoaded", () => {
 // Initialize panic button AFTER login
 window.addEventListener('Login Success', function() {
   // Only create panic button after successful login
-  if (cloakingConfig.showTouchPanicButton && (isTouchDevice() || isIPadOrIOS() || isChromebook())) {
+  const shouldShowPanicButton = cloakingConfig.showTouchPanicButton && 
+    (cloakingConfig.forceTouchPanicButton || isTouchDevice() || isIPadOrIOS() || isChromebook());
+  if (shouldShowPanicButton) {
     setTimeout(() => {
       createTouchPanicButton();
     }, 500);
@@ -16690,6 +16787,69 @@ function savePanicSettings() {
 
   saveCloakingConfig();
   showToast("Panic settings saved!", "fa-save");
+}
+
+function toggleTouchPanicSetting(setting) {
+  cloakingConfig[setting] = !cloakingConfig[setting];
+  saveCloakingConfig();
+  
+  // Update toggle visual state
+  if (setting === 'showTouchPanicButton') {
+    const toggle = document.getElementById('showTouchPanicToggle');
+    if (toggle) toggle.classList.toggle('active', cloakingConfig.showTouchPanicButton);
+  } else if (setting === 'forceTouchPanicButton') {
+    const toggle = document.getElementById('forceTouchPanicToggle');
+    if (toggle) toggle.classList.toggle('active', cloakingConfig.forceTouchPanicButton);
+  }
+  
+  // Re-create or remove the touch panic button based on settings
+  const existingBtn = document.getElementById('touchPanicButton');
+  if (existingBtn) existingBtn.remove();
+  
+  if (cloakingConfig.showTouchPanicButton && 
+      (cloakingConfig.forceTouchPanicButton || isTouchDevice() || isIPadOrIOS() || isChromebook())) {
+    createTouchPanicButton();
+  }
+  
+  showToast(`Touch panic button ${cloakingConfig[setting] ? 'enabled' : 'disabled'}!`, 'fa-hand-pointer');
+}
+
+function updateTouchPanicPosition(position) {
+  cloakingConfig.touchPanicButtonPosition = position;
+  saveCloakingConfig();
+  
+  // Update button position if it exists
+  const btn = document.getElementById('touchPanicButton');
+  if (btn) {
+    // Reset all positions
+    btn.style.top = 'auto';
+    btn.style.bottom = 'auto';
+    btn.style.left = 'auto';
+    btn.style.right = 'auto';
+    
+    // Apply new position
+    switch(position) {
+      case 'top-left':
+        btn.style.top = '20px';
+        btn.style.left = '20px';
+        break;
+      case 'top-right':
+        btn.style.top = '20px';
+        btn.style.right = '20px';
+        break;
+      case 'bottom-left':
+        btn.style.bottom = '80px';
+        btn.style.left = '20px';
+        break;
+      case 'bottom-right':
+      default:
+        btn.style.bottom = '80px';
+        btn.style.right = '20px';
+        break;
+    }
+  }
+  
+  showToast('Button position updated!', 'fa-arrows-alt');
 }
 
 function triggerPanicMode() {
@@ -19499,11 +19659,141 @@ async function executeToolCall(toolCall) {
 // Tool execution functions
 function executeTool_OpenApp(params) {
   const { app_name } = params;
-  openApp(app_name);
+  
+  // Map of valid app names with aliases
+  const validApps = {
+    // Core apps
+    'files': 'files',
+    'file': 'files',
+    'file explorer': 'files',
+    'file manager': 'files',
+    'explorer': 'files',
+    'terminal': 'terminal',
+    'console': 'terminal',
+    'cmd': 'terminal',
+    'command': 'terminal',
+    'settings': 'settings',
+    'preferences': 'settings',
+    'config': 'settings',
+    'editor': 'editor',
+    'text editor': 'editor',
+    'notepad': 'editor',
+    'notes': 'editor',
+    'melodify': 'melodify',
+    'music': 'melodify',
+    'music player': 'melodify',
+    'spotify': 'melodify',
+    'photos': 'photos',
+    'gallery': 'photos',
+    'images': 'photos',
+    'pictures': 'photos',
+    'help': 'help',
+    'documentation': 'help',
+    'docs': 'help',
+    'whatsnew': 'whatsnew',
+    "what's new": 'whatsnew',
+    'whats new': 'whatsnew',
+    'new': 'whatsnew',
+    'appstore': 'appstore',
+    'app store': 'appstore',
+    'store': 'appstore',
+    'shop': 'appstore',
+    'calculator': 'calculator',
+    'calc': 'calculator',
+    'math': 'calculator',
+    'browser': 'browser',
+    'web browser': 'browser',
+    'internet': 'browser',
+    'web': 'browser',
+    'cloaking': 'cloaking',
+    'cloak': 'cloaking',
+    'disguise': 'cloaking',
+    'stealth': 'cloaking',
+    'achievements': 'achievements',
+    'badges': 'achievements',
+    'trophies': 'achievements',
+    'python': 'python',
+    'python interpreter': 'python',
+    'py': 'python',
+    // Extended apps
+    'startup-apps': 'startup-apps',
+    'startup apps': 'startup-apps',
+    'startup': 'startup-apps',
+    'task-manager': 'task-manager',
+    'task manager': 'task-manager',
+    'taskmanager': 'task-manager',
+    'processes': 'task-manager',
+    'snap-manager': 'snap-manager',
+    'snap manager': 'snap-manager',
+    'snap': 'snap-manager',
+    'v86-emulator': 'v86-emulator',
+    'v86': 'v86-emulator',
+    'emulator': 'v86-emulator',
+    'vm': 'v86-emulator',
+    'uv': 'uv',
+    'ultraviolet': 'uv',
+    'proxy': 'uv',
+    'unblock': 'uv',
+    'helios': 'helios',
+    'vsc': 'vsc',
+    'vscode': 'vsc',
+    'visual studio code': 'vsc',
+    'code': 'vsc',
+    'ai-snake': 'ai-snake',
+    'ai snake': 'ai-snake',
+    'snake ai': 'ai-snake',
+    'veltra-ai': 'veltra-ai',
+    'veltra ai': 'veltra-ai',
+    'ai': 'veltra-ai',
+    'assistant': 'veltra-ai',
+    'about': 'about',
+    'about veltra': 'about',
+    'info': 'about',
+    'web-app-creator': 'web-app-creator',
+    'web app creator': 'web-app-creator',
+    'webapp creator': 'web-app-creator',
+    // Games
+    '2048': '2048',
+    'snake': 'snake',
+    'tictactoe': 'tictactoe',
+    'tic tac toe': 'tictactoe',
+    'tic-tac-toe': 'tictactoe',
+  };
+  
+  // Normalize the app name
+  const normalizedName = app_name.toLowerCase().trim();
+  const actualAppName = validApps[normalizedName];
+  
+  if (!actualAppName) {
+    // Try to find a close match
+    const allAppNames = Object.keys(validApps);
+    const closeMatch = allAppNames.find(name => 
+      name.includes(normalizedName) || normalizedName.includes(name)
+    );
+    
+    if (closeMatch) {
+      openApp(validApps[closeMatch]);
+      return {
+        success: true,
+        message: `âœ… Opened ${validApps[closeMatch]} (matched from "${app_name}")`,
+        details: `The ${validApps[closeMatch]} app is now open.`
+      };
+    }
+    
+    // List available apps for the AI to suggest
+    const uniqueApps = [...new Set(Object.values(validApps))];
+    return {
+      success: false,
+      message: `âŒ App "${app_name}" not found`,
+      details: `Available apps: ${uniqueApps.join(', ')}. Please use one of these exact names.`
+    };
+  }
+  
+  openApp(actualAppName);
   return {
     success: true,
-    message: `âœ… Opened ${app_name} application`,
-    details: `The ${app_name} app is now open and visible on your screen.`
+    message: `âœ… Opened ${actualAppName} application`,
+    details: `The ${actualAppName} app is now open and visible on your screen.`
   };
 }
 

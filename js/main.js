@@ -2,6 +2,9 @@
 // Note: VELTRA_FIREBASE_URL, NAUTILUS_FALLBACK_URL, and FALLBACK_WISP_URL
 // are declared in index.html's inline script to ensure early availability
 
+// Get base path for GitHub Pages compatibility (must be at top level for early access)
+const veltraBasePath = window.location.pathname.includes('/veltra') ? '/veltra' : '';
+
 // Fetch Veltra backend URL from Firebase with retry
 async function fetchVeltraBackend(retries = 3) {
     for (let i = 0; i < retries; i++) {
@@ -6670,7 +6673,7 @@ alt="favicon">
                       </h4>
                       <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-start;">
                         <div style="flex-shrink: 0;">
-                          <img src="/assets/LFPaymentMonero.png" alt="XMR QR Code" style="width: 100px; height: 100px; border-radius: 8px; background: white; padding: 4px;">
+                          <img src="assets/LFPaymentMonero.png" alt="XMR QR Code" style="width: 100px; height: 100px; border-radius: 8px; background: white; padding: 4px;">
                         </div>
                         <div style="flex: 1; min-width: 200px;">
                           <p style="color: var(--text-secondary); font-size: 0.8rem; margin-bottom: 0.5rem;">Monero Address:</p>
@@ -6889,7 +6892,7 @@ print(f'Sum: {sum(numbers)}')
         }
         return `
         <div class="browser-container" style="overflow: hidden;">
-                      <iframe src="/app/uv.html" frameborder="0" style="width: 100%; height: 100vh; border-radius: 0px; margin: 0;"></iframe>
+                      <iframe src="${veltraBasePath}/app/uv.html" frameborder="0" style="width: 100%; height: 100vh; border-radius: 0px; margin: 0;"></iframe>
               </div>
       `;
       })(),
@@ -6940,7 +6943,7 @@ print(f'Sum: {sum(numbers)}')
                     <p>Load times may vary</p>
                     </center>
                   </div>
-                  <iframe src="/uv/service/hvtrs8%2F-vqcmdg.fet%2F" frameborder="0" style="width: 100%; height: 100vh; border-radius: 0px; margin: 0;"></iframe>
+                  <iframe src="${veltraBasePath}/uv/service/hvtrs8%2F-vqcmdg.fet%2F" frameborder="0" style="width: 100%; height: 100vh; border-radius: 0px; margin: 0;"></iframe>
               </div>
       `;
       })(),
@@ -6963,7 +6966,7 @@ print(f'Sum: {sum(numbers)}')
         }
         return `
         <div class="browser-container" style="overflow: hidden;">
-                      <iframe src="/app/helios.html" frameborder="0" style="width: 100%; height: 100vh; border-radius: 0px; margin: 0;"></iframe>
+                      <iframe src="${veltraBasePath}/app/helios.html" frameborder="0" style="width: 100%; height: 100vh; border-radius: 0px; margin: 0;"></iframe>
               </div>
       `;
       })(),
@@ -9925,14 +9928,14 @@ function uninstallTheme(themeName) {
 }
 
 const themeDefinitions = {
-  dark: { url: "/style.css" },
-  light: { url: "/themes/light.css" },
-  golden: { url: "/themes/golden.css" },
-  red: { url: "/themes/red.css" },
-  blue: { url: "/themes/blue.css" },
-  purple: { url: "/themes/purple.css" },
-  green: { url: "/themes/green.css" },
-  liquidGlass: { url: "/themes/lg.css" },
+  dark: { url: veltraBasePath + "/style.css" },
+  light: { url: veltraBasePath + "/themes/light.css" },
+  golden: { url: veltraBasePath + "/themes/golden.css" },
+  red: { url: veltraBasePath + "/themes/red.css" },
+  blue: { url: veltraBasePath + "/themes/blue.css" },
+  purple: { url: veltraBasePath + "/themes/purple.css" },
+  green: { url: veltraBasePath + "/themes/green.css" },
+  liquidGlass: { url: veltraBasePath + "/themes/lg.css" },
 };
 
 function applyTheme(themeName) {

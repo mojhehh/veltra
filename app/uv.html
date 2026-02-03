@@ -5,9 +5,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>An Ultraviolet Proxy for Next Dev</title>
-    <script src="/uv/uv.bundle.js"></script>
-    <script src="/uv/uv.config.js"></script>
-    <script src="/baremux/index.js"></script>
+    <script>
+        // Detect base path for GitHub Pages
+        const uvBasePath = window.location.pathname.includes('/veltra') ? '/veltra' : '';
+    </script>
+    <script src="../uv/uv.bundle.js"></script>
+    <script src="../uv/uv.config.js"></script>
+    <script src="../baremux/index.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -319,10 +323,13 @@
     </script>
 
     <script>
-        // register sw
+        // register sw with dynamic base path
         if ("serviceWorker" in navigator) {
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("/uv/sw.js")
+                const basePath = window.location.pathname.includes('/veltra') ? '/veltra' : '';
+                navigator.serviceWorker.register(basePath + "/uv/sw.js", { scope: basePath + "/uv/service/" })
+                    .then(reg => console.log('UV SW registered:', reg.scope))
+                    .catch(err => console.error('UV SW registration failed:', err));
             })
         }
     </script>
@@ -331,11 +338,23 @@
         let tabFrame
 
         // actual uv handling
-        const connection = new BareMux.BareMuxConnection("/baremux/worker.js")
-        const wispUrl = "wss://wisp.rhw.one/" // rhw wisp, super speedy
-        const bareUrl = "https://useclassplay.vercel.app/fq/" // old site i have
-
-        connection.setTransport("/libcurl/index.mjs", [{ websocket: wispUrl }])
+        const basePath = window.location.pathname.includes('/veltra') ? '/veltra' : '';
+        const connection = new BareMux.BareMuxConnection(basePath + "/baremux/worker.js")
+        
+        // Get wisp URL from Firebase or use fallback
+        let wispUrl = "wss://wisp.rhw.one/"; // fallback
+        (async () => {
+            try {
+                const resp = await fetch('https://procces-3efd9-default-rtdb.firebaseio.com/backends/veltra.json');
+                const data = await resp.json();
+                if (data?.url) {
+                    wispUrl = data.url.replace('https://', 'wss://').replace('http://', 'ws://');
+                    if (!wispUrl.endsWith('/wisp/')) wispUrl = wispUrl.replace(/\/$/, '') + '/wisp/';
+                    console.log('[UV] Using Firebase wisp:', wispUrl);
+                }
+            } catch (e) { console.warn('[UV] Firebase fetch failed, using fallback wisp'); }
+            connection.setTransport(basePath + "/libcurl/index.mjs", [{ websocket: wispUrl }]);
+        })();
 
         const tabCont = document.querySelector(".tabs")
 

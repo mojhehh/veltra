@@ -1348,15 +1348,65 @@ function setMusicServer(url) {
 }
 
 // ==================== MELODIFY APP ====================
+// Firebase URL for Melodify library persistence
+const MELODIFY_LIBRARY_FIREBASE_URL = 'https://procces-3efd9-default-rtdb.firebaseio.com/melodify_libraries';
+
 let melodifyState = {
   isPlaying: false,
   isRepeat: false,
   isShuffle: false,
   currentTrack: null,
   queue: [],
-  library: JSON.parse(localStorage.getItem('melodify_library') || '[]'),
-  downloads: []
+  library: [],
+  downloads: [],
+  userId: localStorage.getItem('veltra_userId') || generateMelodifyUserId()
 };
+
+// Generate unique user ID for Firebase persistence
+function generateMelodifyUserId() {
+  const id = 'user_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
+  localStorage.setItem('veltra_userId', id);
+  return id;
+}
+
+// Load library from Firebase with localStorage fallback
+async function loadMelodifyLibrary() {
+  try {
+    const response = await fetch(`${MELODIFY_LIBRARY_FIREBASE_URL}/${melodifyState.userId}.json`);
+    const data = await response.json();
+    if (data && Array.isArray(data)) {
+      melodifyState.library = data;
+      localStorage.setItem('melodify_library', JSON.stringify(data));
+      console.log('[Melodify] Library loaded from Firebase:', data.length, 'songs');
+      return;
+    }
+  } catch (err) {
+    console.warn('[Melodify] Firebase load failed, using localStorage:', err.message);
+  }
+  // Fallback to localStorage
+  melodifyState.library = JSON.parse(localStorage.getItem('melodify_library') || '[]');
+}
+
+// Save library to Firebase and localStorage
+async function saveMelodifyLibrary() {
+  // Always save to localStorage first
+  localStorage.setItem('melodify_library', JSON.stringify(melodifyState.library));
+  
+  // Try to save to Firebase
+  try {
+    await fetch(`${MELODIFY_LIBRARY_FIREBASE_URL}/${melodifyState.userId}.json`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(melodifyState.library)
+    });
+    console.log('[Melodify] Library saved to Firebase');
+  } catch (err) {
+    console.warn('[Melodify] Firebase save failed:', err.message);
+  }
+}
+
+// Initialize library on load
+loadMelodifyLibrary();
 
 function melodifyShowTab(tab) {
   document.querySelectorAll('.melodify-tab').forEach(t => t.classList.remove('active'));
@@ -1493,23 +1543,42 @@ function playMelodifyTrack(index) {
     artist: song.artist,
     thumbnail: song.thumbnail,
     videoId: videoId,
-    duration: song.duration_string
+    duration: song.duration,
+    duration_string: song.duration_string
   };
   
-  // Use an audio proxy or embed - for now show YouTube embed option
   updateMelodifyUI();
+  showToast('Loading: ' + song.title, 'fa-music');
   
-  // Show a mini player notification
-  showToast('Playing: ' + song.title, 'fa-music');
-  
-  // Open YouTube in embedded player format
+  // Use direct audio streaming from server for best quality
+  const audio = document.getElementById('melodifyAudio');
+  if (audio) {
+    getMelodifyBackendUrl().then(serverUrl => {
+      // Use the stream endpoint for direct audio playback
+      audio.src = `${serverUrl}/api/stream/${videoId}`;
+      audio.load();
+      audio.play().then(() => {
+        melodifyState.isPlaying = true;
+        updateMelodifyPlayButton();
+        showToast('Playing: ' + song.title, 'fa-music');
+      }).catch(err => {
+        console.error('Audio play error:', err);
+        // Fallback to YouTube embed if streaming fails
+        playMelodifyYouTubeEmbed(videoId);
+      });
+    });
+  }
+}
+
+// Fallback YouTube embed player
+function playMelodifyYouTubeEmbed(videoId) {
   const artworkDiv = document.getElementById('melodifyArtwork');
   if (artworkDiv) {
     artworkDiv.innerHTML = `<iframe width="56" height="56" src="https://www.youtube.com/embed/${videoId}?autoplay=1&controls=0" frameborder="0" allow="autoplay" style="border-radius: 4px; pointer-events: none;"></iframe>`;
   }
-  
   melodifyState.isPlaying = true;
   updateMelodifyPlayButton();
+  showToast('Playing via YouTube (streaming unavailable)', 'fa-youtube');
 }
 
 function updateMelodifyUI() {
@@ -1614,10 +1683,13 @@ function addToMelodifyLibrary(index, track = null) {
   const song = track || musicSearchResults[index];
   if (!song) return;
   
-  const exists = melodifyState.library.some(t => t.title === song.title);
+  const exists = melodifyState.library.some(t => t.title === song.title && t.artist === song.artist);
   if (!exists) {
-    melodifyState.library.push(song);
-    localStorage.setItem('melodify_library', JSON.stringify(melodifyState.library));
+    melodifyState.library.push({
+      ...song,
+      addedAt: Date.now()
+    });
+    saveMelodifyLibrary(); // Save to Firebase + localStorage
     showToast('Added to library: ' + song.title, 'fa-heart');
     updateMelodifyLibraryUI();
   } else {
@@ -1666,14 +1738,20 @@ function playFromLibrary(index) {
 function removeFromLibrary(index) {
   const song = melodifyState.library[index];
   melodifyState.library.splice(index, 1);
-  localStorage.setItem('melodify_library', JSON.stringify(melodifyState.library));
+  saveMelodifyLibrary(); // Save to Firebase + localStorage
   showToast('Removed: ' + song.title, 'fa-trash');
   updateMelodifyLibraryUI();
 }
 
-async function startMelodifyDownload(index) {
+async function startMelodifyDownload(index, format = null) {
   const song = musicSearchResults[index];
   if (!song) return;
+  
+  // If format not specified, show format selection dialog
+  if (!format) {
+    showMelodifyFormatDialog(index);
+    return;
+  }
   
   const container = document.getElementById('melodifyDownloads');
   const downloadId = 'mldl_' + Date.now();
@@ -1685,6 +1763,7 @@ async function startMelodifyDownload(index) {
     <img src="${song.thumbnail}" class="melodify-dl-img" onerror="this.style.display='none'">
     <div class="melodify-dl-info">
       <div class="melodify-dl-title">${escapeHtml(song.title)}</div>
+      <div class="melodify-dl-format" style="font-size: 0.75rem; color: #1DB954; margin-bottom: 0.25rem;">${format.toUpperCase()} - Best Quality</div>
       <div class="melodify-dl-progress"><div class="melodify-dl-bar"></div></div>
       <div class="melodify-dl-status">Starting...</div>
     </div>
@@ -1695,10 +1774,14 @@ async function startMelodifyDownload(index) {
   melodifyShowTab('downloads');
   
   try {
-    const response = await fetch(`${MUSIC_SERVER_URL}/api/download`, {
+    const serverUrl = await getMelodifyBackendUrl();
+    const response = await fetch(`${serverUrl}/api/download`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: song.url || song.id })
+      body: JSON.stringify({ 
+        url: song.url || song.id,
+        format: format  // 'mp3' or 'wav'
+      })
     });
     
     const data = await response.json();
@@ -1707,16 +1790,64 @@ async function startMelodifyDownload(index) {
       return;
     }
     
-    pollMelodifyDownload(downloadId, data.download_id);
+    pollMelodifyDownload(downloadId, data.download_id, format);
     
   } catch (err) {
     updateMelodifyDlStatus(downloadId, 'error', 'Connection failed');
   }
 }
 
-async function pollMelodifyDownload(uiId, serverId) {
+function showMelodifyFormatDialog(index) {
+  const song = musicSearchResults[index];
+  if (!song) return;
+  
+  // Create format selection modal
+  const modal = document.createElement('div');
+  modal.className = 'melodify-format-modal';
+  modal.style.cssText = `
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.8); z-index: 100000;
+    display: flex; align-items: center; justify-content: center;
+  `;
+  modal.innerHTML = `
+    <div style="background: #282828; border-radius: 12px; padding: 1.5rem; max-width: 400px; width: 90%;">
+      <h3 style="color: white; margin: 0 0 0.5rem 0;">Download Format</h3>
+      <p style="color: #b3b3b3; margin: 0 0 1.5rem 0; font-size: 0.9rem;">${escapeHtml(song.title)}</p>
+      
+      <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+        <button onclick="this.closest('.melodify-format-modal').remove(); startMelodifyDownload(${index}, 'mp3')" 
+          style="background: #1DB954; color: white; border: none; padding: 1rem; border-radius: 8px; cursor: pointer; font-size: 1rem; display: flex; align-items: center; gap: 0.75rem;">
+          <i class="fas fa-file-audio"></i>
+          <div style="text-align: left;">
+            <div style="font-weight: bold;">MP3 (Recommended)</div>
+            <div style="font-size: 0.8rem; opacity: 0.8;">Best quality, smaller file size</div>
+          </div>
+        </button>
+        
+        <button onclick="this.closest('.melodify-format-modal').remove(); startMelodifyDownload(${index}, 'wav')" 
+          style="background: #404040; color: white; border: none; padding: 1rem; border-radius: 8px; cursor: pointer; font-size: 1rem; display: flex; align-items: center; gap: 0.75rem;">
+          <i class="fas fa-compact-disc"></i>
+          <div style="text-align: left;">
+            <div style="font-weight: bold;">WAV (Lossless)</div>
+            <div style="font-size: 0.8rem; opacity: 0.8;">Uncompressed, larger file</div>
+          </div>
+        </button>
+      </div>
+      
+      <button onclick="this.closest('.melodify-format-modal').remove()" 
+        style="width: 100%; margin-top: 1rem; background: transparent; color: #b3b3b3; border: 1px solid #404040; padding: 0.75rem; border-radius: 8px; cursor: pointer;">
+        Cancel
+      </button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+}
+
+async function pollMelodifyDownload(uiId, serverId, format = 'mp3') {
   try {
-    const response = await fetch(`${MUSIC_SERVER_URL}/api/status/${serverId}`);
+    const serverUrl = await getMelodifyBackendUrl();
+    const response = await fetch(`${serverUrl}/api/status/${serverId}`);
     const data = await response.json();
     
     const item = document.getElementById(uiId);
@@ -1728,11 +1859,11 @@ async function pollMelodifyDownload(uiId, serverId) {
     if (data.status === 'downloading' || data.status === 'queued') {
       bar.style.width = (data.progress || 0) + '%';
       status.textContent = `Downloading ${data.progress || 0}%`;
-      setTimeout(() => pollMelodifyDownload(uiId, serverId), 1000);
+      setTimeout(() => pollMelodifyDownload(uiId, serverId, format), 1000);
     } else if (data.status === 'complete') {
       bar.style.width = '100%';
       bar.style.background = '#1DB954';
-      status.innerHTML = `<a href="${MUSIC_SERVER_URL}/api/file/${encodeURIComponent(data.result.file)}" download class="melodify-dl-link"><i class="fas fa-download"></i> Download MP3</a>`;
+      status.innerHTML = `<a href="${serverUrl}/api/file/${encodeURIComponent(data.result.file)}" download class="melodify-dl-link"><i class="fas fa-download"></i> Download ${format.toUpperCase()}</a>`;
     } else if (data.status === 'error') {
       updateMelodifyDlStatus(uiId, 'error', data.error || 'Failed');
     }

@@ -8600,7 +8600,7 @@ const APP_NAMES = {
   terminal: "Terminal",
   settings: "Settings",
   editor: "Text Editor",
-  music: "Music",
+  melodify: "Melodify",
   photos: "Photos",
   help: "Help",
   whatsnew: "What's New",

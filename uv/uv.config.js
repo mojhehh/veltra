@@ -12,7 +12,7 @@
           );
 
     self.__uv$config = {
-        prefix: uvPfx + "service/",
+        prefix: loc + uvPfx + "service/",
         encodeUrl: Ultraviolet.codec.xor.encode,
         decodeUrl: Ultraviolet.codec.xor.decode,
         handler: loc + uvPfx + "uv.handler.js",

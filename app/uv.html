@@ -47,10 +47,24 @@
             z-index: -1;
             border: none;
             display: none;
+            /* Performance optimizations for iPad */
+            -webkit-transform: translateZ(0);
+            transform: translateZ(0);
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            will-change: contents;
+            -webkit-overflow-scrolling: touch;
         }
 
         .viewframe.active {
             display: block;
+        }
+
+        /* Reduce repaints on iPad */
+        @supports (-webkit-touch-callout: none) {
+            iframe.viewframe {
+                -webkit-transform: translate3d(0,0,0);
+            }
         }
 
         .tab.active {
@@ -353,20 +367,95 @@
         const basePath = window.location.pathname.includes('/veltra') ? '/veltra' : '';
         const connection = new BareMux.BareMuxConnection(basePath + "/baremux/worker.js")
         
-        // Get wisp URL from Firebase or use fallback
-        let wispUrl = "wss://wisp.rhw.one/"; // fallback
-        (async () => {
+        // Multiple fallback wisp servers for reliability
+        const WISP_FALLBACKS = [
+            "wss://wisp.mercurywork.shop/",
+            "wss://wisp.rhw.one/",
+            "wss://uv.holyubofficial.net/wisp/",
+            "wss://aluu.xyz/wisp/"
+        ];
+        
+        let wispUrl = WISP_FALLBACKS[0]; // default fallback
+        let currentWispIndex = 0;
+        let connectionRetries = 0;
+        const MAX_RETRIES = 3;
+        
+        // Test if a wisp URL is working
+        async function testWispConnection(url) {
+            return new Promise((resolve) => {
+                const ws = new WebSocket(url);
+                const timeout = setTimeout(() => {
+                    ws.close();
+                    resolve(false);
+                }, 3000); // 3 second timeout
+                
+                ws.onopen = () => {
+                    clearTimeout(timeout);
+                    ws.close();
+                    resolve(true);
+                };
+                ws.onerror = () => {
+                    clearTimeout(timeout);
+                    resolve(false);
+                };
+            });
+        }
+        
+        // Find working wisp server
+        async function findWorkingWisp() {
+            // First try Firebase URL
             try {
                 const resp = await fetch('https://procces-3efd9-default-rtdb.firebaseio.com/backends/veltra.json');
                 const data = await resp.json();
                 if (data?.url) {
-                    wispUrl = data.url.replace('https://', 'wss://').replace('http://', 'ws://');
-                    if (!wispUrl.endsWith('/wisp/')) wispUrl = wispUrl.replace(/\/$/, '') + '/wisp/';
-                    console.log('[UV] Using Firebase wisp:', wispUrl);
+                    let firebaseWisp = data.url.replace('https://', 'wss://').replace('http://', 'ws://');
+                    if (!firebaseWisp.endsWith('/wisp/')) firebaseWisp = firebaseWisp.replace(/\/$/, '') + '/wisp/';
+                    console.log('[UV] Testing Firebase wisp:', firebaseWisp);
+                    if (await testWispConnection(firebaseWisp)) {
+                        console.log('[UV] Firebase wisp is working!');
+                        return firebaseWisp;
+                    }
                 }
-            } catch (e) { console.warn('[UV] Firebase fetch failed, using fallback wisp'); }
-            connection.setTransport(basePath + "/libcurl/index.mjs", [{ websocket: wispUrl }]);
+            } catch (e) { 
+                console.warn('[UV] Firebase fetch failed:', e.message); 
+            }
+            
+            // Try fallbacks
+            for (const fallback of WISP_FALLBACKS) {
+                console.log('[UV] Testing fallback wisp:', fallback);
+                if (await testWispConnection(fallback)) {
+                    console.log('[UV] Fallback wisp working:', fallback);
+                    return fallback;
+                }
+            }
+            
+            // Return first fallback anyway as last resort
+            console.warn('[UV] No wisp servers responding, using first fallback');
+            return WISP_FALLBACKS[0];
+        }
+        
+        // Initialize connection with working wisp
+        (async () => {
+            showToast("Connecting to proxy server...", "fas fa-spinner fa-spin", 2000);
+            wispUrl = await findWorkingWisp();
+            console.log('[UV] Using wisp:', wispUrl);
+            await connection.setTransport(basePath + "/libcurl/index.mjs", [{ websocket: wispUrl }]);
+            showToast("Proxy connected!", "fas fa-check", 1500);
         })();
+        
+        // Auto-retry on connection failure
+        async function retryConnection() {
+            if (connectionRetries >= MAX_RETRIES) {
+                showToast("Connection failed. Try refreshing.", "fas fa-exclamation-triangle", 3000);
+                return false;
+            }
+            connectionRetries++;
+            currentWispIndex = (currentWispIndex + 1) % WISP_FALLBACKS.length;
+            wispUrl = WISP_FALLBACKS[currentWispIndex];
+            console.log('[UV] Retrying with:', wispUrl);
+            await connection.setTransport(basePath + "/libcurl/index.mjs", [{ websocket: wispUrl }]);
+            return true;
+        }
 
         const tabCont = document.querySelector(".tabs")
 
@@ -544,12 +633,12 @@
         }
 
         async function go(u) {
-
+            // Ensure transport is set
             if (!await connection.getTransport()) {
-                connection.setTransport(basePath + "/libcurl/index.mjs", [{ websocket: wispUrl }])
+                await connection.setTransport(basePath + "/libcurl/index.mjs", [{ websocket: wispUrl }]);
             }
 
-            console.log("a")
+            console.log("[UV] Navigating to:", u);
             const cTab = bTabs.find((t) => t.id === aTab)
             const favEl = document.querySelector(`#fav[data-fav-id="${aTab}"]`)
             const viewframe = document.querySelector(`.viewframe[data-frame-id="${aTab}"]`)
@@ -561,30 +650,49 @@
             if (favEl) favEl.src = `https://www.google.com/s2/favicons?domain=${favUrl}&sz=256`
 
             try {
-                viewframe.src = u
-                console.log("ooooo")
-
-                const iframeDoc = viewframe.contentDocument || viewframe.contentWindow.document
-                const title = iframeDoc.title || new URL(cTab.url).hostname
+                // Set loading state
+                viewframe.style.opacity = '0.5';
+                viewframe.src = u;
+                console.log("[UV] Frame src set");
 
                 viewframe.onload = () => {
-                    const tabEl = document.querySelector(`.tab[data-tab-id="${aTab}"]`)
-                    if (tabEl) {
-                        const titleEl = tabEl.querySelector(".btitle")
-                        if (titleEl) titleEl.textContent = title
+                    viewframe.style.opacity = '1';
+                    connectionRetries = 0; // Reset retries on success
+                    
+                    try {
+                        const iframeDoc = viewframe.contentDocument || viewframe.contentWindow.document;
+                        const title = iframeDoc?.title || new URL(cTab.url).hostname;
+                        
+                        const tabEl = document.querySelector(`.tab[data-tab-id="${aTab}"]`);
+                        if (tabEl) {
+                            const titleEl = tabEl.querySelector(".btitle");
+                            if (titleEl) titleEl.textContent = title;
+                        }
+                    } catch (e) {
+                        // Cross-origin, can't access title
                     }
 
-                    const loadC = document.querySelector(".backgroundtext")
+                    const loadC = document.querySelector(".backgroundtext");
                     if (loadC) {
                         loadC.innerHTML = `
                             <h1>ultraviolet</h1>
                             <p>made by $xor | built for veltra-os</p>
-                        `
+                        `;
                     }
-                }
+                };
+                
+                viewframe.onerror = async () => {
+                    console.error("[UV] Frame load error, retrying...");
+                    viewframe.style.opacity = '1';
+                    if (await retryConnection()) {
+                        setTimeout(() => go(u), 500);
+                    }
+                };
+                
             } catch (e) {
-                console.error("There was an error while loading the page:", e)
-                alert("There was an error while loading the page: " + e)
+                console.error("[UV] Navigation error:", e);
+                viewframe.style.opacity = '1';
+                showToast("Error loading page: " + e.message, "fas fa-exclamation-triangle", 3000);
             }
         }
 

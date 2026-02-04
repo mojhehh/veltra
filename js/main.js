@@ -1660,12 +1660,23 @@ function updateMelodifyUI() {
   const titleEl = document.getElementById('melodifyTitle');
   const artistEl = document.getElementById('melodifyArtist');
   const artworkEl = document.getElementById('melodifyArtwork');
+  const totalEl = document.getElementById('melodifyTotalTime');
+  const currentEl = document.getElementById('melodifyCurrentTime');
+  const fillEl = document.getElementById('melodifyProgressFill');
   
   if (titleEl) titleEl.textContent = track.title;
   if (artistEl) artistEl.textContent = track.artist;
   if (artworkEl && track.thumbnail) {
     artworkEl.innerHTML = `<img src="${track.thumbnail}" alt="">`;
   }
+  
+  // Show API-provided duration immediately while audio loads
+  if (totalEl && track.duration_string) {
+    totalEl.textContent = track.duration_string;
+  }
+  // Reset current time and progress bar when loading new track
+  if (currentEl) currentEl.textContent = '0:00';
+  if (fillEl) fillEl.style.width = '0%';
 }
 
 function updateMelodifyPlayButton() {
@@ -1971,14 +1982,34 @@ function initMelodifyAudio() {
   
   melodifyAudioInitialized = true;
   
+  // Show API-provided duration initially while audio loads
+  audio.addEventListener('loadstart', () => {
+    const total = document.getElementById('melodifyTotalTime');
+    if (total && melodifyState.currentTrack?.duration_string) {
+      total.textContent = melodifyState.currentTrack.duration_string;
+    }
+  });
+  
+  // Update duration when audio metadata loads (more accurate)
+  audio.addEventListener('loadedmetadata', () => {
+    const total = document.getElementById('melodifyTotalTime');
+    if (total && audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
+      total.textContent = formatMusicTime(audio.duration);
+    }
+  });
+  
   audio.addEventListener('timeupdate', () => {
     const current = document.getElementById('melodifyCurrentTime');
     const total = document.getElementById('melodifyTotalTime');
     const fill = document.getElementById('melodifyProgressFill');
     
     if (current) current.textContent = formatMusicTime(audio.currentTime);
-    if (total && audio.duration) total.textContent = formatMusicTime(audio.duration);
-    if (fill && audio.duration) fill.style.width = (audio.currentTime / audio.duration * 100) + '%';
+    if (total && audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
+      total.textContent = formatMusicTime(audio.duration);
+    }
+    if (fill && audio.duration && !isNaN(audio.duration)) {
+      fill.style.width = (audio.currentTime / audio.duration * 100) + '%';
+    }
   });
   
   audio.addEventListener('ended', () => {

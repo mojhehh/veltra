@@ -1173,6 +1173,12 @@ const appMetadata = {
     icon: "fa-globe",
     preinstalled: false,
   },
+  "unblocker": {
+    name: "Unblocker",
+    icon: "fa-unlock-alt",
+    preinstalled: true,
+    description: "Real browser proxy — works with everything including Now.gg, TikTok, Roblox"
+  },
   "helios": {
     name: "Helios",
     icon: "fa-server",
@@ -1211,6 +1217,13 @@ const MELODIFY_FIREBASE_URL = 'https://procces-3efd9-default-rtdb.firebaseio.com
 let MUSIC_SERVER_URL = localStorage.getItem('veltra_musicServerUrl') || 'http://localhost:8092';
 let melodifyBackendCache = { url: null, lastFetch: 0 };
 
+// Fallback music streaming services
+const MELODIFY_FALLBACK_SERVERS = [
+  'https://melodify-api.vercel.app',
+  'https://melodify-backend.onrender.com',
+  'https://ytmusic-api.netlify.app'
+];
+
 // Fetch dynamic Melodify backend URL from Firebase
 async function getMelodifyBackendUrl() {
   const now = Date.now();
@@ -1225,13 +1238,36 @@ async function getMelodifyBackendUrl() {
     const response = await fetch(MELODIFY_FIREBASE_URL);
     const data = await response.json();
     if (data?.url) {
-      melodifyBackendCache = { url: data.url, lastFetch: now };
-      MUSIC_SERVER_URL = data.url;
-      console.log('[Melodify] Using Firebase backend:', data.url);
-      return data.url;
+      // Test if server is actually responding
+      try {
+        const testResp = await fetch(data.url + '/api/health', { method: 'HEAD', signal: AbortSignal.timeout(3000) });
+        if (testResp.ok) {
+          melodifyBackendCache = { url: data.url, lastFetch: now };
+          MUSIC_SERVER_URL = data.url;
+          console.log('[Melodify] Using Firebase backend:', data.url);
+          return data.url;
+        }
+      } catch (e) {
+        console.warn('[Melodify] Firebase backend not responding:', e.message);
+      }
     }
   } catch (err) {
-    console.warn('[Melodify] Firebase fetch failed, using fallback:', err.message);
+    console.warn('[Melodify] Firebase fetch failed:', err.message);
+  }
+  
+  // Try fallback servers
+  for (const fallback of MELODIFY_FALLBACK_SERVERS) {
+    try {
+      const testResp = await fetch(fallback + '/api/health', { method: 'HEAD', signal: AbortSignal.timeout(3000) });
+      if (testResp.ok) {
+        console.log('[Melodify] Using fallback backend:', fallback);
+        melodifyBackendCache = { url: fallback, lastFetch: now };
+        MUSIC_SERVER_URL = fallback;
+        return fallback;
+      }
+    } catch (e) {
+      console.warn('[Melodify] Fallback not available:', fallback);
+    }
   }
   
   // Fallback to localStorage or default
@@ -1686,19 +1722,48 @@ function playMelodifyTrack(index) {
     // Initialize audio events if not already done
     initMelodifyAudio();
     
+    // Set a quick timeout - if streaming doesn't work fast, use YouTube embed
+    let streamingWorked = false;
+    const streamTimeout = setTimeout(() => {
+      if (!streamingWorked && !melodifyState.isPlaying) {
+        console.log('[Melodify] Streaming timeout, using YouTube embed');
+        playMelodifyYouTubeEmbed(videoId);
+      }
+    }, 3000); // 3 second timeout
+    
     getMelodifyBackendUrl().then(serverUrl => {
       // Use the stream endpoint for direct audio playback
-      audio.src = `${serverUrl}/api/stream/${videoId}`;
+      const streamUrl = `${serverUrl}/api/stream/${videoId}`;
+      
+      // Listen for errors immediately
+      const errorHandler = () => {
+        clearTimeout(streamTimeout);
+        if (!streamingWorked) {
+          console.log('[Melodify] Stream error, using YouTube embed');
+          playMelodifyYouTubeEmbed(videoId);
+        }
+      };
+      
+      audio.onerror = errorHandler;
+      audio.src = streamUrl;
       audio.load();
+      
       audio.play().then(() => {
+        streamingWorked = true;
+        clearTimeout(streamTimeout);
         melodifyState.isPlaying = true;
         updateMelodifyPlayButton();
         showToast('Playing: ' + song.title, 'fa-music');
       }).catch(err => {
+        clearTimeout(streamTimeout);
         console.error('Audio play error:', err);
         // Fallback to YouTube embed if streaming fails
         playMelodifyYouTubeEmbed(videoId);
       });
+    }).catch(err => {
+      clearTimeout(streamTimeout);
+      console.error('Backend URL error:', err);
+      playMelodifyYouTubeEmbed(videoId);
     });
   }
 }
@@ -7300,6 +7365,29 @@ print(f'Sum: {sum(numbers)}')
       width: 900,
       height: 600,
     },
+    unblocker: {
+      title: "Unblocker",
+      icon: "fas fa-unlock-alt",
+      content: (() => {
+        if (!checkFileProtocol("Unblocker")) {
+          return `
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 3rem; background: rgba(10, 14, 26, 0.8);">
+              <i class="fas fa-exclamation-triangle" style="font-size: 5rem; color: var(--error-red); margin-bottom: 2rem;"></i>
+              <h2 style="margin-bottom: 1rem; color: var(--text-primary);">Unblocker Unavailable</h2>
+              <p style="color: var(--text-secondary); text-align: center; max-width: 400px;">Unblocker doesn't work on file:// protocol. Please run Veltra from a web server to use this feature.</p>
+            </div>
+          `;
+        }
+        return `
+        <div class="browser-container" style="overflow: hidden;">
+          <iframe src="${veltraBasePath}/app/unblocker.html" frameborder="0" style="width: 100%; height: 100vh; border-radius: 0px; margin: 0;"></iframe>
+        </div>
+      `;
+      })(),
+      noPadding: true,
+      width: 1000,
+      height: 700,
+    },
     vsc: {
       title: "Visual Studio Code",
       icon: "fas fa-code",
@@ -9698,6 +9786,17 @@ function switchAppStoreSection(section, element) {
         isInstalled: installedApps.includes("uv"),
         installAction: "installApp('uv')",
         uninstallAction: "uninstallApp('uv')",
+        type: "app"
+      },
+      {
+        name: "Unblocker",
+        author: "Veltra Labs",
+        desc: "Real browser proxy that works with EVERYTHING — TikTok, Now.gg, Roblox, Discord, and more. 60 FPS streaming with full mouse/keyboard support!",
+        customPreviewHtml: `<div class="illustration-unblocker" style="background: linear-gradient(135deg, #0a0e1a, #151923); padding: 20px; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;"> <div style="font-size: 28px;">🔓</div> <div style="color: #5eead4; font-weight: bold; font-size: 14px;">Unblocker</div> <div style="color: #94a3b8; font-size: 10px;">Real Browser • 60 FPS</div> </div>`,
+        isInstalled: true,
+        installButtonText: "Open",
+        installAction: "openApp('unblocker')",
+        uninstallAction: "",
         type: "app"
       },
       {

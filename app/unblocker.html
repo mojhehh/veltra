@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Unblocker — Veltra OS</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Best Proxy — Coming Soon</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
@@ -13,46 +13,46 @@
             --accent2: #2dd4bf;
             --text: #e2e8f0;
             --muted: #94a3b8;
-            --glass: rgba(255,255,255,0.05);
-            --glass2: rgba(0,0,0,0.4);
-            --border: rgba(94, 234, 212, 0.25);
-            --shadow: rgba(0,0,0,0.5);
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
+        
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, var(--bg1) 0%, var(--bg2) 100%);
             min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             color: var(--text);
             overflow: hidden;
         }
 
-        /* Landing Page */
-        .landing {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            padding: 20px;
+        .container {
             text-align: center;
+            padding: 40px;
+            max-width: 500px;
+        }
+
+        .icon {
+            font-size: 5rem;
+            margin-bottom: 24px;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
         }
 
         .title {
-            font-size: 3rem;
+            font-size: 2.5rem;
             font-weight: 800;
             background: linear-gradient(135deg, var(--accent), var(--accent2), #fff);
             -webkit-background-clip: text;
             background-clip: text;
             color: transparent;
-            margin-bottom: 8px;
-        }
-
-        .tagline {
-            color: var(--muted);
-            font-size: 1.1rem;
-            margin-bottom: 32px;
+            margin-bottom: 12px;
         }
 
         .badge {
@@ -60,787 +60,113 @@
             align-items: center;
             gap: 8px;
             padding: 8px 16px;
-            background: rgba(94, 234, 212, 0.15);
-            border: 1px solid var(--border);
+            background: rgba(251, 191, 36, 0.15);
+            border: 1px solid rgba(251, 191, 36, 0.4);
             border-radius: 20px;
-            color: var(--accent);
-            font-size: 0.85rem;
-            font-weight: 500;
+            color: #fbbf24;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 24px;
+        }
+
+        .description {
+            color: var(--muted);
+            font-size: 1.1rem;
+            line-height: 1.6;
             margin-bottom: 32px;
         }
 
-        .badge .dot {
-            width: 8px;
-            height: 8px;
-            background: var(--accent);
-            border-radius: 50%;
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        .search-container {
-            width: 100%;
-            max-width: 600px;
-            margin-bottom: 24px;
-        }
-
-        .search-box {
-            display: flex;
-            background: var(--glass);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            overflow: hidden;
-            transition: all 0.3s;
-        }
-
-        .search-box:focus-within {
-            border-color: var(--accent);
-            box-shadow: 0 0 20px rgba(94, 234, 212, 0.2);
-        }
-
-        .search-box input {
-            flex: 1;
-            padding: 16px 20px;
-            background: transparent;
-            border: none;
-            color: var(--text);
-            font-size: 1rem;
-            outline: none;
-        }
-
-        .search-box input::placeholder { color: var(--muted); }
-
-        .search-box button {
-            padding: 16px 28px;
-            background: linear-gradient(135deg, var(--accent), var(--accent2));
-            border: none;
-            color: var(--bg1);
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .search-box button:hover {
-            filter: brightness(1.1);
-        }
-
-        .search-box button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .quick-sites {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            justify-content: center;
-            margin-bottom: 24px;
-            max-width: 600px;
-        }
-
-        .site-btn {
-            padding: 10px 18px;
-            background: var(--glass);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 12px;
-            color: var(--text);
-            font-size: 0.9rem;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .site-btn:hover {
-            background: rgba(94, 234, 212, 0.15);
-            border-color: var(--border);
-            transform: translateY(-2px);
-        }
-
-        .status {
-            padding: 12px 20px;
-            border-radius: 12px;
-            font-size: 0.9rem;
-            margin-bottom: 20px;
-            display: none;
-        }
-
-        .status.show { display: block; }
-        .status.loading { background: rgba(251, 191, 36, 0.15); border: 1px solid rgba(251, 191, 36, 0.4); color: #fbbf24; }
-        .status.error { background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171; }
-        .status.success { background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.4); color: #22c55e; }
-
-        .info {
+        .features {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            gap: 12px;
-            max-width: 600px;
-            margin-bottom: 20px;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin-bottom: 32px;
         }
 
-        .info-card {
-            padding: 16px;
-            background: var(--glass);
-            border: 1px solid rgba(255,255,255,0.05);
+        .feature {
+            padding: 20px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
             border-radius: 12px;
             text-align: center;
         }
 
-        .info-card .icon { font-size: 1.5rem; margin-bottom: 8px; }
-        .info-card h3 { font-size: 0.9rem; color: var(--text); margin-bottom: 4px; }
-        .info-card p { font-size: 0.75rem; color: var(--muted); }
-
-        /* Browser View */
-        .browser-view {
-            display: none;
-            flex-direction: column;
-            height: 100vh;
-            width: 100%;
+        .feature-icon {
+            font-size: 1.8rem;
+            margin-bottom: 8px;
         }
 
-        .browser-view.active { display: flex; }
-
-        .browser-toolbar {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 12px;
-            background: rgba(10, 14, 26, 0.95);
-            border-bottom: 1px solid var(--border);
-            flex-shrink: 0;
-        }
-
-        .nav-btn {
-            background: var(--glass);
-            border: 1px solid rgba(255,255,255,0.1);
-            width: 36px;
-            height: 36px;
-            border-radius: 8px;
+        .feature h3 {
+            font-size: 0.95rem;
             color: var(--text);
-            cursor: pointer;
+            margin-bottom: 4px;
+        }
+
+        .feature p {
+            font-size: 0.8rem;
+            color: var(--muted);
+        }
+
+        .countdown {
+            color: var(--accent);
             font-size: 1rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s;
+            font-weight: 500;
         }
 
-        .nav-btn:hover {
-            background: rgba(94, 234, 212, 0.15);
-            border-color: var(--accent);
-        }
-
-        .url-bar {
-            flex: 1;
-            display: flex;
-            background: var(--glass);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 8px;
-            overflow: hidden;
-        }
-
-        .url-bar input {
-            flex: 1;
-            background: transparent;
-            border: none;
-            padding: 8px 12px;
-            color: var(--text);
-            font-size: 0.85rem;
-            outline: none;
-        }
-
-        .url-bar button {
-            background: var(--accent);
-            border: none;
-            padding: 8px 16px;
-            color: var(--bg1);
-            font-weight: 600;
-            cursor: pointer;
-        }
-
-        .close-btn {
-            background: rgba(239, 68, 68, 0.2) !important;
-            border-color: rgba(239, 68, 68, 0.4) !important;
-        }
-
-        .close-btn:hover {
-            background: rgba(239, 68, 68, 0.4) !important;
-        }
-
-        .browser-content {
-            flex: 1;
-            position: relative;
-            overflow: hidden;
-            background: #000;
-        }
-
-        #browserCanvas {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-            cursor: default;
-        }
-
-        .loading-overlay {
-            position: absolute;
-            inset: 0;
-            background: rgba(10, 14, 26, 0.95);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-direction: column;
-            z-index: 10;
-        }
-
-        .loading-overlay.hidden { display: none; }
-
-        .spinner {
-            width: 48px;
-            height: 48px;
-            border: 3px solid rgba(94, 234, 212, 0.2);
-            border-top-color: var(--accent);
+        .pulse {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            background: #fbbf24;
             border-radius: 50%;
-            animation: spin 1s linear infinite;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
         }
 
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        .loading-text {
-            margin-top: 16px;
-            color: var(--muted);
-        }
-
-        .stats {
-            position: absolute;
-            bottom: 8px;
-            right: 8px;
-            background: rgba(10, 14, 26, 0.85);
-            padding: 4px 10px;
-            border-radius: 6px;
-            font-size: 0.7rem;
-            color: var(--muted);
-            border: 1px solid var(--border);
-        }
-
-        /* Touch-friendly keyboard input */
-        #hiddenInput {
-            position: absolute;
-            opacity: 0;
-            pointer-events: none;
-        }
-
-        @media (max-width: 600px) {
-            .title { font-size: 2rem; }
-            .info { grid-template-columns: repeat(2, 1fr); }
-            .quick-sites { gap: 6px; }
-            .site-btn { padding: 8px 12px; font-size: 0.8rem; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.9); }
         }
     </style>
 </head>
 <body>
-    <!-- Landing Page -->
-    <div class="landing" id="landingPage">
-        <div class="title">🔓 Unblocker</div>
-        <p class="tagline">Real browser proxy — works with everything</p>
-
+    <div class="container">
+        <div class="icon">🔓</div>
+        <h1 class="title">Best Proxy</h1>
+        
         <div class="badge">
-            <span class="dot"></span>
-            Real Chromium • 60 FPS Streaming
+            <span class="pulse"></span>
+            Coming Soon
         </div>
 
-        <div class="search-container">
-            <form class="search-box" id="startForm">
-                <input type="text" id="urlInput" placeholder="Enter any URL (now.gg, tiktok.com, etc.)" required>
-                <button type="submit" id="startBtn">Launch</button>
-            </form>
-        </div>
+        <p class="description">
+            The ultimate browser proxy is in development. Real Chromium browser streaming at 60 FPS — TikTok, Now.gg, Roblox, and more will all work perfectly.
+        </p>
 
-        <div class="quick-sites">
-            <button class="site-btn" data-url="https://now.gg">☁️ Now.gg</button>
-            <button class="site-btn" data-url="https://www.tiktok.com">🎵 TikTok</button>
-            <button class="site-btn" data-url="https://www.youtube.com">▶️ YouTube</button>
-            <button class="site-btn" data-url="https://www.roblox.com">🎮 Roblox</button>
-            <button class="site-btn" data-url="https://www.twitch.tv">📺 Twitch</button>
-            <button class="site-btn" data-url="https://discord.com/app">💬 Discord</button>
-            <button class="site-btn" data-url="https://www.google.com">🔍 Google</button>
-        </div>
-
-        <div class="status" id="status"></div>
-
-        <div class="info">
-            <div class="info-card">
-                <div class="icon">🖥️</div>
+        <div class="features">
+            <div class="feature">
+                <div class="feature-icon">🖥️</div>
                 <h3>Real Browser</h3>
                 <p>Chromium on server</p>
             </div>
-            <div class="info-card">
-                <div class="icon">✅</div>
-                <h3>95%+ Sites</h3>
-                <p>Even Now.gg works</p>
-            </div>
-            <div class="info-card">
-                <div class="icon">⚡</div>
+            <div class="feature">
+                <div class="feature-icon">⚡</div>
                 <h3>60 FPS</h3>
                 <p>Smooth streaming</p>
             </div>
-            <div class="info-card">
-                <div class="icon">🔒</div>
+            <div class="feature">
+                <div class="feature-icon">✅</div>
+                <h3>Works Everywhere</h3>
+                <p>No site blocks it</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🔒</div>
                 <h3>Private</h3>
-                <p>IP hidden from sites</p>
+                <p>IP stays hidden</p>
             </div>
         </div>
+
+        <p class="countdown">Stay tuned for the release!</p>
     </div>
-
-    <!-- Browser View -->
-    <div class="browser-view" id="browserView">
-        <div class="browser-toolbar">
-            <button class="nav-btn" id="backBtn" title="Back"><i class="fas fa-arrow-left"></i></button>
-            <button class="nav-btn" id="forwardBtn" title="Forward"><i class="fas fa-arrow-right"></i></button>
-            <button class="nav-btn" id="refreshBtn" title="Refresh"><i class="fas fa-sync-alt"></i></button>
-
-            <div class="url-bar">
-                <input type="text" id="currentUrl" placeholder="URL">
-                <button id="goBtn">Go</button>
-            </div>
-
-            <button class="nav-btn" id="fullscreenBtn" title="Fullscreen"><i class="fas fa-expand"></i></button>
-            <button class="nav-btn close-btn" id="closeBtn" title="Close"><i class="fas fa-times"></i></button>
-        </div>
-
-        <div class="browser-content">
-            <div class="loading-overlay" id="loadingOverlay">
-                <div class="spinner"></div>
-                <div class="loading-text">Connecting to browser...</div>
-            </div>
-
-            <canvas id="browserCanvas"></canvas>
-            <input type="text" id="hiddenInput" autocomplete="off" autocorrect="off" autocapitalize="off">
-
-            <div class="stats" id="stats">FPS: -- | Latency: --ms</div>
-        </div>
-    </div>
-
-    <script>
-        // Backend URL from Firebase
-        const BACKEND_FIREBASE_URL = 'https://procces-3efd9-default-rtdb.firebaseio.com/backends/bestproxy.json';
-
-        let backendUrl = null;
-        let ws = null;
-        let sessionId = null;
-        let canvas, ctx;
-        let frameCount = 0;
-        let lastFpsUpdate = Date.now();
-        let fps = 0;
-        let latency = 0;
-
-        // Elements
-        const landingPage = document.getElementById('landingPage');
-        const browserView = document.getElementById('browserView');
-        const urlInput = document.getElementById('urlInput');
-        const currentUrlInput = document.getElementById('currentUrl');
-        const startBtn = document.getElementById('startBtn');
-        const status = document.getElementById('status');
-        const loadingOverlay = document.getElementById('loadingOverlay');
-        const statsEl = document.getElementById('stats');
-
-        // Show status
-        function showStatus(msg, type = 'loading') {
-            status.textContent = msg;
-            status.className = 'status show ' + type;
-        }
-
-        // Fetch backend URL from Firebase
-        async function fetchBackendUrl() {
-            showStatus('Connecting to backend...', 'loading');
-            startBtn.disabled = true;
-
-            try {
-                const response = await fetch(BACKEND_FIREBASE_URL + '?t=' + Date.now());
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data?.url) {
-                        backendUrl = data.url;
-                        console.log('[Unblocker] Using Firebase backend:', backendUrl);
-                        showStatus('Connected to backend', 'success');
-                        startBtn.disabled = false;
-                        return;
-                    }
-                }
-            } catch (e) {
-                console.warn('[Unblocker] Firebase fetch failed:', e);
-            }
-
-            showStatus('Backend offline — try again later', 'error');
-            setTimeout(fetchBackendUrl, 10000);
-        }
-
-        // Normalize URL
-        function normalizeUrl(url) {
-            url = url.trim();
-            if (!url.match(/^https?:\/\//)) {
-                url = 'https://' + url;
-            }
-            return url;
-        }
-
-        // Start session
-        async function startSession(url) {
-            if (!backendUrl) {
-                showStatus('Backend not connected', 'error');
-                return;
-            }
-
-            url = normalizeUrl(url);
-            startBtn.disabled = true;
-            showStatus('Starting browser...', 'loading');
-
-            try {
-                const res = await fetch(backendUrl + '/api/session', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url })
-                });
-
-                const data = await res.json();
-
-                if (data.error) {
-                    showStatus(data.error, 'error');
-                    startBtn.disabled = false;
-                    return;
-                }
-
-                sessionId = data.sessionId;
-                showStatus('Connecting to stream...', 'loading');
-                connectWebSocket();
-
-            } catch (err) {
-                showStatus('Failed: ' + err.message, 'error');
-                startBtn.disabled = false;
-            }
-        }
-
-        // Connect WebSocket
-        function connectWebSocket() {
-            const wsUrl = backendUrl.replace(/^http/, 'ws') + '/stream?session=' + sessionId;
-            ws = new WebSocket(wsUrl);
-
-            ws.onopen = () => {
-                console.log('WebSocket connected');
-                showBrowser();
-            };
-
-            ws.onmessage = async (e) => {
-                // Handle binary Blob data (frames)
-                if (e.data instanceof Blob) {
-                    const url = URL.createObjectURL(e.data);
-                    renderFrameFromUrl(url);
-                    return;
-                }
-
-                // Handle JSON messages
-                try {
-                    const data = JSON.parse(e.data);
-
-                    if (data.type === 'frame') {
-                        renderFrame(data.data);
-                        latency = Date.now() - data.timestamp;
-                    } else if (data.type === 'url') {
-                        currentUrlInput.value = data.url;
-                    } else if (data.type === 'fullscreen_request') {
-                        toggleFullscreen();
-                    }
-                } catch (err) {
-                    console.warn('WebSocket message parse error:', err);
-                }
-            };
-
-            ws.onclose = () => {
-                console.log('WebSocket closed');
-                if (browserView.classList.contains('active')) {
-                    closeBrowser();
-                }
-            };
-
-            ws.onerror = (err) => {
-                console.error('WebSocket error:', err);
-                showStatus('Connection error', 'error');
-            };
-        }
-
-        // Initialize canvas
-        function initCanvas() {
-            canvas = document.getElementById('browserCanvas');
-            ctx = canvas.getContext('2d');
-            canvas.width = 1280;
-            canvas.height = 720;
-        }
-
-        // Show browser
-        function showBrowser() {
-            landingPage.style.display = 'none';
-            browserView.classList.add('active');
-            loadingOverlay.classList.remove('hidden');
-            initCanvas();
-            setupInputHandlers();
-            startBtn.disabled = false;
-            status.classList.remove('show');
-
-            setTimeout(() => loadingOverlay.classList.add('hidden'), 2000);
-        }
-
-        // Close browser
-        function closeBrowser() {
-            if (ws) {
-                ws.close();
-                ws = null;
-            }
-
-            if (sessionId) {
-                fetch(backendUrl + '/api/session/' + sessionId, { method: 'DELETE' }).catch(() => {});
-                sessionId = null;
-            }
-
-            browserView.classList.remove('active');
-            landingPage.style.display = 'flex';
-        }
-
-        // Render frame from Blob URL
-        function renderFrameFromUrl(url) {
-            const img = new Image();
-            img.onload = () => {
-                if (canvas.width !== img.width || canvas.height !== img.height) {
-                    canvas.width = img.width;
-                    canvas.height = img.height;
-                }
-                ctx.drawImage(img, 0, 0);
-                URL.revokeObjectURL(url); // Free memory
-
-                frameCount++;
-                const now = Date.now();
-                if (now - lastFpsUpdate >= 1000) {
-                    fps = frameCount;
-                    frameCount = 0;
-                    lastFpsUpdate = now;
-                    statsEl.textContent = 'FPS: ' + fps + ' | Streaming';
-                }
-
-                loadingOverlay.classList.add('hidden');
-            };
-            img.onerror = () => URL.revokeObjectURL(url);
-            img.src = url;
-        }
-
-        // Render frame from base64
-        function renderFrame(base64Data) {
-            const img = new Image();
-            img.onload = () => {
-                if (canvas.width !== img.width || canvas.height !== img.height) {
-                    canvas.width = img.width;
-                    canvas.height = img.height;
-                }
-                ctx.drawImage(img, 0, 0);
-
-                frameCount++;
-                const now = Date.now();
-                if (now - lastFpsUpdate >= 1000) {
-                    fps = frameCount;
-                    frameCount = 0;
-                    lastFpsUpdate = now;
-                    statsEl.textContent = 'FPS: ' + fps + ' | Latency: ' + latency + 'ms';
-                }
-
-                loadingOverlay.classList.add('hidden');
-            };
-            img.src = 'data:image/jpeg;base64,' + base64Data;
-        }
-
-        // Get coordinates for mouse events
-        function getCoords(e) {
-            const rect = canvas.getBoundingClientRect();
-            let clientX, clientY;
-
-            if (e.touches && e.touches.length > 0) {
-                clientX = e.touches[0].clientX;
-                clientY = e.touches[0].clientY;
-            } else if (e.changedTouches && e.changedTouches.length > 0) {
-                clientX = e.changedTouches[0].clientX;
-                clientY = e.changedTouches[0].clientY;
-            } else {
-                clientX = e.clientX;
-                clientY = e.clientY;
-            }
-
-            const canvasAspect = canvas.width / canvas.height;
-            const rectAspect = rect.width / rect.height;
-
-            let renderWidth, renderHeight, offsetX, offsetY;
-
-            if (rectAspect > canvasAspect) {
-                renderHeight = rect.height;
-                renderWidth = rect.height * canvasAspect;
-                offsetX = (rect.width - renderWidth) / 2;
-                offsetY = 0;
-            } else {
-                renderWidth = rect.width;
-                renderHeight = rect.width / canvasAspect;
-                offsetX = 0;
-                offsetY = (rect.height - renderHeight) / 2;
-            }
-
-            const relX = clientX - rect.left - offsetX;
-            const relY = clientY - rect.top - offsetY;
-
-            return {
-                x: Math.max(0, Math.min(canvas.width, Math.round((relX / renderWidth) * canvas.width))),
-                y: Math.max(0, Math.min(canvas.height, Math.round((relY / renderHeight) * canvas.height)))
-            };
-        }
-
-        // Send input to server
-        function sendInput(msg) {
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify(msg));
-            }
-        }
-
-        // Setup input handlers
-        function setupInputHandlers() {
-            let lastMouseMove = 0;
-
-            // Mouse events
-            canvas.addEventListener('mousemove', (e) => {
-                const now = Date.now();
-                if (now - lastMouseMove < 16) return;
-                lastMouseMove = now;
-                const { x, y } = getCoords(e);
-                sendInput({ type: 'mouse', event: 'mousemove', x, y });
-            });
-
-            canvas.addEventListener('mousedown', (e) => {
-                const { x, y } = getCoords(e);
-                sendInput({ type: 'mouse', event: 'mousedown', x, y, button: ['left', 'middle', 'right'][e.button] || 'left' });
-            });
-
-            canvas.addEventListener('mouseup', (e) => {
-                const { x, y } = getCoords(e);
-                sendInput({ type: 'mouse', event: 'mouseup', x, y, button: ['left', 'middle', 'right'][e.button] || 'left' });
-            });
-
-            canvas.addEventListener('click', (e) => {
-                const { x, y } = getCoords(e);
-                sendInput({ type: 'mouse', event: 'click', x, y });
-            });
-
-            canvas.addEventListener('dblclick', (e) => {
-                const { x, y } = getCoords(e);
-                sendInput({ type: 'mouse', event: 'dblclick', x, y });
-            });
-
-            canvas.addEventListener('wheel', (e) => {
-                e.preventDefault();
-                sendInput({ type: 'mouse', event: 'wheel', deltaX: e.deltaX, deltaY: e.deltaY });
-            }, { passive: false });
-
-            canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-
-            // Touch events
-            canvas.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                const { x, y } = getCoords(e);
-                sendInput({ type: 'touch', event: 'touchstart', x, y });
-            }, { passive: false });
-
-            canvas.addEventListener('touchmove', (e) => {
-                e.preventDefault();
-                const { x, y } = getCoords(e);
-                sendInput({ type: 'touch', event: 'touchmove', x, y });
-            }, { passive: false });
-
-            canvas.addEventListener('touchend', (e) => {
-                e.preventDefault();
-                sendInput({ type: 'touch', event: 'touchend' });
-            }, { passive: false });
-
-            // Keyboard events
-            const hiddenInput = document.getElementById('hiddenInput');
-            
-            document.addEventListener('keydown', (e) => {
-                if (browserView.classList.contains('active') && !e.target.matches('input:not(#hiddenInput)')) {
-                    e.preventDefault();
-                    sendInput({ type: 'keyboard', event: 'keydown', key: e.key, code: e.code });
-                }
-            });
-
-            document.addEventListener('keyup', (e) => {
-                if (browserView.classList.contains('active') && !e.target.matches('input:not(#hiddenInput)')) {
-                    e.preventDefault();
-                    sendInput({ type: 'keyboard', event: 'keyup', key: e.key, code: e.code });
-                }
-            });
-
-            // Focus hidden input on touch for mobile keyboard
-            canvas.addEventListener('touchstart', () => {
-                hiddenInput.focus();
-            });
-
-            hiddenInput.addEventListener('input', (e) => {
-                const text = hiddenInput.value;
-                if (text) {
-                    sendInput({ type: 'keyboard', event: 'keypress', text });
-                    hiddenInput.value = '';
-                }
-            });
-        }
-
-        // Fullscreen toggle
-        function toggleFullscreen() {
-            const elem = browserView;
-            if (!document.fullscreenElement) {
-                elem.requestFullscreen?.() || elem.webkitRequestFullscreen?.();
-            } else {
-                document.exitFullscreen?.() || document.webkitExitFullscreen?.();
-            }
-        }
-
-        // Navigation buttons
-        document.getElementById('backBtn').addEventListener('click', () => sendInput({ type: 'action', action: 'back' }));
-        document.getElementById('forwardBtn').addEventListener('click', () => sendInput({ type: 'action', action: 'forward' }));
-        document.getElementById('refreshBtn').addEventListener('click', () => sendInput({ type: 'action', action: 'refresh' }));
-        document.getElementById('fullscreenBtn').addEventListener('click', toggleFullscreen);
-        document.getElementById('closeBtn').addEventListener('click', closeBrowser);
-
-        document.getElementById('goBtn').addEventListener('click', () => {
-            const url = currentUrlInput.value;
-            if (url) sendInput({ type: 'navigate', url: normalizeUrl(url) });
-        });
-
-        currentUrlInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                const url = currentUrlInput.value;
-                if (url) sendInput({ type: 'navigate', url: normalizeUrl(url) });
-            }
-        });
-
-        // Start form
-        document.getElementById('startForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            startSession(urlInput.value);
-        });
-
-        // Quick site buttons
-        document.querySelectorAll('.site-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                urlInput.value = btn.dataset.url;
-                startSession(btn.dataset.url);
-            });
-        });
-
-        // Initialize
-        fetchBackendUrl();
-        setInterval(fetchBackendUrl, 5 * 60 * 1000);
-    </script>
 </body>
 </html>

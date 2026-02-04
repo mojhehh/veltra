@@ -1174,10 +1174,10 @@ const appMetadata = {
     preinstalled: false,
   },
   "unblocker": {
-    name: "Unblocker",
+    name: "Best Proxy",
     icon: "fa-unlock-alt",
     preinstalled: true,
-    description: "Real browser proxy — works with everything including Now.gg, TikTok, Roblox"
+    description: "Coming Soon — Real browser proxy that works with everything"
   },
   "helios": {
     name: "Helios",
@@ -7366,7 +7366,7 @@ print(f'Sum: {sum(numbers)}')
       height: 600,
     },
     unblocker: {
-      title: "Unblocker",
+      title: "Best Proxy",
       icon: "fas fa-unlock-alt",
       content: (() => {
         if (!checkFileProtocol("Unblocker")) {
@@ -9789,12 +9789,12 @@ function switchAppStoreSection(section, element) {
         type: "app"
       },
       {
-        name: "Unblocker",
+        name: "Best Proxy",
         author: "Veltra Labs",
-        desc: "Real browser proxy that works with EVERYTHING — TikTok, Now.gg, Roblox, Discord, and more. 60 FPS streaming with full mouse/keyboard support!",
-        customPreviewHtml: `<div class="illustration-unblocker" style="background: linear-gradient(135deg, #0a0e1a, #151923); padding: 20px; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;"> <div style="font-size: 28px;">🔓</div> <div style="color: #5eead4; font-weight: bold; font-size: 14px;">Unblocker</div> <div style="color: #94a3b8; font-size: 10px;">Real Browser • 60 FPS</div> </div>`,
+        desc: "Coming Soon — Real browser proxy with 60 FPS streaming. TikTok, Now.gg, Roblox, and more will all work!",
+        customPreviewHtml: `<div class="illustration-unblocker" style="background: linear-gradient(135deg, #0a0e1a, #151923); padding: 20px; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;"> <div style="font-size: 28px;">🔓</div> <div style="color: #fbbf24; font-weight: bold; font-size: 14px;">Best Proxy</div> <div style="color: #94a3b8; font-size: 10px;">Coming Soon</div> </div>`,
         isInstalled: true,
-        installButtonText: "Open",
+        installButtonText: "Preview",
         installAction: "openApp('unblocker')",
         uninstallAction: "",
         type: "app"

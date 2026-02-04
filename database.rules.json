@@ -1,0 +1,28 @@
+{
+  "rules": {
+    "users": {
+      "$userId": {
+        ".read": true,
+        ".write": true
+      }
+    },
+    "melodify_libraries": {
+      "$userId": {
+        ".read": true,
+        ".write": true
+      }
+    },
+    "settings": {
+      "$userId": {
+        ".read": true,
+        ".write": true
+      }
+    },
+    "achievements": {
+      "$userId": {
+        ".read": true,
+        ".write": true
+      }
+    }
+  }
+}

@@ -4387,7 +4387,11 @@ function makeDraggable(element) {
     pos4 = 0;
   let dragging = false;
 
+  // Mouse events
   header.onmousedown = dragMouseDown;
+  
+  // Touch events for iPad/mobile
+  header.addEventListener('touchstart', dragTouchStart, { passive: false });
 
   function dragMouseDown(e) {
     if (e.target.closest(".window-controls")) return;
@@ -4397,6 +4401,24 @@ function makeDraggable(element) {
     document.onmouseup = closeDragElement;
     document.onmousemove = elementDrag;
     dragging = true;
+    element.style.zIndex = ++zIndexCounter;
+    if (snapSettings && snapSettings.enabled) {
+      snapTrackingWindow = element;
+    } else {
+      snapTrackingWindow = null;
+    }
+  }
+
+  function dragTouchStart(e) {
+    if (e.target.closest(".window-controls")) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    pos3 = touch.clientX;
+    pos4 = touch.clientY;
+    document.addEventListener('touchend', closeTouchDrag, { passive: false });
+    document.addEventListener('touchmove', elementTouchDrag, { passive: false });
+    dragging = true;
+    element.style.zIndex = ++zIndexCounter;
     if (snapSettings && snapSettings.enabled) {
       snapTrackingWindow = element;
     } else {
@@ -4424,9 +4446,39 @@ function makeDraggable(element) {
     }
   }
 
+  function elementTouchDrag(e) {
+    e.preventDefault();
+    const touch = e.touches[0];
+    pos1 = pos3 - touch.clientX;
+    pos2 = pos4 - touch.clientY;
+    pos3 = touch.clientX;
+    pos4 = touch.clientY;
+    const newTop = element.offsetTop - pos2;
+    const newLeft = element.offsetLeft - pos1;
+
+    element.style.top =
+      Math.max(0, Math.min(window.innerHeight - element.offsetHeight, newTop)) +
+      "px";
+    element.style.left =
+      Math.max(0, Math.min(window.innerWidth - element.offsetWidth, newLeft)) +
+      "px";
+    if (dragging) {
+      updateSnapPreview(touch.clientX, touch.clientY, element);
+    }
+  }
+
   function closeDragElement() {
     document.onmouseup = null;
     document.onmousemove = null;
+    if (dragging) {
+      finalizeSnap(element);
+    }
+    dragging = false;
+  }
+
+  function closeTouchDrag() {
+    document.removeEventListener('touchend', closeTouchDrag);
+    document.removeEventListener('touchmove', elementTouchDrag);
     if (dragging) {
       finalizeSnap(element);
     }
@@ -12436,6 +12488,16 @@ let aiSnake = {
 
 // Initialize AI Snake App
 async function initializeAISnakeApp() {
+  // Detect iPad/mobile and reduce settings for better performance
+  const isSlowDevice = isIPadOrIOS() || isTouchDevice() || navigator.hardwareConcurrency <= 4;
+  if (isSlowDevice) {
+    // Reduce default settings for iPad/mobile
+    aiSnake.concurrency = Math.min(aiSnake.concurrency, 2);
+    aiSnake.batchSize = 32;
+    aiSnake.memorySize = 5000;
+    aiSnake.gameSpeed = Math.max(aiSnake.gameSpeed, 20); // Slower = less CPU
+    console.log('[AI Snake] Detected slow device, reducing settings for better performance');
+  }
   // Reset model state first
   aiSnake.model = null;
   aiSnake.targetModel = null;
@@ -14959,7 +15021,7 @@ function setFavicon(url) {
   };
 }
 
-function resetCloaking() {
+function resetCloaking(showNotification = true) {
   document.title = originalTitle;
 
   const existingFavicons = document.querySelectorAll('link[rel="icon"]');
@@ -14970,7 +15032,9 @@ function resetCloaking() {
   if (titleInput) titleInput.value = originalTitle;
   if (faviconInput) faviconInput.value = "";
 
-  showToast("Cloaking reset to default", "fa-undo");
+  if (showNotification) {
+    showToast("Cloaking reset to default", "fa-undo");
+  }
 }
 
 function toggleCloakOnClickoff() {
@@ -14986,7 +15050,7 @@ function toggleCloakOnClickoff() {
   if (indicator) indicator.classList.toggle("active", cloakingConfig.cloakOnClickoff);
 
   if (!cloakingConfig.cloakOnClickoff) {
-    resetCloaking();
+    resetCloaking(false);
   }
 
   showToast(`Clickoff Cloak ${cloakingConfig.cloakOnClickoff ? 'enabled' : 'disabled'}`, cloakingConfig.cloakOnClickoff ? "fa-check-circle" : "fa-info-circle");
@@ -15016,7 +15080,7 @@ function resetClickoffCloak() {
   updateClickoffPreview();
 
   if (cloakingConfig.cloakOnClickoff) {
-    resetCloaking();
+    resetCloaking(false);
   }
 
   showToast("Clickoff settings reset", "fa-undo");
@@ -15055,7 +15119,7 @@ window.addEventListener('blur', () => {
 
 window.addEventListener('focus', () => {
   if (cloakingConfig.cloakOnClickoff) {
-    resetCloaking();
+    resetCloaking(false);
   }
 });
 

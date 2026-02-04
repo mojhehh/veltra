@@ -25,31 +25,34 @@
 }
 
 :root {
-    --accent: #7dd3c0;
-    --accent-hover: #6bc4b0;
-    --accent-dark: #469483;
-    --bg-primary: #0a0e1a;
-    --bg-secondary: #121724;
-    --text-primary: #e8eaed;
-    --text-secondary: #9aa0a6;
-    --border: #7dd3c0;
-    --error-red: #ef4444;
-    --error-red-hover: #dc2626;
-    --error-red-bg: rgba(239, 68, 68, 0.15);
-    --error-red-border: rgba(239, 68, 68, 0.3);
+    --accent: #5eead4;
+    --accent-hover: #2dd4bf;
+    --accent-dark: #14b8a6;
+    --accent-glow: rgba(94, 234, 212, 0.3);
+    --bg-primary: #0c1017;
+    --bg-secondary: #131925;
+    --bg-tertiary: #1a2133;
+    --text-primary: #f0f4f8;
+    --text-secondary: #94a3b8;
+    --border: rgba(94, 234, 212, 0.4);
+    --border-subtle: rgba(255, 255, 255, 0.06);
+    --error-red: #f87171;
+    --error-red-hover: #ef4444;
+    --error-red-bg: rgba(248, 113, 113, 0.12);
+    --error-red-border: rgba(248, 113, 113, 0.25);
     --success-green: #4ade80;
-    --overlay-dark: rgba(0, 0, 0, 0.8);
-    --overlay-darker: rgba(0, 0, 0, 0.9);
-    --glass-bg: rgba(21, 25, 35, 0.7);
-    --glass-border: rgba(255, 255, 255, 0.08);
+    --overlay-dark: rgba(0, 0, 0, 0.85);
+    --overlay-darker: rgba(0, 0, 0, 0.92);
+    --glass-bg: rgba(19, 25, 37, 0.75);
+    --glass-border: rgba(255, 255, 255, 0.06);
     --pure-black: #000;
     --pure-white: #fff;
-    --gray-dark: #888;
-    --gray-light: #222;
-    --transparent-white-1: rgba(255, 255, 255, 0.1);
-    --transparent-white-2: rgba(255, 255, 255, 0.2);
-    --transparent-white-5: rgba(255, 255, 255, 0.05);
-    --transparent-white-8: rgba(255, 255, 255, 0.08);
+    --gray-dark: #64748b;
+    --gray-light: #1e293b;
+    --transparent-white-1: rgba(255, 255, 255, 0.08);
+    --transparent-white-2: rgba(255, 255, 255, 0.15);
+    --transparent-white-5: rgba(255, 255, 255, 0.04);
+    --transparent-white-8: rgba(255, 255, 255, 0.06);
 
     --icon-size-multiplier: 1;
     --desktop-icon-width: calc(90px * var(--icon-size-multiplier));
@@ -58,26 +61,44 @@
     --desktop-icon-gap: calc(1.5rem * var(--icon-size-multiplier));
     --desktop-icon-margin-bottom: calc(0.5rem * var(--icon-size-multiplier));
     
+    --window-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px var(--border-subtle);
+    --btn-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    --glow-shadow: 0 0 20px var(--accent-glow);
+    
     --animation-speed: 0.3s;
     --transition-speed: 0.2s;
 }
 
-/* Fast Mode - reduces animations for better performance on slow devices */
+/* Fast Mode - disables animations completely for better performance on slow devices */
 body.fast-mode * {
-    animation-duration: 0.05s !important;
-    transition-duration: 0.05s !important;
+    animation: none !important;
+    transition: none !important;
+    animation-duration: 0s !important;
+    transition-duration: 0s !important;
+    -webkit-animation: none !important;
+    -webkit-transition: none !important;
 }
 
 body.fast-mode .window {
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.3) !important;
 }
 
 body.fast-mode .taskbar,
 body.fast-mode .start-menu,
 body.fast-mode .context-menu {
-    backdrop-filter: blur(10px) !important;
-    -webkit-backdrop-filter: blur(10px) !important;
+    backdrop-filter: blur(5px) !important;
+    -webkit-backdrop-filter: blur(5px) !important;
+}
+
+/* Disable image jittering in fast mode */
+body.fast-mode img,
+body.fast-mode .whatsnew-slide img,
+body.fast-mode .file-item img {
+    image-rendering: auto !important;
+    transform: none !important;
+    will-change: auto !important;
 }
 
 body {
@@ -1515,20 +1536,22 @@ select:focus {
 
 .taskbar {
     position: fixed;
-    bottom: 20px;
+    bottom: 18px;
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(21, 25, 35, 0.7);
-    backdrop-filter: blur(40px) saturate(180%);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 0.4rem 1rem;
+    background: rgba(19, 25, 37, 0.75);
+    backdrop-filter: blur(24px) saturate(140%);
+    -webkit-backdrop-filter: blur(24px) saturate(140%);
+    border: 1px solid var(--border-subtle);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 18px;
+    padding: 0.5rem 1.1rem;
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 0, 0, 0.1);
     z-index: 1000;
-    animation: slideUp 0.5s ease;
+    animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .taskbar-tooltip {
@@ -1867,14 +1890,16 @@ select:focus {
 
 .window {
     position: absolute;
-    background: rgba(21, 25, 35, var(--window-opacity, 0.85));
-    backdrop-filter: blur(40px) saturate(180%);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    background: rgba(19, 25, 37, var(--window-opacity, 0.88));
+    backdrop-filter: blur(32px) saturate(150%);
+    -webkit-backdrop-filter: blur(32px) saturate(150%);
+    border: 1px solid var(--border-subtle);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 14px;
+    box-shadow: var(--window-shadow);
     overflow: hidden;
     z-index: 100;
-    animation: windowOpen 0.1s ease;
+    animation: windowOpen 0.15s ease-out;
     min-width: 400px;
     min-height: 300px;
     /* Force GPU acceleration to prevent black flashes */

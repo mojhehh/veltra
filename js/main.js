@@ -854,6 +854,67 @@ let snapNewLayoutInput = null;
 
 // ========== ACCOUNT MANAGEMENT SYSTEM ==========
 
+// Per-user settings keys that should be stored separately for each account
+const PER_USER_SETTINGS_KEYS = [
+  'Veltra_wallpaper',
+  'Veltra_loginBackground',
+  'Veltra_profilePicture',
+  'Veltra_useSameBackground',
+  'Veltra_theme',
+  'Veltra_taskbarStyle',
+  'Veltra_showWhatsNew',
+  'Veltra_snapSettings',
+  'nOS_wispUrl',
+  'nOS_searchEngine',
+  'Veltra_melodifyLibrary',
+  'Veltra_desktopIconPositions',
+  'Veltra_installedApps',
+  'Veltra_pinnedApps',
+  'Veltra_communityApps'
+];
+
+// Save current user's settings
+function saveUserSettings(username) {
+  if (!username) return;
+  const userSettings = {};
+  PER_USER_SETTINGS_KEYS.forEach(key => {
+    const value = localStorage.getItem(key);
+    if (value !== null) {
+      userSettings[key] = value;
+    }
+  });
+  localStorage.setItem(`Veltra_userSettings_${username}`, JSON.stringify(userSettings));
+  console.log(`[Account] Saved settings for ${username}`);
+}
+
+// Load user's settings
+function loadUserSettings(username) {
+  if (!username) return;
+  const savedSettings = localStorage.getItem(`Veltra_userSettings_${username}`);
+  if (savedSettings) {
+    try {
+      const userSettings = JSON.parse(savedSettings);
+      // Clear current settings first
+      PER_USER_SETTINGS_KEYS.forEach(key => {
+        localStorage.removeItem(key);
+      });
+      // Apply user's settings
+      Object.keys(userSettings).forEach(key => {
+        localStorage.setItem(key, userSettings[key]);
+      });
+      console.log(`[Account] Loaded settings for ${username}`);
+    } catch (e) {
+      console.error('[Account] Error loading user settings:', e);
+    }
+  } else {
+    // New user - clear settings to defaults
+    console.log(`[Account] New user ${username}, using default settings`);
+    PER_USER_SETTINGS_KEYS.forEach(key => {
+      localStorage.removeItem(key);
+    });
+  }
+}
+
 // Account data structure
 class UserAccount {
   constructor(username, password, role = "standard", isPasswordless = false) {
@@ -3716,6 +3777,9 @@ function login() {
 
     currentUsername = username;
     currentUserAccount = null; // Old system doesn't use account objects
+    
+    // Load per-user settings (even for old system)
+    loadUserSettings(username);
   } else {
     // New multi-user system
     if (!username) {
@@ -3738,6 +3802,9 @@ function login() {
 
     currentUsername = username;
     currentUserAccount = account;
+    
+    // Load per-user settings
+    loadUserSettings(username);
   }
 
   document.getElementById("displayUsername").textContent = username;
@@ -11906,6 +11973,11 @@ async function signOutToLogin() {
   const confirmed = await confirm("Are you sure you want to sign out?");
   if (!confirmed) return;
 
+  // Save current user's settings before signing out
+  if (currentUsername) {
+    saveUserSettings(currentUsername);
+  }
+
   const startMenu = document.getElementById("startMenu");
   if (startMenu) startMenu.classList.remove("active");
 
@@ -15990,6 +16062,11 @@ function setupPageClosingListener() {
   if (pageClosingListener) return;
 
   pageClosingListener = (e) => {
+    // Always save user settings before page closes
+    if (currentUsername) {
+      saveUserSettings(currentUsername);
+    }
+    
     if (!cloakingConfig.confirmPageClosing) return;
 
     e.preventDefault();
@@ -16009,6 +16086,14 @@ function removePageClosingListener() {
 
 if (cloakingConfig.antiScreenMonitoring) setupScreenMonitoringListener();
 if (cloakingConfig.confirmPageClosing) setupPageClosingListener();
+
+// Always set up settings auto-save on page close
+window.addEventListener("beforeunload", () => {
+  if (currentUsername) {
+    saveUserSettings(currentUsername);
+  }
+});
+
 function hideProperties() {
   const tooltip = document.getElementById("propertiesTooltip");
   tooltip.classList.remove("active");
@@ -16067,9 +16152,17 @@ function updateLoginWithAccounts(accounts) {
     const account = accounts[0];
     if (usernameInput) {
       usernameInput.value = account.username;
+      usernameInput.style.display = "block";
     }
     if (loginSubtitle) {
-      loginSubtitle.textContent = account.isPasswordless ? "Passwordless account - click Sign In" : "Enter your password";
+      loginSubtitle.innerHTML = `
+        ${account.isPasswordless ? "Passwordless account - click Sign In" : "Enter your password"}
+        <div style="margin-top: 1rem;">
+          <a href="#" onclick="event.preventDefault(); createAccountFromLogin();" style="color: var(--accent); text-decoration: underline; font-size: 0.85rem;">
+            <i class="fas fa-user-plus"></i> Create New Account
+          </a>
+        </div>
+      `;
     }
     if (passwordWrapper) {
       passwordWrapper.style.display = account.isPasswordless ? "none" : "block";
@@ -16090,6 +16183,12 @@ function updateLoginWithAccounts(accounts) {
               ${acc.isPasswordless ? '<i class="fas fa-unlock" style="color: var(--success-green);" title="Passwordless"></i>' : '<i class="fas fa-lock" style="color: var(--text-secondary);"></i>'}
             </div>
           `).join('')}
+          <div class="account-select-item" onclick="createAccountFromLogin()" style="padding: 0.5rem 1rem; background: rgba(94, 234, 212, 0.1); border: 1px dashed var(--accent); border-radius: 12px; cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; gap: 0.75rem;">
+            <i class="fas fa-user-plus" style="color: var(--accent);"></i>
+            <div style="flex: 1;">
+              <div style="color: var(--accent); font-family: fontb;">Create New Account</div>
+            </div>
+          </div>
         </div>
       `;
     }
@@ -16132,6 +16231,71 @@ function selectLoginAccount(username) {
     setTimeout(() => passwordInput.focus(), 100);
   }
 }
+
+// Create account from login screen
+function createAccountFromLogin() {
+  showModal({
+    type: "info",
+    icon: "fa-user-plus",
+    title: "Create New Account",
+    message: `
+      <div style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1rem;">
+        <div>
+          <label style="display: block; color: var(--text-primary); font-size: 0.9rem; margin-bottom: 0.5rem;">Username</label>
+          <input type="text" id="loginNewUsername" class="login-input" placeholder="Enter username" style="width: 100%;">
+        </div>
+        <div>
+          <label style="display: block; color: var(--text-primary); font-size: 0.9rem; margin-bottom: 0.5rem;">Password</label>
+          <input type="password" id="loginNewPassword" class="login-input" placeholder="Enter password" style="width: 100%;">
+        </div>
+        <div>
+          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+            <input type="checkbox" id="loginNewPasswordless">
+            <span style="color: var(--text-primary);">Passwordless Account (no password needed)</span>
+          </label>
+        </div>
+      </div>
+    `,
+    confirm: true,
+    confirmText: "Create Account",
+    cancelText: "Cancel"
+  }).then(result => {
+    if (result) {
+      const username = document.getElementById("loginNewUsername")?.value;
+      const password = document.getElementById("loginNewPassword")?.value;
+      const isPasswordless = document.getElementById("loginNewPasswordless")?.checked;
+
+      if (!username || username.length < 3) {
+        showToast("Username must be at least 3 characters", "fa-exclamation-circle");
+        return;
+      }
+
+      if (!isPasswordless && (!password || password.length < 1)) {
+        showToast("Password is required for non-passwordless accounts", "fa-exclamation-circle");
+        return;
+      }
+
+      // Check if any accounts exist - first account should be superuser
+      const accounts = getAllAccounts();
+      const role = accounts.length === 0 ? "superuser" : "standard";
+
+      const createResult = createAccount(username, password, role, isPasswordless);
+
+      if (createResult.success) {
+        showToast(`Account "${username}" created! ${role === "superuser" ? "(Super User)" : ""}`, "fa-check-circle");
+        updateLoginScreen();
+        
+        // Auto-select the new account
+        setTimeout(() => {
+          selectLoginAccount(username);
+        }, 100);
+      } else {
+        showToast(createResult.message, "fa-exclamation-circle");
+      }
+    }
+  });
+}
+
 function switchSettingsTab(tabName, element) {
   document.querySelectorAll(".settings-nav-item").forEach((item) => {
     item.classList.remove("active");

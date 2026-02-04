@@ -350,13 +350,41 @@
 
     <script>
         // register sw with dynamic base path
+        let swReady = false;
         if ("serviceWorker" in navigator) {
-            window.addEventListener("load", () => {
+            window.addEventListener("load", async () => {
                 const basePath = window.location.pathname.includes('/veltra') ? '/veltra' : '';
-                navigator.serviceWorker.register(basePath + "/uv/sw.js", { scope: basePath + "/uv/service/" })
-                    .then(reg => console.log('UV SW registered:', reg.scope))
-                    .catch(err => console.error('UV SW registration failed:', err));
-            })
+                try {
+                    const reg = await navigator.serviceWorker.register(basePath + "/uv/sw.js", { scope: basePath + "/uv/service/" });
+                    console.log('UV SW registered:', reg.scope);
+                    
+                    // Wait for the SW to be active
+                    if (reg.installing) {
+                        reg.installing.addEventListener('statechange', (e) => {
+                            if (e.target.state === 'activated') {
+                                swReady = true;
+                                console.log('UV SW activated');
+                            }
+                        });
+                    } else if (reg.active) {
+                        swReady = true;
+                        console.log('UV SW already active');
+                    }
+                    
+                    // Also listen for controller change
+                    navigator.serviceWorker.addEventListener('controllerchange', () => {
+                        swReady = true;
+                        console.log('UV SW controller changed');
+                    });
+                    
+                    // If already controlled, we're ready
+                    if (navigator.serviceWorker.controller) {
+                        swReady = true;
+                    }
+                } catch (err) {
+                    console.error('UV SW registration failed:', err);
+                }
+            });
         }
     </script>
 
@@ -535,12 +563,33 @@
         const urlParams = new URLSearchParams(window.location.search);
         const directUrl = urlParams.get('url');
         if (directUrl) {
-            // Wait for connection to be ready, then navigate
-            setTimeout(() => {
+            // Wait for connection to be fully ready, then navigate
+            async function waitAndNav() {
+                // Wait for transport to be set (connection initialization)
+                let attempts = 0;
+                while (attempts < 20) { // Max 10 seconds (500ms * 20)
+                    try {
+                        const transport = await connection.getTransport();
+                        if (transport) {
+                            console.log('[UV] Transport ready, navigating to:', directUrl);
+                            const urlInput = document.getElementById("urlbar");
+                            if (urlInput) urlInput.value = directUrl;
+                            nav(directUrl);
+                            return;
+                        }
+                    } catch (e) {
+                        console.log('[UV] Waiting for transport...', e.message);
+                    }
+                    await new Promise(r => setTimeout(r, 500));
+                    attempts++;
+                }
+                // Fallback - try anyway
+                console.warn('[UV] Transport not ready after timeout, trying anyway');
                 const urlInput = document.getElementById("urlbar");
                 if (urlInput) urlInput.value = directUrl;
                 nav(directUrl);
-            }, 1000);
+            }
+            waitAndNav();
         }
 
         function switchTab(tId) {
@@ -633,9 +682,35 @@
         }
 
         async function go(u) {
-            // Ensure transport is set
-            if (!await connection.getTransport()) {
-                await connection.setTransport(basePath + "/libcurl/index.mjs", [{ websocket: wispUrl }]);
+            // Wait for service worker to be ready
+            let swAttempts = 0;
+            while (!swReady && swAttempts < 20) {
+                console.log('[UV] Waiting for service worker...');
+                await new Promise(r => setTimeout(r, 250));
+                swAttempts++;
+            }
+            if (!swReady) {
+                console.warn('[UV] Service worker not ready, trying anyway');
+            }
+            
+            // Ensure transport is set with retries
+            let transportReady = false;
+            for (let i = 0; i < 5 && !transportReady; i++) {
+                try {
+                    if (!await connection.getTransport()) {
+                        console.log('[UV] Setting transport, attempt', i + 1);
+                        await connection.setTransport(basePath + "/libcurl/index.mjs", [{ websocket: wispUrl }]);
+                    }
+                    transportReady = true;
+                } catch (e) {
+                    console.error('[UV] Transport error:', e.message);
+                    await new Promise(r => setTimeout(r, 500));
+                }
+            }
+            
+            if (!transportReady) {
+                showToast("Proxy connection failed. Try refreshing.", "fas fa-exclamation-triangle", 3000);
+                return;
             }
 
             console.log("[UV] Navigating to:", u);

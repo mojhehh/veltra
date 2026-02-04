@@ -1173,9 +1173,9 @@ const appMetadata = {
     icon: "fa-globe",
     preinstalled: false,
   },
-  "unblocker": {
-    name: "Best Proxy",
-    icon: "fa-unlock-alt",
+  "nebula": {
+    name: "Nebula",
+    icon: "fa-cloud",
     preinstalled: true,
     description: "Coming Soon — Real browser proxy that works with everything"
   },
@@ -7365,9 +7365,9 @@ print(f'Sum: {sum(numbers)}')
       width: 900,
       height: 600,
     },
-    unblocker: {
-      title: "Best Proxy",
-      icon: "fas fa-unlock-alt",
+    nebula: {
+      title: "Nebula",
+      icon: "fas fa-cloud",
       content: (() => {
         if (!checkFileProtocol("Unblocker")) {
           return `
@@ -7380,7 +7380,7 @@ print(f'Sum: {sum(numbers)}')
         }
         return `
         <div class="browser-container" style="overflow: hidden;">
-          <iframe src="${veltraBasePath}/app/unblocker.html" frameborder="0" style="width: 100%; height: 100vh; border-radius: 0px; margin: 0;"></iframe>
+          <iframe src="${veltraBasePath}/app/nebula.html" frameborder="0" style="width: 100%; height: 100vh; border-radius: 0px; margin: 0;"></iframe>
         </div>
       `;
       })(),
@@ -9789,13 +9789,13 @@ function switchAppStoreSection(section, element) {
         type: "app"
       },
       {
-        name: "Best Proxy",
+        name: "Nebula",
         author: "Veltra Labs",
         desc: "Coming Soon — Real browser proxy with 60 FPS streaming. TikTok, Now.gg, Roblox, and more will all work!",
-        customPreviewHtml: `<div class="illustration-unblocker" style="background: linear-gradient(135deg, #0a0e1a, #151923); padding: 20px; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;"> <div style="font-size: 28px;">🔓</div> <div style="color: #fbbf24; font-weight: bold; font-size: 14px;">Best Proxy</div> <div style="color: #94a3b8; font-size: 10px;">Coming Soon</div> </div>`,
+        customPreviewHtml: `<div class="illustration-nebula"> <div class="illustration-nebula-header"> <div class="illustration-nebula-logo"></div> <div class="illustration-nebula-badge">Coming Soon</div> </div> <div class="illustration-nebula-content"> <div class="illustration-nebula-screen"></div> </div> </div>`,
         isInstalled: true,
         installButtonText: "Preview",
-        installAction: "openApp('unblocker')",
+        installAction: "openApp('nebula')",
         uninstallAction: "",
         type: "app"
       },

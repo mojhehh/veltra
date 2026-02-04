@@ -581,6 +581,84 @@ input {
     border-radius: 50%;
 }
 
+/* Nebula Browser Illustration */
+.illustration-nebula {
+    width: 260px;
+    height: 160px;
+    background: rgba(10, 14, 26, 0.95);
+    border: 2px solid #a78bfa;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.illustration-nebula-header {
+    height: 35px;
+    background: rgba(21, 25, 35, 0.9);
+    border-bottom: 2px solid #a78bfa;
+    display: flex;
+    align-items: center;
+    padding: 0 0.75rem;
+    gap: 8px;
+}
+
+.illustration-nebula-logo {
+    width: 20px;
+    height: 20px;
+    background: linear-gradient(135deg, #a78bfa, #8b5cf6);
+    border-radius: 50%;
+    position: relative;
+    box-shadow: 0 0 8px rgba(167, 139, 250, 0.5);
+}
+
+.illustration-nebula-logo::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 6px;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.4);
+    border-radius: 50%;
+}
+
+.illustration-nebula-badge {
+    font-size: 9px;
+    font-weight: 600;
+    color: #fbbf24;
+    background: rgba(251, 191, 36, 0.15);
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: auto;
+}
+
+.illustration-nebula-content {
+    padding: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: calc(100% - 35px);
+    background: radial-gradient(ellipse at center, rgba(167, 139, 250, 0.1) 0%, transparent 70%);
+}
+
+.illustration-nebula-screen {
+    width: 90%;
+    height: 90%;
+    background: linear-gradient(135deg, rgba(167, 139, 250, 0.1), rgba(139, 92, 246, 0.05));
+    border: 1px dashed rgba(167, 139, 250, 0.3);
+    border-radius: 6px;
+    position: relative;
+}
+
+.illustration-nebula-screen::before {
+    content: '60 FPS';
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    font-size: 8px;
+    color: rgba(167, 139, 250, 0.5);
+    font-weight: 600;
+}
+
 /* VS Code Illustration */
 .illustration-vscode {
     width: 260px;

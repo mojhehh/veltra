@@ -3413,7 +3413,7 @@ function generateFileTree(fs, prefix = "", isLast = true) {
 
   entries.forEach((entry, index) => {
     const isLastEntry = index === entries.length - 1;
-    const connector = isLastEntry ? "â""â"€â"€ " : "â"œâ"€â"€ ";
+    const connector = isLastEntry ? "└── " : "├── ";
     const isFolder = typeof fs[entry] === "object";
     const icon = isFolder
       ? '<i class="fas fa-folder"></i>'
@@ -3421,7 +3421,7 @@ function generateFileTree(fs, prefix = "", isLast = true) {
     result += `${prefix}${connector}${icon} ${entry}\n`;
 
     if (isFolder && Object.keys(fs[entry]).length > 0) {
-      const newPrefix = prefix + (isLastEntry ? "    " : "â"‚   ");
+      const newPrefix = prefix + (isLastEntry ? "    " : "│   ");
       result += generateFileTree(fs[entry], newPrefix, isLastEntry);
     }
   });

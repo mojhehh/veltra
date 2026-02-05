@@ -1,4 +1,4 @@
-﻿// ==================== VELTRA FIREBASE BACKEND CONFIG ====================
+// ==================== VELTRA FIREBASE BACKEND CONFIG ====================
 // Note: VELTRA_FIREBASE_URL and FALLBACK_WISP_URL
 // are declared in index.html's inline script to ensure early availability
 
@@ -3413,7 +3413,7 @@ function generateFileTree(fs, prefix = "", isLast = true) {
 
   entries.forEach((entry, index) => {
     const isLastEntry = index === entries.length - 1;
-    const connector = isLastEntry ? "â””â”€â”€ " : "â”œâ”€â”€ ";
+    const connector = isLastEntry ? "â""â"€â"€ " : "â"œâ"€â"€ ";
     const isFolder = typeof fs[entry] === "object";
     const icon = isFolder
       ? '<i class="fas fa-folder"></i>'
@@ -3421,7 +3421,7 @@ function generateFileTree(fs, prefix = "", isLast = true) {
     result += `${prefix}${connector}${icon} ${entry}\n`;
 
     if (isFolder && Object.keys(fs[entry]).length > 0) {
-      const newPrefix = prefix + (isLastEntry ? "    " : "â”‚   ");
+      const newPrefix = prefix + (isLastEntry ? "    " : "â"‚   ");
       result += generateFileTree(fs[entry], newPrefix, isLastEntry);
     }
   });
@@ -3549,17 +3549,17 @@ function generateNeofetch() {
   const folderCount = countFolders(fileSystem);
   
   const logo = [
-    '       <span style="color:#3b82f6;">â–ˆâ–ˆâ–ˆâ•—   â–ˆâ–ˆâ•— â–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ•— â–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ•—</span>',
-    '       <span style="color:#3b82f6;">â–ˆâ–ˆâ–ˆâ–ˆâ•—  â–ˆâ–ˆâ•‘â–ˆâ–ˆâ•”â•â•â•â–ˆâ–ˆâ•—â–ˆâ–ˆâ•”â•â•â•â•â•</span>',
-    '       <span style="color:#60a5fa;">â–ˆâ–ˆâ•”â–ˆâ–ˆâ•— â–ˆâ–ˆâ•‘â–ˆâ–ˆâ•‘   â–ˆâ–ˆâ•‘â–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ•—</span>',
-    '       <span style="color:#60a5fa;">â–ˆâ–ˆâ•‘â•šâ–ˆâ–ˆâ•—â–ˆâ–ˆâ•‘â–ˆâ–ˆâ•‘   â–ˆâ–ˆâ•‘â•šâ•â•â•â•â–ˆâ–ˆâ•‘</span>',
-    '       <span style="color:#93c5fd;">â–ˆâ–ˆâ•‘ â•šâ–ˆâ–ˆâ–ˆâ–ˆâ•‘â•šâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ•”â•â–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ•‘</span>',
-    '       <span style="color:#93c5fd;">â•šâ•â•  â•šâ•â•â•â• â•šâ•â•â•â•â•â• â•šâ•â•â•â•â•â•â•</span>',
+    '       <span style="color:#3b82f6;">â-ˆâ-ˆâ-ˆâ-—   â-ˆâ-ˆâ-— â-ˆâ-ˆâ-ˆâ-ˆâ-ˆâ-ˆâ-— â-ˆâ-ˆâ-ˆâ-ˆâ-ˆâ-ˆâ-ˆâ-—</span>',
+    '       <span style="color:#3b82f6;">â-ˆâ-ˆâ-ˆâ-ˆâ-—  â-ˆâ-ˆâ-'â-ˆâ-ˆâ-"â-â-â-â-ˆâ-ˆâ-—â-ˆâ-ˆâ-"â-â-â-â-â-</span>',
+    '       <span style="color:#60a5fa;">â-ˆâ-ˆâ-"â-ˆâ-ˆâ-— â-ˆâ-ˆâ-'â-ˆâ-ˆâ-'   â-ˆâ-ˆâ-'â-ˆâ-ˆâ-ˆâ-ˆâ-ˆâ-ˆâ-ˆâ-—</span>',
+    '       <span style="color:#60a5fa;">â-ˆâ-ˆâ-'â-šâ-ˆâ-ˆâ-—â-ˆâ-ˆâ-'â-ˆâ-ˆâ-'   â-ˆâ-ˆâ-'â-šâ-â-â-â-â-ˆâ-ˆâ-'</span>',
+    '       <span style="color:#93c5fd;">â-ˆâ-ˆâ-' â-šâ-ˆâ-ˆâ-ˆâ-ˆâ-'â-šâ-ˆâ-ˆâ-ˆâ-ˆâ-ˆâ-ˆâ-"â-â-ˆâ-ˆâ-ˆâ-ˆâ-ˆâ-ˆâ-ˆâ-'</span>',
+    '       <span style="color:#93c5fd;">â-šâ-â-  â-šâ-â-â-â- â-šâ-â-â-â-â-â- â-šâ-â-â-â-â-â-â-</span>',
   ];
   
   const info = [
     `<span style="color:#3b82f6;">${currentUsername}@Veltra</span>`,
-    '<span style="color:#888;">â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€</span>',
+    '<span style="color:#888;">â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€</span>',
     `<span style="color:#3b82f6;">OS:</span> Veltra v1.5`,
     `<span style="color:#3b82f6;">Host:</span> ${os}`,
     `<span style="color:#3b82f6;">Browser:</span> ${browser}`,
@@ -3724,7 +3724,7 @@ function handleCLIInput(e) {
         } else {
           parent[dirName] = {};
           saveFS(fileSystem);
-          output.innerHTML = `<span style="color: #4ade80;">âœ“ Created directory: ${dirName}</span>`;
+          output.innerHTML = `<span style="color: #4ade80;">âœ" Created directory: ${dirName}</span>`;
         }
       }
     } else if (cmd === "touch") {
@@ -3743,7 +3743,7 @@ function handleCLIInput(e) {
         } else {
           parent[fileName] = parent[fileName] || '';
           saveFS(fileSystem);
-          output.innerHTML = `<span style="color: #4ade80;">âœ“ Created file: ${fileName}</span>`;
+          output.innerHTML = `<span style="color: #4ade80;">âœ" Created file: ${fileName}</span>`;
         }
       }
     } else if (cmd === "rm") {
@@ -3759,7 +3759,7 @@ function handleCLIInput(e) {
           output.innerHTML = `<span style="color: #ef4444;">rm: cannot remove '${cmdArgs[0]}': Directory not empty</span>`;
         } else {
           deleteFSNode(targetPath);
-          output.innerHTML = `<span style="color: #4ade80;">âœ“ Removed: ${cmdArgs[0]}</span>`;
+          output.innerHTML = `<span style="color: #4ade80;">âœ" Removed: ${cmdArgs[0]}</span>`;
         }
       }
     } else if (cmd === "neofetch") {
@@ -3799,7 +3799,7 @@ function handleCLIInput(e) {
     } else if (cmd === "reset-boot") {
       localStorage.removeItem("Veltra_bootChoice");
       output.innerHTML =
-        '<span style="color: #4ade80;">âœ“ Bootloader preferences reset successfully</span><br>' +
+        '<span style="color: #4ade80;">âœ" Bootloader preferences reset successfully</span><br>' +
         "The bootloader menu will appear on next page reload.";
     } else if (cmd === "clear") {
       terminal.innerHTML = `
@@ -7275,7 +7275,7 @@ alt="favicon">
             <h1 style="font-size: 2rem; margin-bottom: 0; color: var(--text-primary); font-family: fontb; text-align: center; width: 100%;">Veltra</h1>
             <p style="color: var(--text-secondary); font-size: 1rem; margin: 0; text-align: center; width: 100%;">Version 1.5</p>
             <p style="color: var(--text-secondary); font-size: 0.9rem; max-width:700px; margin: 1rem auto 0; line-height:1.6; text-align: center;">
-              A beautiful, fully-featured web-based operating system experience. Built with vanilla HTML, CSS, and JavaScript â€” no frameworks needed! Veltra brings you a complete desktop environment right in your browser, with file management, multiple apps, themes, and more.
+              A beautiful, fully-featured web-based operating system experience. Built with vanilla HTML, CSS, and JavaScript â€" no frameworks needed! Veltra brings you a complete desktop environment right in your browser, with file management, multiple apps, themes, and more.
             </p>
           </div>
 
@@ -8377,8 +8377,8 @@ print(f'Sum: {sum(numbers)}')
     if (appName === "uv") {
       setTimeout(() => {
         showToast(
-          "💡 Tip: Click the 'New Tab' button for better performance! Runs much faster in a separate tab.",
-          "fa-external-link-alt",
+          "Tip: Click the 'New Tab' button for better performance! Runs much faster in a separate tab.",
+          "fa-lightbulb",
           5000
         );
         // Highlight the new tab button inside the UV iframe
@@ -8529,7 +8529,7 @@ function handleTerminalInput(e) {
         } else {
           parent[dirName] = {};
           saveFS(fileSystem);
-          output.innerHTML = `<span style="color: #4ade80;">âœ“ Created directory: ${dirName}</span>`;
+          output.innerHTML = `<span style="color: #4ade80;">âœ" Created directory: ${dirName}</span>`;
         }
       }
     } else if (cmd === "touch") {
@@ -8548,7 +8548,7 @@ function handleTerminalInput(e) {
         } else {
           parent[fileName] = parent[fileName] || '';
           saveFS(fileSystem);
-          output.innerHTML = `<span style="color: #4ade80;">âœ“ Created file: ${fileName}</span>`;
+          output.innerHTML = `<span style="color: #4ade80;">âœ" Created file: ${fileName}</span>`;
         }
       }
     } else if (cmd === "rm") {
@@ -8564,7 +8564,7 @@ function handleTerminalInput(e) {
           output.innerHTML = `<span style="color: #ef4444;">rm: cannot remove '${cmdArgs[0]}': Directory not empty (use rm -r)</span>`;
         } else {
           deleteFSNode(targetPath);
-          output.innerHTML = `<span style="color: #4ade80;">âœ“ Removed: ${cmdArgs[0]}</span>`;
+          output.innerHTML = `<span style="color: #4ade80;">âœ" Removed: ${cmdArgs[0]}</span>`;
         }
       }
     } else if (cmd === "neofetch") {
@@ -8609,7 +8609,7 @@ function handleTerminalInput(e) {
         };
         if (appMap[appName]) {
           openApp(appMap[appName]);
-          output.innerHTML = `<span style="color: #4ade80;">âœ“ Opening ${appName}...</span>`;
+          output.innerHTML = `<span style="color: #4ade80;">âœ" Opening ${appName}...</span>`;
         } else {
           output.innerHTML = `<span style="color: #ef4444;">open: application '${cmdArgs[0]}' not found</span>`;
         }
@@ -8629,13 +8629,13 @@ function handleTerminalInput(e) {
     } else if (cmd === "reset-boot") {
       localStorage.removeItem("Veltra_bootChoice");
       output.innerHTML =
-        '<span style="color: #4ade80;">âœ“ Bootloader preferences reset successfully</span><br>' +
+        '<span style="color: #4ade80;">âœ" Bootloader preferences reset successfully</span><br>' +
         "The bootloader menu will appear on next page reload.";
     } else if (cmd === "refresh-cache") {
       output.innerHTML = "Submitting purge request to jsDelivr...<br>";
       fetch('https://purge.jsdelivr.net/gh/nautilus-os/community@main/files/info.json').catch(e => { });
       fetch('https://purge.jsdelivr.net/gh/nautilus-os/community@main/apps').catch(e => { });
-      output.innerHTML += '<span style="color: #4ade80;">âœ“ Purge request sent.</span><br>' +
+      output.innerHTML += '<span style="color: #4ade80;">âœ" Purge request sent.</span><br>' +
         "Please wait a few moments and try reloading the store.";
     } else if (cmd === "clear") {
       terminal.innerHTML = `
@@ -15149,7 +15149,7 @@ function refreshAchievementsWindow() {
                 <div class="achievement-icon">
                     <i class="fas ${achievement.icon}"></i>
                     ${achievement.unlocked
-          ? '<div class="achievement-badge">âœ“</div>'
+          ? '<div class="achievement-badge">âœ"</div>'
           : ""
         }
                 </div>
@@ -15333,7 +15333,7 @@ function openAchievements() {
                 <div class="achievement-icon">
                     <i class="fas ${achievement.icon}"></i>
                     ${achievement.unlocked
-          ? '<div class="achievement-badge">âœ“</div>'
+          ? '<div class="achievement-badge">âœ"</div>'
           : ""
         }
                 </div>
@@ -16459,7 +16459,7 @@ function setupScreenMonitoringListener() {
       return;
     }
 
-    // If an overlay already exists, a previous trigger is still active â€” keep it
+    // If an overlay already exists, a previous trigger is still active â€" keep it
     const existingOverlay = document.getElementById("screenMonitoringBlackout");
     if (existingOverlay) {
       // Do not recreate or remove it here; let the original timeout handle cleanup
@@ -16897,7 +16897,7 @@ function expandHelpTopic(topicId) {
                     <li><strong>Veltra (Graphical)</strong> - Full desktop environment with windows, icons, and applications</li>
                     <li><strong>Veltra (Command Line)</strong> - Terminal-only interface for command-line operations</li>
                 </ul>
-                <p>Your boot choice is remembered automatically. To change it, open Settings â†’ System â†’ Reset Boot Preference.</p>
+                <p>Your boot choice is remembered automatically. To change it, open Settings â†' System â†' Reset Boot Preference.</p>
             `,
     },
     apps: {
@@ -19739,9 +19739,9 @@ TOOL USAGE GUIDELINES:
 8. Tool results will be provided to you in a follow-up message
 
 CRITICAL FOR SETTINGS:
-- Before changing theme â†’ use get_available_options with category='themes' to see installed themes
-- Before changing search engine â†’ use get_available_options with category='search_engines'
-- For other settings â†’ use get_available_options with category='settings'
+- Before changing theme â†' use get_available_options with category='themes' to see installed themes
+- Before changing search engine â†' use get_available_options with category='search_engines'
+- For other settings â†' use get_available_options with category='settings'
 - This prevents errors from using invalid values!
 
 EXAMPLE CONVERSATIONS:
@@ -20200,7 +20200,7 @@ async function sendAiMessage() {
               // User rejected - show feedback
               addToolFeedbackToChat(toolCall, {
                 success: false,
-                message: `â›” Action rejected by user`,
+                message: `â›" Action rejected by user`,
                 details: `The ${toolCall.tool} action was not executed.`
               });
 

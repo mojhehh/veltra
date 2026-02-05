@@ -69,11 +69,9 @@
     --transition-speed: 0.2s;
 }
 
-/* Logo filter - converts black to teal (#7DD3C0) */
+/* Logo styling */
 .veltra-logo {
-    filter: invert(78%) sepia(25%) saturate(522%) hue-rotate(112deg) brightness(92%) contrast(87%);
-    border-radius: 50%;
-    background: var(--bg-primary);
+    border-radius: 12px;
 }
 
 /* Fast Mode - disables animations completely for better performance on slow devices */

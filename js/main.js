@@ -5311,7 +5311,7 @@ function openApp(appName, editorContent = "", filename = "") {
                   <div class="browser-content" id="browserContent">
                       <div class="browser-view active" data-view-id="0">
                           <div class="browser-landing">
-                              <i class="fas fa-fish browser-landing-logo"></i>
+                              <img src="logo.png" alt="Veltra" class="browser-landing-logo" style="width: 80px; height: 80px; object-fit: contain;">
                               <div class="browser-landing-search">
                                   <i class="fas fa-search"></i>
                                   <input
@@ -6925,7 +6925,7 @@ alt="favicon">
               <div style="display: flex; flex-direction: column; align-items: center; gap: 1.5rem;">
                   <div style="width: 200px; height: 140px; background: rgba(21, 25, 35, 0.95); border: 2px solid var(--accent); border-radius: 16px; padding: 1.5rem; display: flex; flex-direction: column; align-items: center; gap: 1rem; position: relative;">
                       <div style="position: absolute; top: 20px; width: 100px; height: 60px; background: linear-gradient(135deg, var(--accent), var(--accent-hover)); border-radius: 12px; display: flex; align-items: center; justify-content: center; gap: 0.5rem; font-size: 1.5rem; color: var(--bg-primary); box-shadow: 0 4px 12px rgba(125, 211, 192, 0.4); animation: float 3s ease-in-out infinite;">
-                          <i class="fas fa-fish"></i>
+                          <img src="logo.png" alt="Veltra" style="width: 30px; height: 30px; object-fit: contain;">
                           <i class="fas fa-user-plus" style="font-size: 1.2rem;"></i>
                       </div>
                       <div style="display: flex; flex-direction: column; gap: 0.5rem; width: 100%; margin-top: 4rem;">
@@ -7270,7 +7270,7 @@ alt="favicon">
         <div class="about-app-container" style="padding: 1.75rem 1.25rem 4rem; max-height: 80vh; overflow: auto; display: flex; flex-direction: column; box-sizing: border-box;">
           <div class="about-header" style="display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: 2rem; padding-top: 0.25rem;">
             <div style="width: 100px; height: 100px; background: linear-gradient(135deg, var(--accent), var(--accent-hover)); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; animation: float 3s ease-in-out infinite;">
-              <i class="fas fa-fish" style="font-size: 3rem; color: var(--bg-primary);"></i>
+              <img src="logo.png" alt="Veltra" style="width: 60px; height: 60px; object-fit: contain;">
             </div>
             <h1 style="font-size: 2rem; margin-bottom: 0; color: var(--text-primary); font-family: fontb; text-align: center; width: 100%;">Veltra</h1>
             <p style="color: var(--text-secondary); font-size: 1rem; margin: 0; text-align: center; width: 100%;">Version 1.5</p>
@@ -11033,7 +11033,7 @@ function createBrowserTab() {
   viewEl.dataset.viewId = newTab.id;
   viewEl.innerHTML = `
               <div class="browser-landing">
-                  <i class="fas fa-fish browser-landing-logo"></i>
+                  <img src="logo.png" alt="Veltra" class="browser-landing-logo" style="width: 80px; height: 80px; object-fit: contain;">
                   <div class="browser-landing-search">
                       <i class="fas fa-search"></i>
                       <input
@@ -14887,7 +14887,7 @@ let achievementsData = {
       id: "first-login",
       name: "Welcome Aboard!",
       description: "Successfully log in to Veltra for the first time",
-      icon: "fa-fish",
+      icon: "fa-star",
       unlocked: false,
       unlockedDate: null,
     },
@@ -21364,7 +21364,7 @@ async function resetWispUrl() {
   const input = document.getElementById('wispUrlInput');
   if (input) input.value = defaultUrl;
   
-  const icons = { Firebase: 'fa-cloud-download-alt', Community: 'fa-fish', default: 'fa-undo' };
+  const icons = { Firebase: 'fa-cloud-download-alt', Community: 'fa-users', default: 'fa-undo' };
   showToast(`Wisp URL synced from ${source}!`, icons[source]);
 }
 

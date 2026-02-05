@@ -526,6 +526,110 @@
             font-size: 0.9rem;
         }
 
+        /* Request Chat View */
+        .request-chat-view {
+            display: flex;
+            flex-direction: column;
+            height: 400px;
+            background: rgba(21, 25, 35, 0.4);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .request-chat-header {
+            padding: 1rem;
+            background: rgba(30, 35, 48, 0.8);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .request-chat-header .back-btn {
+            background: transparent;
+            border: 1px solid rgba(125, 211, 192, 0.3);
+            color: #7dd3c0;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+            margin-bottom: 0.75rem;
+        }
+
+        .request-chat-header .back-btn:hover {
+            background: rgba(125, 211, 192, 0.1);
+        }
+
+        .request-chat-header .request-info {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+        }
+
+        .request-chat-header h3 {
+            font-size: 1rem;
+            color: #e0e0e0;
+            margin: 0;
+        }
+
+        .request-description {
+            padding: 1rem;
+            background: rgba(30, 35, 48, 0.4);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .request-description p {
+            color: #aaa;
+            font-size: 0.85rem;
+            margin: 0 0 0.5rem 0;
+        }
+
+        .request-messages {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .request-chat-input {
+            display: flex;
+            gap: 0.5rem;
+            padding: 0.75rem;
+            background: rgba(30, 35, 48, 0.6);
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .request-chat-input input {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            background: rgba(21, 25, 35, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            color: #e0e0e0;
+            font-size: 0.9rem;
+        }
+
+        .request-chat-input input:focus {
+            outline: none;
+            border-color: #7dd3c0;
+        }
+
+        .request-chat-input button {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #7dd3c0, #5ec4ab);
+            border: none;
+            border-radius: 50%;
+            color: #0a0e1a;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .request-chat-input button:hover {
+            transform: scale(1.05);
+        }
+
         /* FAQ Section */
         .faq-list {
             display: flex;
@@ -949,7 +1053,7 @@
                 </div>
                 <div class="chat-messages" id="chatMessages">
                     <div class="chat-message bot">
-                        <strong>Hey there! 👋</strong><br><br>
+                        <strong>Hey there! <i class="fas fa-hand-wave" style="color: #fbbf24;"></i></strong><br><br>
                         I'm Veltra AI, your personal assistant. I can help you with:
                         <ul style="margin: 0.5rem 0 0 1rem;">
                             <li>Using Veltra features and apps</li>
@@ -1370,9 +1474,112 @@
         }
 
         function viewRequest(id) {
-            // Could open a detailed view or chat for this request
-            if (window.parent && window.parent.showToast) {
-                window.parent.showToast('Request details coming soon!', 'fa-info-circle');
+            // Open a live chat view for this specific request
+            openRequestChat(id);
+        }
+        
+        async function openRequestChat(requestId) {
+            // Fetch request details
+            let request = null;
+            try {
+                const response = await fetch(`${SUPPORT_FIREBASE_URL}/requests/${requestId}.json`);
+                if (response.ok) {
+                    request = await response.json();
+                    request.id = requestId;
+                }
+            } catch (err) {
+                console.error('Failed to fetch request:', err);
+            }
+            
+            if (!request) {
+                if (window.parent && window.parent.showToast) {
+                    window.parent.showToast('Could not load request details', 'fa-exclamation-circle');
+                }
+                return;
+            }
+            
+            // Hide my requests list and show chat view
+            const container = document.getElementById('requestsList');
+            container.innerHTML = `
+                <div class="request-chat-view">
+                    <div class="request-chat-header">
+                        <button class="back-btn" onclick="loadMyRequests()">
+                            <i class="fas fa-arrow-left"></i> Back to Requests
+                        </button>
+                        <div class="request-info">
+                            <h3>${escapeHtml(request.title)}</h3>
+                            <span class="request-status ${request.status}">${request.status.replace('-', ' ')}</span>
+                        </div>
+                    </div>
+                    <div class="request-description">
+                        <p>${escapeHtml(request.description || 'No description provided.')}</p>
+                        <div class="request-meta">
+                            <span><i class="fas fa-${request.type === 'bug' ? 'bug' : request.type === 'feature' ? 'lightbulb' : 'heart'}"></i> ${request.type}</span>
+                            <span><i class="far fa-clock"></i> ${formatTimeAgo(request.createdAt)}</span>
+                        </div>
+                    </div>
+                    <div class="request-messages" id="requestMessages"></div>
+                    <div class="request-chat-input">
+                        <input type="text" id="requestChatInput" placeholder="Send a message about this request..." onkeypress="if(event.key==='Enter')sendRequestMessage('${requestId}')">
+                        <button onclick="sendRequestMessage('${requestId}')"><i class="fas fa-paper-plane"></i></button>
+                    </div>
+                </div>
+            `;
+            
+            // Load existing messages for this request
+            loadRequestMessages(requestId);
+        }
+        
+        async function loadRequestMessages(requestId) {
+            const container = document.getElementById('requestMessages');
+            try {
+                const response = await fetch(`${SUPPORT_FIREBASE_URL}/requests/${requestId}/messages.json`);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data) {
+                        const messages = Object.entries(data).map(([id, msg]) => ({ id, ...msg }));
+                        messages.sort((a, b) => a.timestamp - b.timestamp);
+                        container.innerHTML = messages.map(msg => `
+                            <div class="chat-message ${msg.from === 'admin' ? 'bot' : 'user'}">
+                                ${msg.from === 'admin' ? `<div style="font-size: 0.75rem; color: var(--accent); margin-bottom: 0.25rem;"><i class="fas fa-shield-alt"></i> ${escapeHtml(msg.adminName || 'Support')}</div>` : ''}
+                                ${escapeHtml(msg.message)}
+                                <div style="font-size: 0.7rem; color: #666; margin-top: 0.25rem;">${formatTimeAgo(msg.timestamp)}</div>
+                            </div>
+                        `).join('');
+                        container.scrollTop = container.scrollHeight;
+                    } else {
+                        container.innerHTML = '<div style="text-align: center; color: #888; padding: 2rem;"><i class="fas fa-comments" style="font-size: 2rem; margin-bottom: 0.5rem;"></i><p>No messages yet. Send a message to get help from support.</p></div>';
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to load messages:', err);
+            }
+        }
+        
+        async function sendRequestMessage(requestId) {
+            const input = document.getElementById('requestChatInput');
+            const message = input.value.trim();
+            if (!message) return;
+            
+            input.value = '';
+            
+            try {
+                await fetch(`${SUPPORT_FIREBASE_URL}/requests/${requestId}/messages.json`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        from: 'user',
+                        username: currentUsername,
+                        message: message,
+                        timestamp: Date.now()
+                    })
+                });
+                loadRequestMessages(requestId);
+            } catch (err) {
+                console.error('Failed to send message:', err);
+                if (window.parent && window.parent.showToast) {
+                    window.parent.showToast('Failed to send message', 'fa-exclamation-circle');
+                }
             }
         }
 
@@ -1868,11 +2075,11 @@
                         // Rebuild chat with all messages including admin ones
                         let html = `
                             <div class="chat-message bot">
-                                <strong>Hey there! 👋</strong><br><br>
+                                <strong>Hey there! <i class="fas fa-hand-wave" style="color: #fbbf24;"></i></strong><br><br>
                                 I'm Veltra AI, your personal assistant. I can help you with:<br>
-                                • Using Veltra features and apps<br>
-                                • Troubleshooting issues<br>
-                                • Customizing your experience<br><br>
+                                <i class="fas fa-check" style="color: var(--accent); margin-right: 0.5rem;"></i>Using Veltra features and apps<br>
+                                <i class="fas fa-check" style="color: var(--accent); margin-right: 0.5rem;"></i>Troubleshooting issues<br>
+                                <i class="fas fa-check" style="color: var(--accent); margin-right: 0.5rem;"></i>Customizing your experience<br><br>
                                 How can I help you today?
                             </div>
                         `;

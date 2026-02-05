@@ -1,4 +1,4 @@
-// ==================== VELTRA FIREBASE BACKEND CONFIG ====================
+﻿// ==================== VELTRA FIREBASE BACKEND CONFIG ====================
 // Note: VELTRA_FIREBASE_URL and FALLBACK_WISP_URL
 // are declared in index.html's inline script to ensure early availability
 
@@ -3549,17 +3549,17 @@ function generateNeofetch() {
   const folderCount = countFolders(fileSystem);
   
   const logo = [
-    '       <span style="color:#3b82f6;">â-ˆâ-ˆâ-ˆâ-—   â-ˆâ-ˆâ-— â-ˆâ-ˆâ-ˆâ-ˆâ-ˆâ-ˆâ-— â-ˆâ-ˆâ-ˆâ-ˆâ-ˆâ-ˆâ-ˆâ-—</span>',
-    '       <span style="color:#3b82f6;">â-ˆâ-ˆâ-ˆâ-ˆâ-—  â-ˆâ-ˆâ-'â-ˆâ-ˆâ-"â-â-â-â-ˆâ-ˆâ-—â-ˆâ-ˆâ-"â-â-â-â-â-</span>',
-    '       <span style="color:#60a5fa;">â-ˆâ-ˆâ-"â-ˆâ-ˆâ-— â-ˆâ-ˆâ-'â-ˆâ-ˆâ-'   â-ˆâ-ˆâ-'â-ˆâ-ˆâ-ˆâ-ˆâ-ˆâ-ˆâ-ˆâ-—</span>',
-    '       <span style="color:#60a5fa;">â-ˆâ-ˆâ-'â-šâ-ˆâ-ˆâ-—â-ˆâ-ˆâ-'â-ˆâ-ˆâ-'   â-ˆâ-ˆâ-'â-šâ-â-â-â-â-ˆâ-ˆâ-'</span>',
-    '       <span style="color:#93c5fd;">â-ˆâ-ˆâ-' â-šâ-ˆâ-ˆâ-ˆâ-ˆâ-'â-šâ-ˆâ-ˆâ-ˆâ-ˆâ-ˆâ-ˆâ-"â-â-ˆâ-ˆâ-ˆâ-ˆâ-ˆâ-ˆâ-ˆâ-'</span>',
-    '       <span style="color:#93c5fd;">â-šâ-â-  â-šâ-â-â-â- â-šâ-â-â-â-â-â- â-šâ-â-â-â-â-â-â-</span>',
+    '       <span style="color:#3b82f6;">███╗   ██╗ ██████╗ ███████╗</span>',
+    '       <span style="color:#3b82f6;">████╗  ██║██╔═══██╗██╔════╝</span>',
+    '       <span style="color:#60a5fa;">██╔██╗ ██║██║   ██║███████╗</span>',
+    '       <span style="color:#60a5fa;">██║╚██╗██║██║   ██║╚════██║</span>',
+    '       <span style="color:#93c5fd;">██║ ╚████║╚██████╔╝███████║</span>',
+    '       <span style="color:#93c5fd;">╚═╝  ╚═══╝ ╚═════╝ ╚══════╝</span>',
   ];
   
   const info = [
     `<span style="color:#3b82f6;">${currentUsername}@Veltra</span>`,
-    '<span style="color:#888;">â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€</span>',
+    '<span style="color:#888;">─────────────────────</span>',
     `<span style="color:#3b82f6;">OS:</span> Veltra v1.5`,
     `<span style="color:#3b82f6;">Host:</span> ${os}`,
     `<span style="color:#3b82f6;">Browser:</span> ${browser}`,

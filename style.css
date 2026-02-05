@@ -8441,3 +8441,225 @@ select {
     position: relative;
     z-index: 1;
 }
+/* ==================== STARTUP ANIMATION ==================== */
+.startup-animation {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #0a0e1a 0%, #0d1321 50%, #0a0e1a 100%);
+    opacity: 1;
+    transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+}
+
+.startup-animation.fade-out {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.startup-animation.hidden {
+    display: none;
+}
+
+.startup-bg {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+}
+
+.startup-particle {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    background: var(--accent);
+    border-radius: 50%;
+    opacity: 0;
+    animation: startupParticle 3s ease-in-out infinite;
+}
+
+.startup-particle:nth-child(1) { left: 10%; top: 20%; animation-delay: 0s; }
+.startup-particle:nth-child(2) { left: 20%; top: 80%; animation-delay: 0.4s; }
+.startup-particle:nth-child(3) { left: 40%; top: 10%; animation-delay: 0.8s; }
+.startup-particle:nth-child(4) { left: 60%; top: 70%; animation-delay: 1.2s; }
+.startup-particle:nth-child(5) { left: 80%; top: 30%; animation-delay: 1.6s; }
+.startup-particle:nth-child(6) { left: 90%; top: 60%; animation-delay: 2s; }
+.startup-particle:nth-child(7) { left: 30%; top: 50%; animation-delay: 2.4s; }
+.startup-particle:nth-child(8) { left: 70%; top: 90%; animation-delay: 2.8s; }
+
+@keyframes startupParticle {
+    0% {
+        opacity: 0;
+        transform: translateY(50px) scale(0);
+    }
+    50% {
+        opacity: 0.8;
+        transform: translateY(-20px) scale(1.5);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(-100px) scale(0);
+    }
+}
+
+.startup-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    z-index: 1;
+}
+
+.startup-logo-container {
+    position: relative;
+    width: 160px;
+    height: 160px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 2rem;
+}
+
+.startup-logo-ring {
+    position: absolute;
+    inset: 0;
+    border: 2px solid transparent;
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: startupRingSpin 2s linear infinite;
+}
+
+.startup-logo-ring.delay-1 {
+    inset: 10px;
+    border-top-color: rgba(94, 234, 212, 0.6);
+    animation-direction: reverse;
+    animation-duration: 3s;
+}
+
+.startup-logo-ring.delay-2 {
+    inset: 20px;
+    border-top-color: rgba(94, 234, 212, 0.3);
+    animation-duration: 4s;
+}
+
+@keyframes startupRingSpin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.startup-logo {
+    position: relative;
+    width: 100px;
+    height: 100px;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 
+        0 0 60px rgba(94, 234, 212, 0.4),
+        0 0 100px rgba(94, 234, 212, 0.2),
+        inset 0 0 30px rgba(255, 255, 255, 0.1);
+    animation: startupLogoPulse 2s ease-in-out infinite;
+}
+
+.startup-logo i {
+    font-size: 3rem;
+    color: var(--bg-primary);
+    animation: startupLogoFloat 3s ease-in-out infinite;
+}
+
+@keyframes startupLogoPulse {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 
+            0 0 60px rgba(94, 234, 212, 0.4),
+            0 0 100px rgba(94, 234, 212, 0.2);
+    }
+    50% {
+        transform: scale(1.05);
+        box-shadow: 
+            0 0 80px rgba(94, 234, 212, 0.5),
+            0 0 120px rgba(94, 234, 212, 0.3);
+    }
+}
+
+@keyframes startupLogoFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+}
+
+.startup-title {
+    font-family: fontb, sans-serif;
+    font-size: 3.5rem;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+    letter-spacing: 0.1em;
+    text-shadow: 0 0 30px rgba(94, 234, 212, 0.3);
+    animation: startupTitleFade 1s ease-out 0.3s both;
+}
+
+.startup-subtitle {
+    font-family: font, sans-serif;
+    font-size: 1.1rem;
+    color: var(--text-secondary);
+    margin-bottom: 2rem;
+    animation: startupTitleFade 1s ease-out 0.5s both;
+}
+
+@keyframes startupTitleFade {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.startup-progress {
+    width: 200px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    overflow: hidden;
+    animation: startupTitleFade 1s ease-out 0.7s both;
+}
+
+.startup-progress-bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent), var(--accent-hover), var(--accent));
+    background-size: 200% 100%;
+    border-radius: 2px;
+    animation: 
+        startupProgressFill 2.5s cubic-bezier(0.4, 0, 0.2, 1) 0.8s forwards,
+        startupProgressShimmer 1.5s linear infinite;
+}
+
+@keyframes startupProgressFill {
+    from { width: 0%; }
+    to { width: 100%; }
+}
+
+@keyframes startupProgressShimmer {
+    from { background-position: -200% 0; }
+    to { background-position: 200% 0; }
+}
+
+/* Respect fast mode for startup animation */
+body.fast-mode .startup-animation {
+    transition: none !important;
+}
+
+body.fast-mode .startup-animation * {
+    animation-duration: 0.1s !important;
+}
+
+/* Skip startup animation setting */
+.startup-animation.skip-animation {
+    display: none;
+}

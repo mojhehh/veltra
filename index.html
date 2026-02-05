@@ -55,6 +55,35 @@
 </head>
 
 <body>
+    <!-- Startup Animation -->
+    <div id="startupAnimation" class="startup-animation">
+        <div class="startup-bg">
+            <div class="startup-particle"></div>
+            <div class="startup-particle"></div>
+            <div class="startup-particle"></div>
+            <div class="startup-particle"></div>
+            <div class="startup-particle"></div>
+            <div class="startup-particle"></div>
+            <div class="startup-particle"></div>
+            <div class="startup-particle"></div>
+        </div>
+        <div class="startup-content">
+            <div class="startup-logo-container">
+                <div class="startup-logo-ring"></div>
+                <div class="startup-logo-ring delay-1"></div>
+                <div class="startup-logo-ring delay-2"></div>
+                <div class="startup-logo">
+                    <i class="fas fa-fish"></i>
+                </div>
+            </div>
+            <h1 class="startup-title">Veltra</h1>
+            <p class="startup-subtitle">Initializing your workspace...</p>
+            <div class="startup-progress">
+                <div class="startup-progress-bar"></div>
+            </div>
+        </div>
+    </div>
+
     <div id="bootloader">
         <div class="boot-logo"><i class="fas fa-fish"></i></div>
         <h1 class="boot-title"><b>Veltra</b></h1>
@@ -465,6 +494,12 @@
             </div>
             <div class="desktop-icon" ondblclick="openApp('about')" data-app="about">
                 <i class="fas fa-info-circle"></i> <span>About Veltra</span>
+            </div>
+            <div class="desktop-icon" ondblclick="openApp('support')" data-app="support">
+                <i class="fas fa-headset"></i> <span>Support Center</span>
+            </div>
+            <div class="desktop-icon" ondblclick="openApp('walkthrough')" data-app="walkthrough">
+                <i class="fas fa-map-signs"></i> <span>Welcome Guide</span>
             </div>
         </div>
         <div id="taskbar" class="taskbar">

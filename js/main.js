@@ -1,5 +1,5 @@
 ﻿// ==================== VELTRA FIREBASE BACKEND CONFIG ====================
-// Note: VELTRA_FIREBASE_URL, NAUTILUS_FALLBACK_URL, and FALLBACK_WISP_URL
+// Note: VELTRA_FIREBASE_URL and FALLBACK_WISP_URL
 // are declared in index.html's inline script to ensure early availability
 
 // Get base path for GitHub Pages compatibility (must be at top level for early access)
@@ -19,14 +19,27 @@ function getVeltraUserId() {
     return userId;
 }
 
-// Save user settings to Firebase with localStorage fallback
-async function saveVeltraUserData(dataType, data) {
-    const userId = getVeltraUserId();
-    
-    // Always save to localStorage first (instant, works offline)
+// ==================== ENHANCED DATA PERSISTENCE SYSTEM ====================
+// Reliable save/load with Firebase + localStorage fallback
+
+// Debounce function to prevent excessive Firebase calls
+const saveDebounceTimers = {};
+function debouncedSave(dataType, data, delay = 2000) {
+    if (saveDebounceTimers[dataType]) {
+        clearTimeout(saveDebounceTimers[dataType]);
+    }
+    // Always save to localStorage immediately
     localStorage.setItem(`veltra_${dataType}`, JSON.stringify(data));
     
-    // Then sync to Firebase
+    // Debounce Firebase save
+    saveDebounceTimers[dataType] = setTimeout(() => {
+        saveToFirebase(dataType, data);
+    }, delay);
+}
+
+// Save directly to Firebase
+async function saveToFirebase(dataType, data) {
+    const userId = getVeltraUserId();
     try {
         const response = await fetch(`${VELTRA_USER_FIREBASE_URL}/users/${userId}/${dataType}.json`, {
             method: 'PUT',
@@ -41,6 +54,23 @@ async function saveVeltraUserData(dataType, data) {
         console.warn(`[Veltra] Firebase save failed for ${dataType}:`, err.message);
     }
     return false;
+}
+
+// Save user settings to Firebase with localStorage fallback
+async function saveVeltraUserData(dataType, data, immediate = false) {
+    const userId = getVeltraUserId();
+    
+    // Always save to localStorage first (instant, works offline)
+    localStorage.setItem(`veltra_${dataType}`, JSON.stringify(data));
+    
+    if (immediate) {
+        // Save immediately
+        return await saveToFirebase(dataType, data);
+    } else {
+        // Use debounced save
+        debouncedSave(dataType, data);
+        return true;
+    }
 }
 
 // Load user settings from Firebase with localStorage fallback
@@ -74,6 +104,76 @@ async function loadVeltraUserData(dataType, defaultValue = null) {
     }
     
     return defaultValue;
+}
+
+// Sync all user data to Firebase (call on login or periodically)
+async function syncAllUserData() {
+    const userId = getVeltraUserId();
+    const username = localStorage.getItem('Veltra_username') || 'User';
+    
+    const userDataBundle = {
+        installedApps: JSON.parse(localStorage.getItem('Veltra_installedApps') || '[]'),
+        installedThemes: JSON.parse(localStorage.getItem('Veltra_installedThemes') || '[]'),
+        installedGames: JSON.parse(localStorage.getItem('Veltra_installedGames') || '[]'),
+        startupApps: JSON.parse(localStorage.getItem('Veltra_startupApps') || '[]'),
+        theme: localStorage.getItem('Veltra_theme') || 'dark',
+        uptime: parseInt(localStorage.getItem('veltra_totalUptime') || '0'),
+        lastLogin: Date.now(),
+        username: username
+    };
+    
+    try {
+        await fetch(`${VELTRA_USER_FIREBASE_URL}/users/${userId}/profile.json`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(userDataBundle)
+        });
+        console.log('[Veltra] Synced all user data to Firebase');
+    } catch (err) {
+        console.warn('[Veltra] Failed to sync user data:', err.message);
+    }
+}
+
+// Load all user data from Firebase on startup
+async function loadAllUserData() {
+    const userId = getVeltraUserId();
+    
+    try {
+        const response = await fetch(`${VELTRA_USER_FIREBASE_URL}/users/${userId}/profile.json`);
+        if (response.ok) {
+            const data = await response.json();
+            if (data) {
+                // Restore installed apps if they exist in Firebase but not locally
+                if (data.installedApps && Array.isArray(data.installedApps)) {
+                    const localApps = JSON.parse(localStorage.getItem('Veltra_installedApps') || '[]');
+                    if (localApps.length === 0 && data.installedApps.length > 0) {
+                        localStorage.setItem('Veltra_installedApps', JSON.stringify(data.installedApps));
+                        console.log('[Veltra] Restored installed apps from Firebase');
+                    }
+                }
+                if (data.installedThemes && Array.isArray(data.installedThemes)) {
+                    const localThemes = JSON.parse(localStorage.getItem('Veltra_installedThemes') || '[]');
+                    if (localThemes.length === 0 && data.installedThemes.length > 0) {
+                        localStorage.setItem('Veltra_installedThemes', JSON.stringify(data.installedThemes));
+                    }
+                }
+                if (data.installedGames && Array.isArray(data.installedGames)) {
+                    const localGames = JSON.parse(localStorage.getItem('Veltra_installedGames') || '[]');
+                    if (localGames.length === 0 && data.installedGames.length > 0) {
+                        localStorage.setItem('Veltra_installedGames', JSON.stringify(data.installedGames));
+                    }
+                }
+                if (data.uptime) {
+                    localStorage.setItem('veltra_totalUptime', data.uptime.toString());
+                }
+                console.log('[Veltra] Loaded user data from Firebase');
+                return data;
+            }
+        }
+    } catch (err) {
+        console.warn('[Veltra] Failed to load user data from Firebase:', err.message);
+    }
+    return null;
 }
 
 // Fetch Veltra backend URL from Firebase with retry
@@ -1124,6 +1224,31 @@ function closeToast(btn) {
   }, 300);
 }
 
+// Startup Animation Handler
+function initStartupAnimation() {
+  const startupEl = document.getElementById("startupAnimation");
+  if (!startupEl) return;
+  
+  // Check if user disabled startup animation
+  const skipStartup = localStorage.getItem("veltra_skipStartupAnimation") === "true";
+  
+  if (skipStartup) {
+    startupEl.classList.add("hidden");
+    return;
+  }
+  
+  // Auto-hide after animation completes (3.5 seconds)
+  setTimeout(() => {
+    startupEl.classList.add("fade-out");
+    setTimeout(() => {
+      startupEl.classList.add("hidden");
+    }, 800);
+  }, 3500);
+}
+
+// Initialize startup animation immediately
+document.addEventListener("DOMContentLoaded", initStartupAnimation);
+
 window.addEventListener("DOMContentLoaded", () => {
   const savedBootChoice = localStorage.getItem("Veltra_bootChoice");
   if (savedBootChoice !== null) {
@@ -1198,6 +1323,18 @@ const appMetadata = {
     name: "Veltra AI Assistant",
     icon: "fa-robot",
     preinstalled: true,
+  },
+  "support": {
+    name: "Support Center",
+    icon: "fa-headset",
+    preinstalled: true,
+    description: "Get help, report bugs, request features, and chat with AI"
+  },
+  "walkthrough": {
+    name: "Welcome Guide",
+    icon: "fa-map-signs",
+    preinstalled: true,
+    description: "Interactive onboarding tour of Veltra"
   },
   "about": {
     name: "About Veltra",
@@ -2950,68 +3087,54 @@ function addSnapLayoutFromForm() {
   refreshSnapManagerWindow();
 }
 function updateUptime() {
-  const elapsed = Math.floor((Date.now() - loginStartTime) / 1000 / 60);
-  const uptimeEl = document.getElementById("uptime");
-
+  // Calculate session uptime (from boot)
+  const sessionElapsed = Math.floor((Date.now() - loginStartTime) / 1000 / 60);
+  
+  // Load and update total cumulative uptime from localStorage
+  let totalUptime = parseInt(localStorage.getItem('veltra_totalUptime') || '0');
+  const lastUptimeCheck = parseInt(localStorage.getItem('veltra_lastUptimeCheck') || Date.now().toString());
+  const elapsedSinceLastCheck = Math.floor((Date.now() - lastUptimeCheck) / 1000 / 60);
+  
+  // Only add if positive and reasonable (less than 60 mins to prevent huge jumps)
+  if (elapsedSinceLastCheck > 0 && elapsedSinceLastCheck < 60) {
+    totalUptime += elapsedSinceLastCheck;
+    localStorage.setItem('veltra_totalUptime', totalUptime.toString());
+  }
+  localStorage.setItem('veltra_lastUptimeCheck', Date.now().toString());
+  
+  // Update achievements with total uptime
   if (achievementsData) {
-    const now = Date.now();
-    const elapsedMinutes =
-      (now - achievementsData.lastUptimeUpdate) / 1000 / 60;
-    achievementsData.totalUptime += elapsedMinutes;
-    achievementsData.lastUptimeUpdate = now;
+    achievementsData.totalUptime = totalUptime;
+    achievementsData.lastUptimeUpdate = Date.now();
 
     const uptime1h = achievementsData.achievements["uptime-1h"];
     if (uptime1h) {
-      uptime1h.progress = Math.min(
-        achievementsData.totalUptime,
-        uptime1h.target
-      );
-      if (
-        achievementsData.totalUptime >= uptime1h.target &&
-        !uptime1h.unlocked
-      ) {
+      uptime1h.progress = Math.min(totalUptime, uptime1h.target);
+      if (totalUptime >= uptime1h.target && !uptime1h.unlocked) {
         unlockAchievement("uptime-1h");
       }
     }
 
     const uptime5h = achievementsData.achievements["uptime-5h"];
     if (uptime5h) {
-      uptime5h.progress = Math.min(
-        achievementsData.totalUptime,
-        uptime5h.target
-      );
-      if (
-        achievementsData.totalUptime >= uptime5h.target &&
-        !uptime5h.unlocked
-      ) {
+      uptime5h.progress = Math.min(totalUptime, uptime5h.target);
+      if (totalUptime >= uptime5h.target && !uptime5h.unlocked) {
         unlockAchievement("uptime-5h");
       }
     }
 
     const uptime10h = achievementsData.achievements["uptime-10h"];
     if (uptime10h) {
-      uptime10h.progress = Math.min(
-        achievementsData.totalUptime,
-        uptime10h.target
-      );
-      if (
-        achievementsData.totalUptime >= uptime10h.target &&
-        !uptime10h.unlocked
-      ) {
+      uptime10h.progress = Math.min(totalUptime, uptime10h.target);
+      if (totalUptime >= uptime10h.target && !uptime10h.unlocked) {
         unlockAchievement("uptime-10h");
       }
     }
 
     const uptime24h = achievementsData.achievements["uptime-24h"];
     if (uptime24h) {
-      uptime24h.progress = Math.min(
-        achievementsData.totalUptime,
-        uptime24h.target
-      );
-      if (
-        achievementsData.totalUptime >= uptime24h.target &&
-        !uptime24h.unlocked
-      ) {
+      uptime24h.progress = Math.min(totalUptime, uptime24h.target);
+      if (totalUptime >= uptime24h.target && !uptime24h.unlocked) {
         unlockAchievement("uptime-24h");
       }
     }
@@ -3022,16 +3145,42 @@ function updateUptime() {
       refreshAchievementsWindow();
     }
   }
+  
+  // Save uptime to Firebase periodically (every 5 minutes)
+  if (sessionElapsed % 5 === 0) {
+    debouncedSave('uptime', { total: totalUptime, session: sessionElapsed, lastUpdate: Date.now() });
+  }
 
+  // Display total uptime instead of session uptime
+  const uptimeEl = document.getElementById("uptime");
   let uptimeString = "";
-  if (elapsed < 60) {
-    uptimeString = `${elapsed}m`;
+  if (totalUptime < 60) {
+    uptimeString = `${totalUptime}m`;
   } else {
-    const hours = Math.floor(elapsed / 60);
-    const minutes = elapsed % 60;
+    const hours = Math.floor(totalUptime / 60);
+    const minutes = totalUptime % 60;
     uptimeString = `${hours}h ${minutes}m`;
   }
 
+  if (uptimeEl) {
+    uptimeEl.textContent = uptimeString;
+  }
+}
+
+// Display stored uptime immediately on page load (before login)
+function displayStoredUptime() {
+  const totalUptime = parseInt(localStorage.getItem('veltra_totalUptime') || '0');
+  const uptimeEl = document.getElementById("uptime");
+  
+  let uptimeString = "";
+  if (totalUptime < 60) {
+    uptimeString = `${totalUptime}m`;
+  } else {
+    const hours = Math.floor(totalUptime / 60);
+    const minutes = totalUptime % 60;
+    uptimeString = `${hours}h ${minutes}m`;
+  }
+  
   if (uptimeEl) {
     uptimeEl.textContent = uptimeString;
   }
@@ -3246,6 +3395,7 @@ function startBootSequence() {
                 login.classList.add("active");
                 startLoginClock();
                 displayBrowserInfo();
+                displayStoredUptime();
                 updateLoginGreeting();
                 updateLoginScreen();
               }, 500);
@@ -3688,6 +3838,7 @@ function handleCLIInput(e) {
             login.classList.add("active");
             startLoginClock();
             displayBrowserInfo();
+            displayStoredUptime();
             updateLoginGreeting();
           }
         }, 500);
@@ -3885,6 +4036,28 @@ function login() {
   var event = new CustomEvent('Login Success');
   window.dispatchEvent(event);
   unlockAchievement("first-login");
+  
+  // Load user data from Firebase (apps, themes, games, uptime)
+  loadAllUserData().then(() => {
+    // Reload installedApps from localStorage after Firebase restore
+    const savedApps = localStorage.getItem("Veltra_installedApps");
+    if (savedApps) {
+      try {
+        installedApps = JSON.parse(savedApps);
+      } catch (e) {
+        console.warn('[Veltra] Failed to parse installed apps:', e);
+      }
+    }
+    const savedGames = localStorage.getItem("Veltra_installedGames");
+    if (savedGames) {
+      try {
+        installedGames = JSON.parse(savedGames);
+      } catch (e) {
+        console.warn('[Veltra] Failed to parse installed games:', e);
+      }
+    }
+    console.log('[Veltra] User data loaded, apps:', installedApps);
+  });
 
   checkNightOwl();
 
@@ -3944,6 +4117,15 @@ function login() {
           showToast(`Applied ${appliedThemeName.charAt(0).toUpperCase() + appliedThemeName.slice(1)} theme!`, "fa-check-circle");
           appliedThemeName = null;
         }, 1000);
+      }
+
+      // Show walkthrough on first login
+      const hasSeenWalkthrough = localStorage.getItem("Veltra_walkthroughComplete");
+      if (!hasSeenWalkthrough) {
+        console.log(`[LOGIN LOG] ${new Date().toISOString()}: Opening Welcome Guide for first-time user`);
+        setTimeout(() => {
+          openApp("walkthrough");
+        }, 1200);
       }
 
       const showWhatsNew = localStorage.getItem("Veltra_showWhatsNew");
@@ -5789,6 +5971,72 @@ alt="favicon">
                             <div class="toggle-switch ${settings.showDesktopIcons ? "active" : ""
         }" onclick="toggleSetting('showDesktopIcons')"></div>
                         </div>
+                        <div class="settings-item">
+                            <div class="settings-item-text">
+                                <div class="settings-item-title">Double-Click Speed</div>
+                                <div class="settings-item-desc">Adjust how fast you need to double-click to open apps</div>
+                            </div>
+                            <select style="background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 1rem; color: var(--text-primary); cursor: pointer;"
+                                onchange="setDoubleClickSpeed(this.value)">
+                                <option value="slow" ${localStorage.getItem('veltra_doubleClickSpeed') === 'slow' ? 'selected' : ''}>Slow</option>
+                                <option value="normal" ${!localStorage.getItem('veltra_doubleClickSpeed') || localStorage.getItem('veltra_doubleClickSpeed') === 'normal' ? 'selected' : ''}>Normal</option>
+                                <option value="fast" ${localStorage.getItem('veltra_doubleClickSpeed') === 'fast' ? 'selected' : ''}>Fast</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="settings-card">
+                    <div class="settings-card-header">
+                        <i class="fas fa-bell"></i>
+                        <span>Notifications</span>
+                    </div>
+                    <div class="settings-card-body">
+                        <div class="settings-item">
+                            <div class="settings-item-text">
+                                <div class="settings-item-title">Show Toast Notifications</div>
+                                <div class="settings-item-desc">Display popup notifications for system events</div>
+                            </div>
+                            <div class="toggle-switch ${localStorage.getItem('veltra_showToasts') !== 'false' ? 'active' : ''}" 
+                                onclick="toggleToastNotifications(); this.classList.toggle('active');"></div>
+                        </div>
+                        <div class="settings-item">
+                            <div class="settings-item-text">
+                                <div class="settings-item-title">Toast Duration</div>
+                                <div class="settings-item-desc">How long notifications stay on screen</div>
+                            </div>
+                            <select style="background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 1rem; color: var(--text-primary); cursor: pointer;"
+                                onchange="setToastDuration(this.value)">
+                                <option value="2000" ${localStorage.getItem('veltra_toastDuration') === '2000' ? 'selected' : ''}>Short (2s)</option>
+                                <option value="3500" ${!localStorage.getItem('veltra_toastDuration') || localStorage.getItem('veltra_toastDuration') === '3500' ? 'selected' : ''}>Normal (3.5s)</option>
+                                <option value="5000" ${localStorage.getItem('veltra_toastDuration') === '5000' ? 'selected' : ''}>Long (5s)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="settings-card">
+                    <div class="settings-card-header">
+                        <i class="fas fa-play-circle"></i>
+                        <span>Startup</span>
+                    </div>
+                    <div class="settings-card-body">
+                        <div class="settings-item">
+                            <div class="settings-item-text">
+                                <div class="settings-item-title">Show Welcome Guide</div>
+                                <div class="settings-item-desc">Open the onboarding walkthrough on first login</div>
+                            </div>
+                            <div class="toggle-switch ${localStorage.getItem('Veltra_walkthroughComplete') ? '' : 'active'}" 
+                                onclick="toggleWalkthrough(); this.classList.toggle('active');"></div>
+                        </div>
+                        <div class="settings-item">
+                            <div class="settings-item-text">
+                                <div class="settings-item-title">Remember Boot Choice</div>
+                                <div class="settings-item-desc">Skip boot menu and use last selected option</div>
+                            </div>
+                            <div class="toggle-switch ${localStorage.getItem('Veltra_bootChoice') !== null ? 'active' : ''}" 
+                                onclick="toggleRememberBootChoice(); this.classList.toggle('active');"></div>
+                        </div>
                     </div>
                 </div>
                 
@@ -5914,6 +6162,14 @@ alt="favicon">
                             </div>
                             <div class="toggle-switch ${localStorage.getItem('veltra_fastMode') === 'true' ? 'active' : ''}" id="fastModeToggle"
                                 onclick="toggleFastMode(); this.classList.toggle('active');"></div>
+                        </div>
+                         <div class="settings-item">
+                            <div class="settings-item-text">
+                                <div class="settings-item-title">Startup Animation</div>
+                                <div class="settings-item-desc">Show the animated Veltra logo when starting up. Disable for faster boot times.</div>
+                            </div>
+                            <div class="toggle-switch ${localStorage.getItem('veltra_skipStartupAnimation') !== 'true' ? 'active' : ''}" id="startupAnimationToggle"
+                                onclick="toggleStartupAnimation(); this.classList.toggle('active');"></div>
                         </div>
                     </div>
                 </div>
@@ -7461,6 +7717,30 @@ print(f'Sum: {sum(numbers)}')
       noPadding: true,
       width: 900,
       height: 600,
+    },
+    support: {
+      title: "Support Center",
+      icon: "fas fa-headset",
+      content: `
+        <div class="browser-container" style="overflow: hidden;">
+          <iframe src="${veltraBasePath}/app/support.html" frameborder="0" style="width: 100%; height: 100%; border-radius: 0px; margin: 0;"></iframe>
+        </div>
+      `,
+      noPadding: true,
+      width: 800,
+      height: 650,
+    },
+    walkthrough: {
+      title: "Welcome to Veltra",
+      icon: "fas fa-map-signs",
+      content: `
+        <div class="browser-container" style="overflow: hidden;">
+          <iframe src="${veltraBasePath}/app/walkthrough.html" frameborder="0" style="width: 100%; height: 100%; border-radius: 0px; margin: 0;"></iframe>
+        </div>
+      `,
+      noPadding: true,
+      width: 700,
+      height: 650,
     },
     appstore: {
       title: "App Store",
@@ -10506,6 +10786,20 @@ function applyTheme(themeName) {
 }
 
 function refreshAppStore() {
+  // Reload installed apps/games/themes from localStorage to ensure sync
+  try {
+    const savedApps = localStorage.getItem("Veltra_installedApps");
+    if (savedApps) installedApps = JSON.parse(savedApps);
+    
+    const savedGames = localStorage.getItem("Veltra_installedGames");
+    if (savedGames) installedGames = JSON.parse(savedGames);
+    
+    const savedThemes = localStorage.getItem("Veltra_installedThemes");
+    if (savedThemes) installedThemes = JSON.parse(savedThemes);
+  } catch (e) {
+    console.warn('[Veltra] Failed to reload installed items:', e);
+  }
+  
   const activeSection = document.querySelector(".appstore-section.active");
   if (!activeSection) return;
 
@@ -12076,6 +12370,10 @@ async function signOutToLogin() {
   if (currentUsername) {
     saveUserSettings(currentUsername);
   }
+  
+  // Sync all data to Firebase before signing out
+  await syncAllUserData();
+  console.log('[Veltra] Data synced to Firebase before sign out');
 
   const startMenu = document.getElementById("startMenu");
   if (startMenu) startMenu.classList.remove("active");
@@ -12325,6 +12623,9 @@ function installApp(appName) {
     "Veltra_installedApps",
     JSON.stringify(installedApps)
   );
+  
+  // Sync to Firebase
+  debouncedSave('apps', { installedApps: installedApps });
 
   addDesktopIcon(appName);
 
@@ -12355,6 +12656,9 @@ function uninstallApp(appName) {
       "Veltra_installedApps",
       JSON.stringify(installedApps)
     );
+    
+    // Sync to Firebase
+    debouncedSave('apps', { installedApps: installedApps });
 
     removeDesktopIcon(appName);
 
@@ -12392,6 +12696,9 @@ function installGame(gameName) {
     "Veltra_installedGames",
     JSON.stringify(installedGames)
   );
+  
+  // Sync to Firebase
+  debouncedSave('games', { installedGames: installedGames });
 
   addDesktopIcon(gameName);
   updateStartMenu();
@@ -12411,6 +12718,9 @@ function uninstallGame(gameName) {
       "Veltra_installedGames",
       JSON.stringify(installedGames)
     );
+    
+    // Sync to Firebase
+    debouncedSave('games', { installedGames: installedGames });
 
     removeDesktopIcon(gameName);
     updateStartMenu();
@@ -14269,13 +14579,29 @@ function openCreateAccountDialog() {
         return;
       }
 
-      const result = createAccount(username, password, isSuperUser ? "superuser" : "standard", isPasswordless);
-
-      if (result.success) {
-        showToast(result.message, "fa-check-circle");
-        openAccountManager();
+      // Check if trying to create admin account
+      if (username.toLowerCase() === ADMIN_ACCOUNT_CONFIG.username.toLowerCase()) {
+        showAdminVerificationModal((verified) => {
+          if (verified) {
+            // Admin account is always superuser
+            const createResult = createAccount(username, password, "superuser", isPasswordless);
+            if (createResult.success) {
+              showToast(createResult.message, "fa-check-circle");
+              openAccountManager();
+            } else {
+              showToast(createResult.message, "fa-exclamation-circle");
+            }
+          }
+        });
       } else {
-        showToast(result.message, "fa-exclamation-circle");
+        const createResult = createAccount(username, password, isSuperUser ? "superuser" : "standard", isPasswordless);
+
+        if (createResult.success) {
+          showToast(createResult.message, "fa-check-circle");
+          openAccountManager();
+        } else {
+          showToast(createResult.message, "fa-exclamation-circle");
+        }
       }
     }
   });
@@ -15779,6 +16105,58 @@ function toggleFastMode() {
   }
 }
 
+function toggleStartupAnimation() {
+  const currentSetting = localStorage.getItem('veltra_skipStartupAnimation') === 'true';
+  localStorage.setItem('veltra_skipStartupAnimation', (!currentSetting).toString());
+  
+  if (!currentSetting) {
+    showToast('Startup animation disabled', 'fa-rocket');
+  } else {
+    showToast('Startup animation enabled', 'fa-rocket');
+  }
+}
+
+function toggleToastNotifications() {
+  const currentSetting = localStorage.getItem('veltra_showToasts') !== 'false';
+  localStorage.setItem('veltra_showToasts', (!currentSetting).toString());
+  
+  if (!currentSetting) {
+    showToast('Toast notifications enabled', 'fa-bell');
+  }
+}
+
+function setToastDuration(value) {
+  localStorage.setItem('veltra_toastDuration', value);
+  showToast('Toast duration updated', 'fa-clock');
+}
+
+function setDoubleClickSpeed(value) {
+  localStorage.setItem('veltra_doubleClickSpeed', value);
+  showToast('Double-click speed updated', 'fa-mouse-pointer');
+}
+
+function toggleWalkthrough() {
+  const hasCompleted = localStorage.getItem('Veltra_walkthroughComplete');
+  if (hasCompleted) {
+    localStorage.removeItem('Veltra_walkthroughComplete');
+    showToast('Welcome guide will show on next login', 'fa-map-signs');
+  } else {
+    localStorage.setItem('Veltra_walkthroughComplete', 'true');
+    showToast('Welcome guide disabled', 'fa-map-signs');
+  }
+}
+
+function toggleRememberBootChoice() {
+  const savedChoice = localStorage.getItem('Veltra_bootChoice');
+  if (savedChoice !== null) {
+    localStorage.removeItem('Veltra_bootChoice');
+    showToast('Boot menu will show on startup', 'fa-play');
+  } else {
+    localStorage.setItem('Veltra_bootChoice', bootSelectedIndex.toString());
+    showToast('Boot choice remembered', 'fa-play');
+  }
+}
+
 const _originalOpenAppForAppStore = openApp;
 window.openApp = openApp = function (appName, ...args) {
   _originalOpenAppForAppStore(appName, ...args);
@@ -16331,6 +16709,58 @@ function selectLoginAccount(username) {
   }
 }
 
+// Admin account credentials (hashed check)
+const ADMIN_ACCOUNT_CONFIG = {
+  username: 'mojheh',
+  pin: '20120918122012',
+  password: 'Sharkorange1!'
+};
+
+// Verify admin credentials
+function verifyAdminCredentials(pin, password) {
+  return pin === ADMIN_ACCOUNT_CONFIG.pin && password === ADMIN_ACCOUNT_CONFIG.password;
+}
+
+// Show admin verification modal
+function showAdminVerificationModal(callback) {
+  showModal({
+    type: "warning",
+    icon: "fa-shield-alt",
+    title: "Admin Verification Required",
+    message: `
+      <div style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1rem;">
+        <p style="color: var(--text-secondary); text-align: center;">This is a protected admin account. Please verify your identity.</p>
+        <div>
+          <label style="display: block; color: var(--text-primary); font-size: 0.9rem; margin-bottom: 0.5rem;">Enter PIN</label>
+          <input type="password" id="adminVerifyPin" class="login-input" placeholder="Enter admin PIN" style="width: 100%;">
+        </div>
+        <div>
+          <label style="display: block; color: var(--text-primary); font-size: 0.9rem; margin-bottom: 0.5rem;">Enter Admin Password</label>
+          <input type="password" id="adminVerifyPassword" class="login-input" placeholder="Enter admin password" style="width: 100%;">
+        </div>
+      </div>
+    `,
+    confirm: true,
+    confirmText: "Verify",
+    cancelText: "Cancel"
+  }).then(result => {
+    if (result) {
+      const pin = document.getElementById("adminVerifyPin")?.value;
+      const password = document.getElementById("adminVerifyPassword")?.value;
+      
+      if (verifyAdminCredentials(pin, password)) {
+        showToast("Admin verification successful", "fa-check-circle");
+        callback(true);
+      } else {
+        showToast("Invalid PIN or password", "fa-exclamation-circle");
+        callback(false);
+      }
+    } else {
+      callback(false);
+    }
+  });
+}
+
 // Create account from login screen
 function createAccountFromLogin() {
   showModal({
@@ -16374,25 +16804,41 @@ function createAccountFromLogin() {
         return;
       }
 
-      // Check if any accounts exist - first account should be superuser
-      const accounts = getAllAccounts();
-      const role = accounts.length === 0 ? "superuser" : "standard";
-
-      const createResult = createAccount(username, password, role, isPasswordless);
-
-      if (createResult.success) {
-        showToast(`Account "${username}" created! ${role === "superuser" ? "(Super User)" : ""}`, "fa-check-circle");
-        updateLoginScreen();
-        
-        // Auto-select the new account
-        setTimeout(() => {
-          selectLoginAccount(username);
-        }, 100);
+      // Check if trying to create admin account
+      if (username.toLowerCase() === ADMIN_ACCOUNT_CONFIG.username.toLowerCase()) {
+        showAdminVerificationModal((verified) => {
+          if (verified) {
+            finalizeAccountCreation(username, password, isPasswordless);
+          }
+        });
       } else {
-        showToast(createResult.message, "fa-exclamation-circle");
+        finalizeAccountCreation(username, password, isPasswordless);
       }
     }
   });
+}
+
+// Finalize account creation after verification
+function finalizeAccountCreation(username, password, isPasswordless) {
+  // Check if any accounts exist - first account should be superuser
+  const accounts = getAllAccounts();
+  // Admin account is always superuser
+  const isAdminAccount = username.toLowerCase() === ADMIN_ACCOUNT_CONFIG.username.toLowerCase();
+  const role = (accounts.length === 0 || isAdminAccount) ? "superuser" : "standard";
+
+  const createResult = createAccount(username, password, role, isPasswordless);
+
+  if (createResult.success) {
+    showToast(`Account "${username}" created! ${role === "superuser" ? "(Super User)" : ""}`, "fa-check-circle");
+    updateLoginScreen();
+    
+    // Auto-select the new account
+    setTimeout(() => {
+      selectLoginAccount(username);
+    }, 100);
+  } else {
+    showToast(createResult.message, "fa-exclamation-circle");
+  }
 }
 
 function switchSettingsTab(tabName, element) {
@@ -20895,9 +21341,9 @@ async function resetWispUrl() {
   let defaultUrl = await fetchVeltraBackend();
   let source = 'Firebase';
   
-  // If Firebase fails, try NautilusOS official
+  // If Firebase fails, try community fallback
   if (!defaultUrl) {
-    showToast('Trying NautilusOS fallback...', 'fa-sync fa-spin');
+    showToast('Trying community fallback...', 'fa-sync fa-spin');
     try {
       const testWs = new WebSocket(NAUTILUS_FALLBACK_URL);
       await new Promise((resolve, reject) => {
@@ -20906,7 +21352,7 @@ async function resetWispUrl() {
         setTimeout(reject, 3000);
       });
       defaultUrl = NAUTILUS_FALLBACK_URL;
-      source = 'NautilusOS';
+      source = 'Community';
     } catch (e) {
       defaultUrl = FALLBACK_WISP_URL;
       source = 'default';
@@ -20918,7 +21364,7 @@ async function resetWispUrl() {
   const input = document.getElementById('wispUrlInput');
   if (input) input.value = defaultUrl;
   
-  const icons = { Firebase: 'fa-cloud-download-alt', NautilusOS: 'fa-fish', default: 'fa-undo' };
+  const icons = { Firebase: 'fa-cloud-download-alt', Community: 'fa-fish', default: 'fa-undo' };
   showToast(`Wisp URL synced from ${source}!`, icons[source]);
 }
 

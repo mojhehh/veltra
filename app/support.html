@@ -1,0 +1,1913 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Veltra Support</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0a0e1a 0%, #151923 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+        }
+
+        .support-container {
+            max-width: 100%;
+            padding: 1.5rem;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Header */
+        .support-header {
+            text-align: center;
+            margin-bottom: 2rem;
+            padding: 1.5rem;
+            background: linear-gradient(135deg, rgba(125, 211, 192, 0.1), rgba(125, 211, 192, 0.05));
+            border-radius: 16px;
+            border: 1px solid rgba(125, 211, 192, 0.2);
+        }
+
+        .support-header-icon {
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(135deg, #7dd3c0, #5ec4ab);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1rem;
+            font-size: 1.75rem;
+            color: #0a0e1a;
+            box-shadow: 0 8px 24px rgba(125, 211, 192, 0.3);
+        }
+
+        .support-header h1 {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, #7dd3c0, #5ec4ab);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .support-header p {
+            color: #888;
+            font-size: 0.9rem;
+        }
+
+        /* Navigation Tabs */
+        .support-tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+            padding: 0.25rem;
+            background: rgba(30, 35, 48, 0.5);
+            border-radius: 12px;
+            overflow-x: auto;
+        }
+
+        .support-tab {
+            flex: 1;
+            min-width: 80px;
+            padding: 0.75rem 1rem;
+            background: transparent;
+            border: none;
+            border-radius: 10px;
+            color: #888;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            white-space: nowrap;
+        }
+
+        .support-tab:hover {
+            background: rgba(125, 211, 192, 0.1);
+            color: #e0e0e0;
+        }
+
+        .support-tab.active {
+            background: linear-gradient(135deg, #7dd3c0, #5ec4ab);
+            color: #0a0e1a;
+        }
+
+        .support-tab i {
+            font-size: 1rem;
+        }
+
+        /* Tab Content */
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Quick Actions Grid */
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .quick-action {
+            background: rgba(30, 35, 48, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 1.25rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .quick-action:hover {
+            background: rgba(125, 211, 192, 0.1);
+            border-color: rgba(125, 211, 192, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .quick-action-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 0.75rem;
+            font-size: 1.25rem;
+        }
+
+        .quick-action-icon.bug { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+        .quick-action-icon.feature { background: rgba(168, 85, 247, 0.2); color: #a855f7; }
+        .quick-action-icon.chat { background: rgba(59, 130, 246, 0.2); color: #3b82f6; }
+        .quick-action-icon.faq { background: rgba(251, 191, 36, 0.2); color: #fbbf24; }
+        .quick-action-icon.docs { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+        .quick-action-icon.feedback { background: rgba(236, 72, 153, 0.2); color: #ec4899; }
+
+        .quick-action h3 {
+            font-size: 0.9rem;
+            margin-bottom: 0.25rem;
+            color: #e0e0e0;
+        }
+
+        .quick-action p {
+            font-size: 0.75rem;
+            color: #888;
+        }
+
+        /* Form Styles */
+        .support-form {
+            background: rgba(30, 35, 48, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 1.5rem;
+        }
+
+        .form-title {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .form-title i {
+            width: 40px;
+            height: 40px;
+            background: rgba(125, 211, 192, 0.2);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #7dd3c0;
+        }
+
+        .form-title h2 {
+            font-size: 1.1rem;
+            color: #e0e0e0;
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.85rem;
+            color: #888;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 0.875rem 1rem;
+            background: rgba(21, 25, 35, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            color: #e0e0e0;
+            font-size: 0.9rem;
+            font-family: inherit;
+            transition: all 0.2s ease;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #7dd3c0;
+            box-shadow: 0 0 0 3px rgba(125, 211, 192, 0.1);
+        }
+
+        .form-group textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .form-group select {
+            cursor: pointer;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 1.5rem;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 0.875rem 1.5rem;
+            border: none;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #7dd3c0, #5ec4ab);
+            color: #0a0e1a;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(125, 211, 192, 0.3);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.08);
+            color: #e0e0e0;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.12);
+        }
+
+        /* Chat Section */
+        .chat-container {
+            background: rgba(30, 35, 48, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 250px);
+            min-height: 400px;
+        }
+
+        .chat-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1rem 1.25rem;
+            background: rgba(21, 25, 35, 0.6);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .chat-avatar {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #7dd3c0, #5ec4ab);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #0a0e1a;
+            font-size: 1.1rem;
+        }
+
+        .chat-info h3 {
+            font-size: 0.95rem;
+            color: #e0e0e0;
+        }
+
+        .chat-info p {
+            font-size: 0.8rem;
+            color: #22c55e;
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .chat-info p::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            background: #22c55e;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .chat-message {
+            max-width: 80%;
+            padding: 0.75rem 1rem;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .chat-message.bot {
+            background: rgba(125, 211, 192, 0.15);
+            border: 1px solid rgba(125, 211, 192, 0.2);
+            align-self: flex-start;
+        }
+
+        .chat-message.user {
+            background: linear-gradient(135deg, #7dd3c0, #5ec4ab);
+            color: #0a0e1a;
+            align-self: flex-end;
+        }
+
+        .chat-input-area {
+            display: flex;
+            gap: 0.75rem;
+            padding: 1rem;
+            background: rgba(21, 25, 35, 0.6);
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .chat-input-area input {
+            flex: 1;
+            padding: 0.875rem 1rem;
+            background: rgba(30, 35, 48, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 24px;
+            color: #e0e0e0;
+            font-size: 0.9rem;
+        }
+
+        .chat-input-area input:focus {
+            outline: none;
+            border-color: #7dd3c0;
+        }
+
+        .chat-send-btn {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, #7dd3c0, #5ec4ab);
+            border: none;
+            border-radius: 50%;
+            color: #0a0e1a;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .chat-send-btn:hover {
+            transform: scale(1.05);
+        }
+
+        /* Quick Suggestions */
+        .chat-suggestions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            padding: 0.75rem 1rem;
+            background: rgba(21, 25, 35, 0.4);
+        }
+
+        .chat-suggestion {
+            padding: 0.5rem 1rem;
+            background: rgba(125, 211, 192, 0.1);
+            border: 1px solid rgba(125, 211, 192, 0.2);
+            border-radius: 20px;
+            color: #7dd3c0;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .chat-suggestion:hover {
+            background: rgba(125, 211, 192, 0.2);
+        }
+
+        /* My Requests */
+        .requests-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .request-item {
+            background: rgba(30, 35, 48, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 1rem 1.25rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .request-item:hover {
+            border-color: rgba(125, 211, 192, 0.3);
+            background: rgba(125, 211, 192, 0.05);
+        }
+
+        .request-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.5rem;
+        }
+
+        .request-title {
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: #e0e0e0;
+        }
+
+        .request-status {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .request-status.pending { background: rgba(251, 191, 36, 0.2); color: #fbbf24; }
+        .request-status.in-progress { background: rgba(59, 130, 246, 0.2); color: #3b82f6; }
+        .request-status.resolved { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+        .request-status.closed { background: rgba(107, 114, 128, 0.2); color: #6b7280; }
+
+        .request-meta {
+            display: flex;
+            gap: 1rem;
+            font-size: 0.8rem;
+            color: #888;
+        }
+
+        .request-meta span {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 3rem 2rem;
+            color: #888;
+        }
+
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        .empty-state h3 {
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+            color: #e0e0e0;
+        }
+
+        .empty-state p {
+            font-size: 0.9rem;
+        }
+
+        /* FAQ Section */
+        .faq-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .faq-item {
+            background: rgba(30, 35, 48, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }
+
+        .faq-item.open {
+            border-color: rgba(125, 211, 192, 0.3);
+        }
+
+        .faq-question {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 1.25rem;
+            cursor: pointer;
+            font-weight: 500;
+            color: #e0e0e0;
+        }
+
+        .faq-question i {
+            color: #7dd3c0;
+            transition: transform 0.2s ease;
+        }
+
+        .faq-item.open .faq-question i {
+            transform: rotate(180deg);
+        }
+
+        .faq-answer {
+            display: none;
+            padding: 0 1.25rem 1rem;
+            color: #888;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        .faq-item.open .faq-answer {
+            display: block;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(125, 211, 192, 0.3);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(125, 211, 192, 0.5);
+        }
+
+        /* Admin Panel Styles */
+        .admin-badge {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: #0a0e1a;
+            padding: 0.25rem 0.5rem;
+            border-radius: 6px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            margin-left: 0.5rem;
+        }
+
+        .admin-dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .admin-stat {
+            background: rgba(30, 35, 48, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .admin-stat-value {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: #7dd3c0;
+            margin-bottom: 0.25rem;
+        }
+
+        .admin-stat-label {
+            font-size: 0.8rem;
+            color: #888;
+        }
+
+        .admin-filters {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .admin-filter {
+            padding: 0.5rem 1rem;
+            background: rgba(30, 35, 48, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+            color: #888;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .admin-filter:hover, .admin-filter.active {
+            background: rgba(125, 211, 192, 0.15);
+            border-color: rgba(125, 211, 192, 0.3);
+            color: #7dd3c0;
+        }
+
+        .admin-request-item {
+            background: rgba(30, 35, 48, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 1rem 1.25rem;
+            margin-bottom: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .admin-request-item:hover {
+            border-color: rgba(125, 211, 192, 0.3);
+            background: rgba(125, 211, 192, 0.05);
+        }
+
+        .admin-request-user {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            color: #7dd3c0;
+            margin-bottom: 0.5rem;
+        }
+
+        .admin-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+        }
+
+        .admin-action-btn {
+            padding: 0.4rem 0.75rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .admin-action-btn.respond {
+            background: rgba(59, 130, 246, 0.2);
+            color: #3b82f6;
+        }
+
+        .admin-action-btn.resolve {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+        }
+
+        .admin-action-btn.close {
+            background: rgba(107, 114, 128, 0.2);
+            color: #6b7280;
+        }
+
+        .admin-action-btn:hover {
+            transform: translateY(-1px);
+        }
+
+        /* Live Chat Admin View */
+        .live-chats-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .live-chat-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            background: rgba(30, 35, 48, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .live-chat-item:hover {
+            border-color: rgba(125, 211, 192, 0.3);
+        }
+
+        .live-chat-item.has-unread {
+            border-color: rgba(59, 130, 246, 0.5);
+            background: rgba(59, 130, 246, 0.05);
+        }
+
+        .live-chat-avatar {
+            width: 40px;
+            height: 40px;
+            background: rgba(125, 211, 192, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #7dd3c0;
+        }
+
+        .live-chat-info {
+            flex: 1;
+        }
+
+        .live-chat-name {
+            font-weight: 500;
+            color: #e0e0e0;
+            margin-bottom: 0.25rem;
+        }
+
+        .live-chat-preview {
+            font-size: 0.8rem;
+            color: #888;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 200px;
+        }
+
+        .live-chat-time {
+            font-size: 0.75rem;
+            color: #888;
+        }
+
+        .unread-badge {
+            width: 20px;
+            height: 20px;
+            background: #3b82f6;
+            border-radius: 50%;
+            font-size: 0.7rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+        }
+
+        /* Admin Chat Response */
+        .admin-chat-container {
+            background: rgba(30, 35, 48, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 300px);
+            min-height: 350px;
+        }
+
+        .admin-chat-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 1.25rem;
+            background: rgba(21, 25, 35, 0.6);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .admin-chat-back {
+            background: none;
+            border: none;
+            color: #7dd3c0;
+            font-size: 1rem;
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .admin-chat-back:hover {
+            background: rgba(125, 211, 192, 0.1);
+        }
+
+        .chat-message.admin {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+            align-self: flex-end;
+        }
+
+        .chat-message .admin-label {
+            font-size: 0.7rem;
+            opacity: 0.8;
+            margin-bottom: 0.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="support-container">
+        <!-- Header -->
+        <div class="support-header">
+            <div class="support-header-icon">
+                <i class="fas fa-headset"></i>
+            </div>
+            <h1>Veltra Support Center</h1>
+            <p>We're here to help! Submit requests, get help, or chat with our AI assistant.</p>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="support-tabs">
+            <button class="support-tab active" onclick="showSupportTab('home')" data-tab="home">
+                <i class="fas fa-home"></i>
+                <span>Home</span>
+            </button>
+            <button class="support-tab" onclick="showSupportTab('chat')" data-tab="chat">
+                <i class="fas fa-comments"></i>
+                <span>Live Chat</span>
+            </button>
+            <button class="support-tab" onclick="showSupportTab('requests')" data-tab="requests">
+                <i class="fas fa-ticket-alt"></i>
+                <span>My Requests</span>
+            </button>
+            <button class="support-tab" onclick="showSupportTab('faq')" data-tab="faq">
+                <i class="fas fa-question-circle"></i>
+                <span>FAQ</span>
+            </button>
+            <button class="support-tab" onclick="showSupportTab('admin')" data-tab="admin" id="adminTab" style="display: none;">
+                <i class="fas fa-shield-alt"></i>
+                <span>Admin<span class="admin-badge">STAFF</span></span>
+            </button>
+        </div>
+
+        <!-- Home Tab -->
+        <div class="tab-content active" id="tab-home">
+            <div class="quick-actions">
+                <div class="quick-action" onclick="showSupportForm('bug')">
+                    <div class="quick-action-icon bug">
+                        <i class="fas fa-bug"></i>
+                    </div>
+                    <h3>Report a Bug</h3>
+                    <p>Something not working right?</p>
+                </div>
+                <div class="quick-action" onclick="showSupportForm('feature')">
+                    <div class="quick-action-icon feature">
+                        <i class="fas fa-lightbulb"></i>
+                    </div>
+                    <h3>Feature Request</h3>
+                    <p>Have an idea for Veltra?</p>
+                </div>
+                <div class="quick-action" onclick="showSupportTab('chat')">
+                    <div class="quick-action-icon chat">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <h3>AI Assistant</h3>
+                    <p>Get instant help</p>
+                </div>
+                <div class="quick-action" onclick="showSupportTab('faq')">
+                    <div class="quick-action-icon faq">
+                        <i class="fas fa-book-open"></i>
+                    </div>
+                    <h3>Help & FAQ</h3>
+                    <p>Find quick answers</p>
+                </div>
+                <div class="quick-action" onclick="showSupportForm('feedback')">
+                    <div class="quick-action-icon feedback">
+                        <i class="fas fa-heart"></i>
+                    </div>
+                    <h3>Send Feedback</h3>
+                    <p>Tell us what you think</p>
+                </div>
+                <div class="quick-action" onclick="openDocs()">
+                    <div class="quick-action-icon docs">
+                        <i class="fas fa-file-alt"></i>
+                    </div>
+                    <h3>Documentation</h3>
+                    <p>Read the guides</p>
+                </div>
+            </div>
+
+            <!-- Form Container (hidden by default) -->
+            <div id="supportFormContainer" style="display: none;"></div>
+        </div>
+
+        <!-- Chat Tab -->
+        <div class="tab-content" id="tab-chat">
+            <div class="chat-container">
+                <div class="chat-header">
+                    <div class="chat-avatar">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <div class="chat-info">
+                        <h3>Veltra AI Assistant</h3>
+                        <p>Online - Ready to help</p>
+                    </div>
+                </div>
+                <div class="chat-suggestions">
+                    <button class="chat-suggestion" onclick="sendChatMessage('How do I use the browser?')">Using the browser</button>
+                    <button class="chat-suggestion" onclick="sendChatMessage('How do I install apps?')">Installing apps</button>
+                    <button class="chat-suggestion" onclick="sendChatMessage('What is Ultraviolet?')">About Ultraviolet</button>
+                    <button class="chat-suggestion" onclick="sendChatMessage('How do I customize Veltra?')">Customization</button>
+                </div>
+                <div class="chat-messages" id="chatMessages">
+                    <div class="chat-message bot">
+                        <strong>Hey there! 👋</strong><br><br>
+                        I'm Veltra AI, your personal assistant. I can help you with:
+                        <ul style="margin: 0.5rem 0 0 1rem;">
+                            <li>Using Veltra features and apps</li>
+                            <li>Troubleshooting issues</li>
+                            <li>Customizing your experience</li>
+                            <li>Finding the right tools</li>
+                        </ul>
+                        <br>How can I help you today?
+                    </div>
+                </div>
+                <div class="chat-input-area">
+                    <input type="text" id="chatInput" placeholder="Type your message..." onkeypress="if(event.key==='Enter')sendChatMessage()">
+                    <button class="chat-send-btn" onclick="sendChatMessage()">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Requests Tab -->
+        <div class="tab-content" id="tab-requests">
+            <div id="requestsList">
+                <div class="empty-state">
+                    <i class="fas fa-inbox"></i>
+                    <h3>No requests yet</h3>
+                    <p>Submit a bug report or feature request to see it here.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- FAQ Tab -->
+        <div class="tab-content" id="tab-faq">
+            <div class="faq-list">
+                <div class="faq-item" onclick="toggleFaq(this)">
+                    <div class="faq-question">
+                        <span>How do I unblock websites?</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div class="faq-answer">
+                        Veltra has a built-in browser that can access most websites. For websites that are still blocked, 
+                        go to the <strong>App Store</strong> and install <strong>Ultraviolet</strong>. It's the most 
+                        reliable unblocker and works with nearly everything including YouTube, Discord, and more!
+                    </div>
+                </div>
+                <div class="faq-item" onclick="toggleFaq(this)">
+                    <div class="faq-question">
+                        <span>What is Ultraviolet?</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div class="faq-answer">
+                        Ultraviolet (UV) is a powerful web proxy that can unblock almost any website. It works by 
+                        routing your traffic through a secure server. To use it, install it from the App Store and 
+                        enter any URL you want to visit. It supports full video playback, login systems, and more!
+                    </div>
+                </div>
+                <div class="faq-item" onclick="toggleFaq(this)">
+                    <div class="faq-question">
+                        <span>How do I install apps?</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div class="faq-answer">
+                        Open the <strong>App Store</strong> from your desktop or Start Menu. Browse the available apps 
+                        and themes, then click <strong>Install</strong> on any app you want. Installed apps appear on 
+                        your desktop and in the Start Menu.
+                    </div>
+                </div>
+                <div class="faq-item" onclick="toggleFaq(this)">
+                    <div class="faq-question">
+                        <span>How do I change themes?</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div class="faq-answer">
+                        Go to the <strong>App Store</strong> and click on the <strong>Themes</strong> tab. Install any 
+                        theme you like, then go to <strong>Settings → Appearance</strong> to activate it. We have dark, 
+                        light, purple, blue, and many more themes available!
+                    </div>
+                </div>
+                <div class="faq-item" onclick="toggleFaq(this)">
+                    <div class="faq-question">
+                        <span>Why aren't my settings saving?</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div class="faq-answer">
+                        Settings are saved both locally and to our cloud servers. If settings aren't saving:
+                        <ul style="margin: 0.5rem 0 0 1rem;">
+                            <li>Make sure you're not in private/incognito mode</li>
+                            <li>Clear your browser cache and try again</li>
+                            <li>Check if localStorage is enabled in your browser</li>
+                        </ul>
+                        If issues persist, contact support through the bug report form.
+                    </div>
+                </div>
+                <div class="faq-item" onclick="toggleFaq(this)">
+                    <div class="faq-question">
+                        <span>How do I use the Files app?</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div class="faq-answer">
+                        The Files app lets you browse and manage files within Veltra. You can create folders, 
+                        upload files, and organize your content. Right-click on files or folders for more options 
+                        like rename, delete, or download.
+                    </div>
+                </div>
+                <div class="faq-item" onclick="toggleFaq(this)">
+                    <div class="faq-question">
+                        <span>Can I use Veltra on mobile?</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div class="faq-answer">
+                        Yes! Veltra works on mobile browsers. For the best experience, use Chrome on Android or 
+                        Safari on iOS. You can even add Veltra to your home screen for quick access. Some features 
+                        may be limited on smaller screens.
+                    </div>
+                </div>
+                <div class="faq-item" onclick="toggleFaq(this)">
+                    <div class="faq-question">
+                        <span>Is Veltra safe and private?</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div class="faq-answer">
+                        Yes! Veltra runs entirely in your browser. Your files and settings are stored locally on 
+                        your device and optionally synced to our secure cloud. We don't track your browsing activity 
+                        or sell your data. Use cloaking features to hide Veltra if needed.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Admin Tab (hidden for non-admins) -->
+        <div class="tab-content" id="tab-admin">
+            <div id="adminContent">
+                <!-- Dashboard Stats -->
+                <div class="admin-dashboard" id="adminStats">
+                    <div class="admin-stat">
+                        <div class="admin-stat-value" id="statTotal">0</div>
+                        <div class="admin-stat-label">Total Requests</div>
+                    </div>
+                    <div class="admin-stat">
+                        <div class="admin-stat-value" id="statPending" style="color: #fbbf24;">0</div>
+                        <div class="admin-stat-label">Pending</div>
+                    </div>
+                    <div class="admin-stat">
+                        <div class="admin-stat-value" id="statInProgress" style="color: #3b82f6;">0</div>
+                        <div class="admin-stat-label">In Progress</div>
+                    </div>
+                    <div class="admin-stat">
+                        <div class="admin-stat-value" id="statResolved" style="color: #22c55e;">0</div>
+                        <div class="admin-stat-label">Resolved</div>
+                    </div>
+                </div>
+
+                <!-- Sub-tabs for Admin -->
+                <div class="admin-filters" id="adminSubTabs">
+                    <button class="admin-filter active" onclick="switchAdminView('requests')">
+                        <i class="fas fa-inbox"></i> All Requests
+                    </button>
+                    <button class="admin-filter" onclick="switchAdminView('livechats')">
+                        <i class="fas fa-comments"></i> Live Chats
+                    </button>
+                </div>
+
+                <!-- Filters -->
+                <div class="admin-filters" id="adminFilters">
+                    <button class="admin-filter active" onclick="filterAdminRequests('all')">All</button>
+                    <button class="admin-filter" onclick="filterAdminRequests('pending')">Pending</button>
+                    <button class="admin-filter" onclick="filterAdminRequests('in-progress')">In Progress</button>
+                    <button class="admin-filter" onclick="filterAdminRequests('resolved')">Resolved</button>
+                    <button class="admin-filter" onclick="filterAdminRequests('bug')">Bugs</button>
+                    <button class="admin-filter" onclick="filterAdminRequests('feature')">Features</button>
+                </div>
+
+                <!-- Admin Requests List -->
+                <div id="adminRequestsList"></div>
+
+                <!-- Live Chats List (hidden by default) -->
+                <div id="adminLiveChatsList" style="display: none;"></div>
+
+                <!-- Admin Chat View (hidden by default) -->
+                <div id="adminChatView" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Firebase URL for support requests
+        const SUPPORT_FIREBASE_URL = 'https://veltra-6fea6-default-rtdb.firebaseio.com/support';
+        
+        // Admin users list
+        const ADMIN_USERS = ['mojheh', 'dinguschan', '$xor', 'lanefiedler-731', 'admin'];
+        
+        // Check if current user is admin
+        let isAdmin = false;
+        let currentUsername = '';
+        let currentChatUserId = null;
+        let allRequests = [];
+        let liveChats = {};
+        let chatPollingInterval = null;
+        
+        function checkAdminStatus() {
+            currentUsername = localStorage.getItem('Veltra_username') || '';
+            isAdmin = ADMIN_USERS.includes(currentUsername.toLowerCase());
+            
+            const adminTab = document.getElementById('adminTab');
+            if (adminTab) {
+                adminTab.style.display = isAdmin ? 'flex' : 'none';
+            }
+            
+            return isAdmin;
+        }
+
+        // Show tab content
+        function showSupportTab(tabId) {
+            // Update tab buttons
+            document.querySelectorAll('.support-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.tab === tabId);
+            });
+            
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.toggle('active', content.id === `tab-${tabId}`);
+            });
+
+            // Hide form when switching tabs
+            const formContainer = document.getElementById('supportFormContainer');
+            if (formContainer && tabId !== 'home') {
+                formContainer.style.display = 'none';
+            }
+
+            // Load requests when switching to requests tab
+            if (tabId === 'requests') {
+                loadMyRequests();
+            }
+            
+            // Load admin data when switching to admin tab
+            if (tabId === 'admin' && isAdmin) {
+                loadAdminRequests();
+            }
+            
+            // Initialize live chat when switching to chat tab
+            if (tabId === 'chat') {
+                initUserLiveChat();
+            }
+        }
+
+        // Toggle FAQ item
+        function toggleFaq(item) {
+            item.classList.toggle('open');
+        }
+
+        // Show support form
+        function showSupportForm(type) {
+            const container = document.getElementById('supportFormContainer');
+            const titles = {
+                bug: { title: 'Report a Bug', icon: 'fa-bug', color: '#ef4444' },
+                feature: { title: 'Feature Request', icon: 'fa-lightbulb', color: '#a855f7' },
+                feedback: { title: 'Send Feedback', icon: 'fa-heart', color: '#ec4899' }
+            };
+            
+            const info = titles[type] || titles.feedback;
+            
+            container.innerHTML = `
+                <div class="support-form">
+                    <div class="form-title">
+                        <i class="fas ${info.icon}" style="background: ${info.color}20; color: ${info.color}"></i>
+                        <h2>${info.title}</h2>
+                    </div>
+                    <form onsubmit="submitSupportRequest(event, '${type}')">
+                        <div class="form-group">
+                            <label>Title</label>
+                            <input type="text" id="requestTitle" placeholder="Brief description of your ${type}" required>
+                        </div>
+                        ${type === 'bug' ? `
+                        <div class="form-group">
+                            <label>Severity</label>
+                            <select id="requestSeverity">
+                                <option value="low">Low - Minor issue</option>
+                                <option value="medium" selected>Medium - Affects functionality</option>
+                                <option value="high">High - Major problem</option>
+                                <option value="critical">Critical - Can't use Veltra</option>
+                            </select>
+                        </div>
+                        ` : ''}
+                        <div class="form-group">
+                            <label>Description</label>
+                            <textarea id="requestDescription" placeholder="Please provide as much detail as possible..." required></textarea>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-secondary" onclick="hideForm()">Cancel</button>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-paper-plane"></i> Submit
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            `;
+            container.style.display = 'block';
+            container.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function hideForm() {
+            document.getElementById('supportFormContainer').style.display = 'none';
+        }
+
+        // Submit support request
+        async function submitSupportRequest(event, type) {
+            event.preventDefault();
+            
+            const title = document.getElementById('requestTitle').value;
+            const description = document.getElementById('requestDescription').value;
+            const severity = document.getElementById('requestSeverity')?.value || 'medium';
+            
+            const userId = localStorage.getItem('veltra_userId') || 
+                ('user_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 9));
+            localStorage.setItem('veltra_userId', userId);
+            
+            const request = {
+                type,
+                title,
+                description,
+                severity: type === 'bug' ? severity : null,
+                userId,
+                username: localStorage.getItem('Veltra_username') || 'Anonymous',
+                status: 'pending',
+                createdAt: Date.now(),
+                messages: []
+            };
+            
+            try {
+                // Save to Firebase
+                const response = await fetch(`${SUPPORT_FIREBASE_URL}/requests.json`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(request)
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    // Also save locally
+                    const localRequests = JSON.parse(localStorage.getItem('veltra_supportRequests') || '[]');
+                    localRequests.push({ id: data.name, ...request });
+                    localStorage.setItem('veltra_supportRequests', JSON.stringify(localRequests));
+                    
+                    if (window.parent && window.parent.showToast) {
+                        window.parent.showToast('Request submitted successfully!', 'fa-check-circle');
+                    }
+                    hideForm();
+                    showSupportTab('requests');
+                } else {
+                    throw new Error('Failed to submit');
+                }
+            } catch (err) {
+                console.error('Failed to submit request:', err);
+                // Save locally as fallback
+                const localRequests = JSON.parse(localStorage.getItem('veltra_supportRequests') || '[]');
+                localRequests.push({ id: 'local_' + Date.now(), ...request });
+                localStorage.setItem('veltra_supportRequests', JSON.stringify(localRequests));
+                
+                if (window.parent && window.parent.showToast) {
+                    window.parent.showToast('Saved locally - will sync when online', 'fa-cloud-upload-alt');
+                }
+                hideForm();
+                showSupportTab('requests');
+            }
+        }
+
+        // Load my requests
+        async function loadMyRequests() {
+            const container = document.getElementById('requestsList');
+            const userId = localStorage.getItem('veltra_userId');
+            
+            // Start with local requests
+            let requests = JSON.parse(localStorage.getItem('veltra_supportRequests') || '[]');
+            
+            // Try to fetch from Firebase
+            try {
+                const response = await fetch(`${SUPPORT_FIREBASE_URL}/requests.json?orderBy="userId"&equalTo="${userId}"`);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data) {
+                        requests = Object.entries(data).map(([id, req]) => ({ id, ...req }));
+                        localStorage.setItem('veltra_supportRequests', JSON.stringify(requests));
+                    }
+                }
+            } catch (err) {
+                console.warn('Failed to fetch requests from Firebase:', err);
+            }
+            
+            if (requests.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-inbox"></i>
+                        <h3>No requests yet</h3>
+                        <p>Submit a bug report or feature request to see it here.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Sort by date (newest first)
+            requests.sort((a, b) => b.createdAt - a.createdAt);
+            
+            container.innerHTML = `
+                <div class="requests-list">
+                    ${requests.map(req => `
+                        <div class="request-item" onclick="viewRequest('${req.id}')">
+                            <div class="request-header">
+                                <span class="request-title">${escapeHtml(req.title)}</span>
+                                <span class="request-status ${req.status}">${req.status.replace('-', ' ')}</span>
+                            </div>
+                            <div class="request-meta">
+                                <span><i class="fas fa-${req.type === 'bug' ? 'bug' : req.type === 'feature' ? 'lightbulb' : 'heart'}"></i> ${req.type}</span>
+                                <span><i class="far fa-clock"></i> ${formatTimeAgo(req.createdAt)}</span>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function viewRequest(id) {
+            // Could open a detailed view or chat for this request
+            if (window.parent && window.parent.showToast) {
+                window.parent.showToast('Request details coming soon!', 'fa-info-circle');
+            }
+        }
+
+        // Chat functionality
+        const chatResponses = {
+            'browser': "To use the browser, just open it from your desktop or Start Menu. Type any URL in the address bar and press Enter. If a site is blocked, try installing Ultraviolet from the App Store for better unblocking!",
+            'ultraviolet': "Ultraviolet is our most powerful web proxy. It can unblock almost any website including YouTube, Discord, and social media. Install it from the App Store → Apps tab, then open it and enter any URL.",
+            'install': "To install apps, open the App Store from your desktop. Browse the available apps and themes, then click 'Install' on anything you want. Apps will appear on your desktop and in the Start Menu!",
+            'theme': "You can change themes in Settings → Appearance. First install themes from the App Store → Themes tab. We have dark, light, purple, blue, golden and many more themes!",
+            'unblock': "For unblocking websites, I recommend installing Ultraviolet from the App Store. It's the most reliable option and works with video sites, login systems, and more!",
+            'customize': "Veltra is highly customizable! Go to Settings to change wallpapers, themes, taskbar style, and more. The App Store has additional themes. You can also install Snap Manager for window snapping layouts.",
+            'save': "Your settings are automatically saved locally and synced to our cloud. If settings aren't saving, make sure you're not in private/incognito mode and that localStorage is enabled.",
+            'help': "I can help you with: using the browser, installing apps, customizing Veltra, troubleshooting issues, and finding the right tools. What would you like help with?",
+            'default': "I'm here to help! You can ask me about using Veltra, installing apps, customizing your experience, or troubleshooting issues. For specific problems, try submitting a bug report from the Home tab."
+        };
+
+        function sendChatMessage(message) {
+            const input = document.getElementById('chatInput');
+            const text = message || input.value.trim();
+            if (!text) return;
+            
+            const messagesContainer = document.getElementById('chatMessages');
+            
+            // Add user message
+            messagesContainer.innerHTML += `
+                <div class="chat-message user">${escapeHtml(text)}</div>
+            `;
+            
+            input.value = '';
+            
+            // Save to Firebase for admin to see
+            if (userChatId) {
+                fetch(`${SUPPORT_FIREBASE_URL}/chats/${userChatId}/messages.json`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        from: 'user',
+                        message: text,
+                        timestamp: Date.now()
+                    })
+                }).catch(err => console.warn('Failed to save chat message:', err));
+            }
+            
+            // Generate AI response
+            setTimeout(() => {
+                const lowerText = text.toLowerCase();
+                let response = chatResponses.default;
+                
+                for (const [key, value] of Object.entries(chatResponses)) {
+                    if (lowerText.includes(key)) {
+                        response = value;
+                        break;
+                    }
+                }
+                
+                messagesContainer.innerHTML += `
+                    <div class="chat-message bot">${response}</div>
+                `;
+                
+                // Save bot response to Firebase too
+                if (userChatId) {
+                    fetch(`${SUPPORT_FIREBASE_URL}/chats/${userChatId}/messages.json`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            from: 'bot',
+                            message: response,
+                            timestamp: Date.now()
+                        })
+                    }).catch(err => console.warn('Failed to save bot message:', err));
+                }
+                
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }, 500);
+            
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // Open docs
+        function openDocs() {
+            if (window.parent && window.parent.openApp) {
+                window.parent.openApp('help');
+            }
+        }
+
+        // Utility functions
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function formatTimeAgo(timestamp) {
+            const seconds = Math.floor((Date.now() - timestamp) / 1000);
+            if (seconds < 60) return 'Just now';
+            if (seconds < 3600) return Math.floor(seconds / 60) + 'm ago';
+            if (seconds < 86400) return Math.floor(seconds / 3600) + 'h ago';
+            return Math.floor(seconds / 86400) + 'd ago';
+        }
+
+        // ==================== ADMIN FUNCTIONS ====================
+        
+        // Load all requests for admin
+        async function loadAdminRequests() {
+            if (!isAdmin) return;
+            
+            const container = document.getElementById('adminRequestsList');
+            container.innerHTML = '<div style="text-align: center; padding: 2rem;"><i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--accent);"></i></div>';
+            
+            try {
+                const response = await fetch(`${SUPPORT_FIREBASE_URL}/requests.json`);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data) {
+                        allRequests = Object.entries(data).map(([id, req]) => ({ id, ...req }));
+                        allRequests.sort((a, b) => b.createdAt - a.createdAt);
+                        updateAdminStats();
+                        renderAdminRequests(allRequests);
+                    } else {
+                        container.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><h3>No requests yet</h3><p>Requests will appear here when users submit them.</p></div>';
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to load admin requests:', err);
+                container.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><h3>Failed to load</h3><p>Could not connect to the server.</p></div>';
+            }
+        }
+        
+        function updateAdminStats() {
+            document.getElementById('statTotal').textContent = allRequests.length;
+            document.getElementById('statPending').textContent = allRequests.filter(r => r.status === 'pending').length;
+            document.getElementById('statInProgress').textContent = allRequests.filter(r => r.status === 'in-progress').length;
+            document.getElementById('statResolved').textContent = allRequests.filter(r => r.status === 'resolved' || r.status === 'closed').length;
+        }
+        
+        function renderAdminRequests(requests) {
+            const container = document.getElementById('adminRequestsList');
+            
+            if (requests.length === 0) {
+                container.innerHTML = '<div class="empty-state"><i class="fas fa-filter"></i><h3>No matching requests</h3><p>Try a different filter.</p></div>';
+                return;
+            }
+            
+            container.innerHTML = requests.map(req => `
+                <div class="admin-request-item">
+                    <div class="admin-request-user">
+                        <i class="fas fa-user"></i>
+                        ${escapeHtml(req.username || 'Anonymous')}
+                        <span style="color: #888; font-size: 0.75rem;">• ${formatTimeAgo(req.createdAt)}</span>
+                    </div>
+                    <div class="request-header">
+                        <span class="request-title">${escapeHtml(req.title)}</span>
+                        <span class="request-status ${req.status}">${req.status.replace('-', ' ')}</span>
+                    </div>
+                    <div style="font-size: 0.85rem; color: #888; margin: 0.5rem 0;">${escapeHtml(req.description?.substring(0, 150) || '')}${req.description?.length > 150 ? '...' : ''}</div>
+                    <div class="request-meta">
+                        <span><i class="fas fa-${req.type === 'bug' ? 'bug' : req.type === 'feature' ? 'lightbulb' : 'heart'}"></i> ${req.type}</span>
+                        ${req.severity ? `<span><i class="fas fa-exclamation-circle"></i> ${req.severity}</span>` : ''}
+                    </div>
+                    <div class="admin-actions">
+                        <button class="admin-action-btn respond" onclick="event.stopPropagation(); openAdminResponse('${req.id}')">
+                            <i class="fas fa-reply"></i> Respond
+                        </button>
+                        <button class="admin-action-btn resolve" onclick="event.stopPropagation(); updateRequestStatus('${req.id}', 'resolved')">
+                            <i class="fas fa-check"></i> Resolve
+                        </button>
+                        <button class="admin-action-btn close" onclick="event.stopPropagation(); updateRequestStatus('${req.id}', 'closed')">
+                            <i class="fas fa-times"></i> Close
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function filterAdminRequests(filter) {
+            // Update active filter button
+            document.querySelectorAll('#adminFilters .admin-filter').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.textContent.toLowerCase().includes(filter) || (filter === 'all' && btn.textContent === 'All')) {
+                    btn.classList.add('active');
+                }
+            });
+            
+            let filtered = allRequests;
+            if (filter !== 'all') {
+                if (['pending', 'in-progress', 'resolved', 'closed'].includes(filter)) {
+                    filtered = allRequests.filter(r => r.status === filter);
+                } else if (['bug', 'feature', 'feedback'].includes(filter)) {
+                    filtered = allRequests.filter(r => r.type === filter);
+                }
+            }
+            renderAdminRequests(filtered);
+        }
+        
+        function switchAdminView(view) {
+            // Update sub-tab buttons
+            document.querySelectorAll('#adminSubTabs .admin-filter').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            const requestsList = document.getElementById('adminRequestsList');
+            const liveChatsList = document.getElementById('adminLiveChatsList');
+            const filters = document.getElementById('adminFilters');
+            const chatView = document.getElementById('adminChatView');
+            
+            if (view === 'requests') {
+                requestsList.style.display = 'block';
+                liveChatsList.style.display = 'none';
+                filters.style.display = 'flex';
+                chatView.style.display = 'none';
+                loadAdminRequests();
+            } else if (view === 'livechats') {
+                requestsList.style.display = 'none';
+                liveChatsList.style.display = 'block';
+                filters.style.display = 'none';
+                chatView.style.display = 'none';
+                loadLiveChats();
+            }
+        }
+        
+        async function updateRequestStatus(requestId, newStatus) {
+            try {
+                await fetch(`${SUPPORT_FIREBASE_URL}/requests/${requestId}/status.json`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newStatus)
+                });
+                
+                // Update local data
+                const request = allRequests.find(r => r.id === requestId);
+                if (request) request.status = newStatus;
+                
+                updateAdminStats();
+                renderAdminRequests(allRequests);
+                
+                if (window.parent && window.parent.showToast) {
+                    window.parent.showToast(`Request marked as ${newStatus}`, 'fa-check-circle');
+                }
+            } catch (err) {
+                console.error('Failed to update status:', err);
+            }
+        }
+        
+        async function openAdminResponse(requestId) {
+            const request = allRequests.find(r => r.id === requestId);
+            if (!request) return;
+            
+            const response = prompt(`Reply to "${request.title}":\n\nEnter your response to ${request.username}:`);
+            if (!response) return;
+            
+            try {
+                // Save admin response
+                const message = {
+                    from: 'admin',
+                    adminName: currentUsername,
+                    message: response,
+                    timestamp: Date.now()
+                };
+                
+                await fetch(`${SUPPORT_FIREBASE_URL}/requests/${requestId}/messages.json`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(message)
+                });
+                
+                // Update status to in-progress if pending
+                if (request.status === 'pending') {
+                    await updateRequestStatus(requestId, 'in-progress');
+                }
+                
+                if (window.parent && window.parent.showToast) {
+                    window.parent.showToast('Response sent!', 'fa-paper-plane');
+                }
+            } catch (err) {
+                console.error('Failed to send response:', err);
+            }
+        }
+        
+        // ==================== LIVE CHAT FUNCTIONS ====================
+        
+        async function loadLiveChats() {
+            const container = document.getElementById('adminLiveChatsList');
+            container.innerHTML = '<div style="text-align: center; padding: 2rem;"><i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--accent);"></i></div>';
+            
+            try {
+                const response = await fetch(`${SUPPORT_FIREBASE_URL}/chats.json`);
+                if (response.ok) {
+                    const data = await response.json();
+                    liveChats = data || {};
+                    renderLiveChats();
+                } else {
+                    container.innerHTML = '<div class="empty-state"><i class="fas fa-comments"></i><h3>No active chats</h3><p>Live chat sessions will appear here.</p></div>';
+                }
+            } catch (err) {
+                console.error('Failed to load live chats:', err);
+            }
+        }
+        
+        function renderLiveChats() {
+            const container = document.getElementById('adminLiveChatsList');
+            const chatEntries = Object.entries(liveChats);
+            
+            if (chatEntries.length === 0) {
+                container.innerHTML = '<div class="empty-state"><i class="fas fa-comments"></i><h3>No active chats</h3><p>Live chat sessions will appear here.</p></div>';
+                return;
+            }
+            
+            container.innerHTML = `<div class="live-chats-list">
+                ${chatEntries.map(([odropdownId, chat]) => {
+                    const messages = Object.values(chat.messages || {});
+                    const lastMsg = messages[messages.length - 1];
+                    const unreadCount = messages.filter(m => m.from === 'user' && !m.read).length;
+                    
+                    return `
+                        <div class="live-chat-item ${unreadCount > 0 ? 'has-unread' : ''}" onclick="openAdminChat('${odropdownId}')">
+                            <div class="live-chat-avatar">
+                                <i class="fas fa-user"></i>
+                            </div>
+                            <div class="live-chat-info">
+                                <div class="live-chat-name">${escapeHtml(chat.username || 'Anonymous')}</div>
+                                <div class="live-chat-preview">${lastMsg ? escapeHtml(lastMsg.message?.substring(0, 40) || '') : 'No messages'}</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div class="live-chat-time">${lastMsg ? formatTimeAgo(lastMsg.timestamp) : ''}</div>
+                                ${unreadCount > 0 ? `<div class="unread-badge">${unreadCount}</div>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>`;
+        }
+        
+        async function openAdminChat(odropdownId) {
+            currentChatUserId = odropdownId;
+            const chat = liveChats[odropdownId];
+            if (!chat) return;
+            
+            document.getElementById('adminLiveChatsList').style.display = 'none';
+            document.getElementById('adminStats').style.display = 'none';
+            document.getElementById('adminSubTabs').style.display = 'none';
+            
+            const chatView = document.getElementById('adminChatView');
+            chatView.style.display = 'block';
+            chatView.innerHTML = `
+                <div class="admin-chat-container">
+                    <div class="admin-chat-header">
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <button class="admin-chat-back" onclick="closeAdminChat()">
+                                <i class="fas fa-arrow-left"></i>
+                            </button>
+                            <div class="chat-avatar"><i class="fas fa-user"></i></div>
+                            <div class="chat-info">
+                                <h3>${escapeHtml(chat.username || 'Anonymous')}</h3>
+                                <p style="color: #22c55e;">Active chat session</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chat-messages" id="adminChatMessages"></div>
+                    <div class="chat-input-area">
+                        <input type="text" id="adminChatInput" placeholder="Type your response..." onkeypress="if(event.key==='Enter')sendAdminChatMessage()">
+                        <button class="chat-send-btn" onclick="sendAdminChatMessage()">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            // Load and display messages
+            refreshAdminChatMessages();
+            
+            // Start polling for new messages
+            if (chatPollingInterval) clearInterval(chatPollingInterval);
+            chatPollingInterval = setInterval(refreshAdminChatMessages, 3000);
+        }
+        
+        async function refreshAdminChatMessages() {
+            if (!currentChatUserId) return;
+            
+            try {
+                const response = await fetch(`${SUPPORT_FIREBASE_URL}/chats/${currentChatUserId}/messages.json`);
+                if (response.ok) {
+                    const data = await response.json();
+                    const container = document.getElementById('adminChatMessages');
+                    if (!container) return;
+                    
+                    if (data) {
+                        const messages = Object.entries(data).map(([id, msg]) => ({ id, ...msg }));
+                        messages.sort((a, b) => a.timestamp - b.timestamp);
+                        
+                        container.innerHTML = messages.map(msg => `
+                            <div class="chat-message ${msg.from === 'admin' ? 'admin' : 'bot'}">
+                                ${msg.from === 'admin' ? `<div class="admin-label"><i class="fas fa-shield-alt"></i> ${escapeHtml(msg.adminName || 'Staff')}</div>` : ''}
+                                ${escapeHtml(msg.message)}
+                            </div>
+                        `).join('');
+                        
+                        container.scrollTop = container.scrollHeight;
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to refresh messages:', err);
+            }
+        }
+        
+        async function sendAdminChatMessage() {
+            const input = document.getElementById('adminChatInput');
+            const message = input.value.trim();
+            if (!message || !currentChatUserId) return;
+            
+            input.value = '';
+            
+            try {
+                await fetch(`${SUPPORT_FIREBASE_URL}/chats/${currentChatUserId}/messages.json`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        from: 'admin',
+                        adminName: currentUsername,
+                        message: message,
+                        timestamp: Date.now()
+                    })
+                });
+                
+                refreshAdminChatMessages();
+            } catch (err) {
+                console.error('Failed to send message:', err);
+            }
+        }
+        
+        function closeAdminChat() {
+            if (chatPollingInterval) {
+                clearInterval(chatPollingInterval);
+                chatPollingInterval = null;
+            }
+            currentChatUserId = null;
+            
+            document.getElementById('adminChatView').style.display = 'none';
+            document.getElementById('adminLiveChatsList').style.display = 'block';
+            document.getElementById('adminStats').style.display = 'grid';
+            document.getElementById('adminSubTabs').style.display = 'flex';
+            
+            loadLiveChats();
+        }
+        
+        // ==================== USER LIVE CHAT FUNCTIONS ====================
+        
+        let userChatId = null;
+        let userChatPolling = null;
+        
+        async function initUserLiveChat() {
+            const userId = localStorage.getItem('veltra_userId') || 
+                ('user_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 9));
+            localStorage.setItem('veltra_userId', userId);
+            userChatId = userId;
+            
+            // Check for existing chat or create new one
+            try {
+                const response = await fetch(`${SUPPORT_FIREBASE_URL}/chats/${userChatId}.json`);
+                if (!response.ok || !(await response.json())) {
+                    // Create new chat session
+                    await fetch(`${SUPPORT_FIREBASE_URL}/chats/${userChatId}.json`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            username: localStorage.getItem('Veltra_username') || 'Anonymous',
+                            startedAt: Date.now(),
+                            messages: {}
+                        })
+                    });
+                }
+            } catch (err) {
+                console.warn('Failed to init user chat:', err);
+            }
+            
+            // Start polling for admin responses
+            if (userChatPolling) clearInterval(userChatPolling);
+            userChatPolling = setInterval(checkForAdminMessages, 5000);
+        }
+        
+        async function checkForAdminMessages() {
+            if (!userChatId) return;
+            
+            try {
+                const response = await fetch(`${SUPPORT_FIREBASE_URL}/chats/${userChatId}/messages.json`);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data) {
+                        const container = document.getElementById('chatMessages');
+                        const messages = Object.entries(data).map(([id, msg]) => ({ id, ...msg }));
+                        messages.sort((a, b) => a.timestamp - b.timestamp);
+                        
+                        // Rebuild chat with all messages including admin ones
+                        let html = `
+                            <div class="chat-message bot">
+                                <strong>Hey there! 👋</strong><br><br>
+                                I'm Veltra AI, your personal assistant. I can help you with:<br>
+                                • Using Veltra features and apps<br>
+                                • Troubleshooting issues<br>
+                                • Customizing your experience<br><br>
+                                How can I help you today?
+                            </div>
+                        `;
+                        
+                        messages.forEach(msg => {
+                            if (msg.from === 'admin') {
+                                html += `
+                                    <div class="chat-message bot" style="border-color: rgba(59, 130, 246, 0.3); background: rgba(59, 130, 246, 0.15);">
+                                        <div class="admin-label" style="color: #3b82f6;"><i class="fas fa-shield-alt"></i> ${escapeHtml(msg.adminName || 'Support Staff')}</div>
+                                        ${escapeHtml(msg.message)}
+                                    </div>
+                                `;
+                            } else if (msg.from === 'user') {
+                                html += `<div class="chat-message user">${escapeHtml(msg.message)}</div>`;
+                            } else if (msg.from === 'bot') {
+                                html += `<div class="chat-message bot">${msg.message}</div>`;
+                            }
+                        });
+                        
+                        container.innerHTML = html;
+                        container.scrollTop = container.scrollHeight;
+                    }
+                }
+            } catch (err) {
+                console.warn('Failed to check for admin messages:', err);
+            }
+        }
+
+        // Initialize
+        checkAdminStatus();
+        loadMyRequests();
+        
+        // If admin, preload admin data
+        if (isAdmin) {
+            console.log('[Support] Admin mode enabled for:', currentUsername);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to Veltra</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0a0e1a 0%, #151923 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Animated background */
+        .bg-particles {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        .particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: rgba(125, 211, 192, 0.3);
+            border-radius: 50%;
+            animation: float 15s infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(100vh) scale(0); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: translateY(-10vh) scale(1); opacity: 0; }
+        }
+
+        /* Walkthrough container */
+        .walkthrough-container {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        /* Slide */
+        .slide {
+            position: absolute;
+            width: 100%;
+            max-width: 600px;
+            padding: 2rem;
+            opacity: 0;
+            transform: translateX(100px);
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            pointer-events: none;
+        }
+
+        .slide.active {
+            opacity: 1;
+            transform: translateX(0);
+            pointer-events: auto;
+        }
+
+        .slide.exit {
+            opacity: 0;
+            transform: translateX(-100px);
+        }
+
+        /* Slide content */
+        .slide-icon {
+            width: 100px;
+            height: 100px;
+            background: linear-gradient(135deg, rgba(125, 211, 192, 0.2), rgba(125, 211, 192, 0.1));
+            border: 2px solid rgba(125, 211, 192, 0.3);
+            border-radius: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 2rem;
+            font-size: 2.5rem;
+            color: #7dd3c0;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(125, 211, 192, 0.4); }
+            50% { transform: scale(1.05); box-shadow: 0 0 30px 10px rgba(125, 211, 192, 0.2); }
+        }
+
+        .slide h1 {
+            font-size: 2rem;
+            text-align: center;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, #7dd3c0, #5ec4ab);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .slide p {
+            text-align: center;
+            color: #888;
+            font-size: 1rem;
+            line-height: 1.7;
+            margin-bottom: 1.5rem;
+        }
+
+        /* Feature cards */
+        .feature-cards {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin: 1.5rem 0;
+        }
+
+        .feature-card {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem 1.25rem;
+            background: rgba(30, 35, 48, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .feature-card:hover {
+            border-color: rgba(125, 211, 192, 0.3);
+            background: rgba(125, 211, 192, 0.05);
+            transform: translateX(5px);
+        }
+
+        .feature-card.recommended {
+            border-color: rgba(125, 211, 192, 0.5);
+            background: rgba(125, 211, 192, 0.1);
+        }
+
+        .feature-card.recommended::after {
+            content: 'Recommended';
+            position: absolute;
+            right: 1rem;
+            font-size: 0.7rem;
+            color: #7dd3c0;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .feature-card-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+
+        .feature-card-icon.uv { background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(139, 92, 246, 0.3)); color: #a855f7; }
+        .feature-card-icon.browser { background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(37, 99, 235, 0.3)); color: #3b82f6; }
+        .feature-card-icon.apps { background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(22, 163, 74, 0.3)); color: #22c55e; }
+        .feature-card-icon.themes { background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(245, 158, 11, 0.3)); color: #fbbf24; }
+        .feature-card-icon.files { background: linear-gradient(135deg, rgba(236, 72, 153, 0.2), rgba(219, 39, 119, 0.3)); color: #ec4899; }
+        .feature-card-icon.nebula { background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(124, 58, 237, 0.3)); color: #a855f7; }
+
+        .feature-card-content h3 {
+            font-size: 0.95rem;
+            color: #e0e0e0;
+            margin-bottom: 0.25rem;
+        }
+
+        .feature-card-content p {
+            font-size: 0.8rem;
+            color: #888;
+            text-align: left;
+            margin: 0;
+        }
+
+        .feature-badge {
+            margin-left: auto;
+            padding: 0.25rem 0.75rem;
+            background: rgba(125, 211, 192, 0.2);
+            border-radius: 20px;
+            font-size: 0.7rem;
+            color: #7dd3c0;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        /* Progress indicator */
+        .progress-dots {
+            display: flex;
+            justify-content: center;
+            gap: 0.5rem;
+            margin: 2rem 0 1.5rem;
+        }
+
+        .progress-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(125, 211, 192, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .progress-dot.active {
+            background: #7dd3c0;
+            width: 24px;
+            border-radius: 4px;
+        }
+
+        .progress-dot.completed {
+            background: rgba(125, 211, 192, 0.5);
+        }
+
+        /* Navigation buttons */
+        .nav-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+        }
+
+        .nav-btn {
+            padding: 0.875rem 2rem;
+            border: none;
+            border-radius: 12px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .nav-btn-primary {
+            background: linear-gradient(135deg, #7dd3c0, #5ec4ab);
+            color: #0a0e1a;
+        }
+
+        .nav-btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(125, 211, 192, 0.3);
+        }
+
+        .nav-btn-secondary {
+            background: rgba(255, 255, 255, 0.08);
+            color: #e0e0e0;
+        }
+
+        .nav-btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.12);
+        }
+
+        .nav-btn-skip {
+            position: absolute;
+            top: 1.5rem;
+            right: 1.5rem;
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #888;
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
+        }
+
+        .nav-btn-skip:hover {
+            border-color: rgba(125, 211, 192, 0.3);
+            color: #7dd3c0;
+        }
+
+        /* Checkbox for "Don't show again" */
+        .dont-show-again {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-top: 1.5rem;
+            color: #888;
+            font-size: 0.85rem;
+        }
+
+        .dont-show-again input {
+            width: 18px;
+            height: 18px;
+            accent-color: #7dd3c0;
+        }
+
+        /* Tip box */
+        .tip-box {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            padding: 1rem;
+            background: rgba(251, 191, 36, 0.1);
+            border: 1px solid rgba(251, 191, 36, 0.2);
+            border-radius: 12px;
+            margin: 1rem 0;
+        }
+
+        .tip-box i {
+            color: #fbbf24;
+            font-size: 1.1rem;
+            margin-top: 0.1rem;
+        }
+
+        .tip-box p {
+            text-align: left;
+            margin: 0;
+            font-size: 0.85rem;
+            color: #e0e0e0;
+        }
+
+        /* Install button in cards */
+        .install-btn {
+            padding: 0.5rem 1rem;
+            background: linear-gradient(135deg, #7dd3c0, #5ec4ab);
+            border: none;
+            border-radius: 8px;
+            color: #0a0e1a;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-left: auto;
+        }
+
+        .install-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .install-btn.installed {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+        }
+
+        /* Animation for entrance */
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .animate-in {
+            animation: slideUp 0.5s ease forwards;
+        }
+
+        .delay-1 { animation-delay: 0.1s; opacity: 0; }
+        .delay-2 { animation-delay: 0.2s; opacity: 0; }
+        .delay-3 { animation-delay: 0.3s; opacity: 0; }
+        .delay-4 { animation-delay: 0.4s; opacity: 0; }
+    </style>
+</head>
+<body>
+    <!-- Animated particles -->
+    <div class="bg-particles" id="particles"></div>
+
+    <div class="walkthrough-container">
+        <!-- Skip button -->
+        <button class="nav-btn nav-btn-skip" onclick="skipWalkthrough()">
+            Skip <i class="fas fa-forward"></i>
+        </button>
+
+        <!-- Slide 1: Welcome -->
+        <div class="slide active" id="slide-0">
+            <div class="slide-icon animate-in">
+                <i class="fas fa-fish"></i>
+            </div>
+            <h1 class="animate-in delay-1">Welcome to Veltra!</h1>
+            <p class="animate-in delay-2">
+                Your new favorite web-based operating system. Let's take a quick tour to help you get the most out of Veltra.
+            </p>
+            <div class="progress-dots animate-in delay-3">
+                <div class="progress-dot active"></div>
+                <div class="progress-dot"></div>
+                <div class="progress-dot"></div>
+                <div class="progress-dot"></div>
+                <div class="progress-dot"></div>
+            </div>
+            <div class="nav-buttons animate-in delay-4">
+                <button class="nav-btn nav-btn-primary" onclick="nextSlide()">
+                    Get Started <i class="fas fa-arrow-right"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Slide 2: Browser & Ultraviolet -->
+        <div class="slide" id="slide-1">
+            <div class="slide-icon">
+                <i class="fas fa-globe"></i>
+            </div>
+            <h1>Browse Freely</h1>
+            <p>
+                Need to access blocked websites? Veltra has you covered with powerful browsing tools.
+            </p>
+            <div class="feature-cards">
+                <div class="feature-card recommended" style="position: relative;">
+                    <div class="feature-card-icon uv">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <div class="feature-card-content">
+                        <h3>Ultraviolet</h3>
+                        <p>The best unblocker for YouTube, Discord, social media & more</p>
+                    </div>
+                    <button class="install-btn" id="installUV" onclick="installFromWalkthrough('uv')">Install</button>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-card-icon browser">
+                        <i class="fas fa-compass"></i>
+                    </div>
+                    <div class="feature-card-content">
+                        <h3>Veltra Browser</h3>
+                        <p>Built-in browser for quick browsing</p>
+                    </div>
+                    <span class="feature-badge">Pre-installed</span>
+                </div>
+            </div>
+            <div class="tip-box">
+                <i class="fas fa-lightbulb"></i>
+                <p><strong>Pro tip:</strong> Ultraviolet works with video sites, login systems, and even games. It's the most reliable option for unblocking!</p>
+            </div>
+            <div class="progress-dots">
+                <div class="progress-dot completed"></div>
+                <div class="progress-dot active"></div>
+                <div class="progress-dot"></div>
+                <div class="progress-dot"></div>
+                <div class="progress-dot"></div>
+            </div>
+            <div class="nav-buttons">
+                <button class="nav-btn nav-btn-secondary" onclick="prevSlide()">
+                    <i class="fas fa-arrow-left"></i> Back
+                </button>
+                <button class="nav-btn nav-btn-primary" onclick="nextSlide()">
+                    Continue <i class="fas fa-arrow-right"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Slide 3: App Store -->
+        <div class="slide" id="slide-2">
+            <div class="slide-icon">
+                <i class="fas fa-store"></i>
+            </div>
+            <h1>Discover Apps</h1>
+            <p>
+                The App Store is your gateway to new features and experiences. Install apps, themes, and tools!
+            </p>
+            <div class="feature-cards">
+                <div class="feature-card" onclick="openAppFromWalkthrough('appstore')">
+                    <div class="feature-card-icon apps">
+                        <i class="fas fa-rocket"></i>
+                    </div>
+                    <div class="feature-card-content">
+                        <h3>Productivity Apps</h3>
+                        <p>Task Manager, Startup Apps, Snap Manager & more</p>
+                    </div>
+                    <i class="fas fa-chevron-right" style="color: #888;"></i>
+                </div>
+                <div class="feature-card" onclick="openAppFromWalkthrough('appstore')">
+                    <div class="feature-card-icon themes">
+                        <i class="fas fa-palette"></i>
+                    </div>
+                    <div class="feature-card-content">
+                        <h3>Beautiful Themes</h3>
+                        <p>Dark, Light, Purple, Blue, Golden & more</p>
+                    </div>
+                    <i class="fas fa-chevron-right" style="color: #888;"></i>
+                </div>
+                <div class="feature-card" onclick="openAppFromWalkthrough('appstore')">
+                    <div class="feature-card-icon nebula">
+                        <i class="fas fa-cloud"></i>
+                    </div>
+                    <div class="feature-card-content">
+                        <h3>Coming Soon: Nebula</h3>
+                        <p>Real browser streaming proxy for TikTok, Roblox & more</p>
+                    </div>
+                    <span class="feature-badge">Preview</span>
+                </div>
+            </div>
+            <div class="progress-dots">
+                <div class="progress-dot completed"></div>
+                <div class="progress-dot completed"></div>
+                <div class="progress-dot active"></div>
+                <div class="progress-dot"></div>
+                <div class="progress-dot"></div>
+            </div>
+            <div class="nav-buttons">
+                <button class="nav-btn nav-btn-secondary" onclick="prevSlide()">
+                    <i class="fas fa-arrow-left"></i> Back
+                </button>
+                <button class="nav-btn nav-btn-primary" onclick="nextSlide()">
+                    Continue <i class="fas fa-arrow-right"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Slide 4: Customization -->
+        <div class="slide" id="slide-3">
+            <div class="slide-icon">
+                <i class="fas fa-magic"></i>
+            </div>
+            <h1>Make It Yours</h1>
+            <p>
+                Veltra is highly customizable. Change themes, wallpapers, and settings to match your style.
+            </p>
+            <div class="feature-cards">
+                <div class="feature-card" onclick="openAppFromWalkthrough('settings')">
+                    <div class="feature-card-icon" style="background: linear-gradient(135deg, rgba(125, 211, 192, 0.2), rgba(94, 196, 171, 0.3)); color: #7dd3c0;">
+                        <i class="fas fa-cog"></i>
+                    </div>
+                    <div class="feature-card-content">
+                        <h3>Settings</h3>
+                        <p>Wallpapers, clock format, taskbar style & more</p>
+                    </div>
+                    <i class="fas fa-chevron-right" style="color: #888;"></i>
+                </div>
+                <div class="feature-card" onclick="openAppFromWalkthrough('cloaking')">
+                    <div class="feature-card-icon" style="background: linear-gradient(135deg, rgba(107, 114, 128, 0.2), rgba(75, 85, 99, 0.3)); color: #6b7280;">
+                        <i class="fas fa-mask"></i>
+                    </div>
+                    <div class="feature-card-content">
+                        <h3>Cloaking</h3>
+                        <p>Hide Veltra by disguising the tab</p>
+                    </div>
+                    <i class="fas fa-chevron-right" style="color: #888;"></i>
+                </div>
+            </div>
+            <div class="tip-box">
+                <i class="fas fa-star"></i>
+                <p><strong>Did you know?</strong> You can right-click on the desktop for quick actions, and drag icons to rearrange them!</p>
+            </div>
+            <div class="progress-dots">
+                <div class="progress-dot completed"></div>
+                <div class="progress-dot completed"></div>
+                <div class="progress-dot completed"></div>
+                <div class="progress-dot active"></div>
+                <div class="progress-dot"></div>
+            </div>
+            <div class="nav-buttons">
+                <button class="nav-btn nav-btn-secondary" onclick="prevSlide()">
+                    <i class="fas fa-arrow-left"></i> Back
+                </button>
+                <button class="nav-btn nav-btn-primary" onclick="nextSlide()">
+                    Continue <i class="fas fa-arrow-right"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Slide 5: Get Help & Finish -->
+        <div class="slide" id="slide-4">
+            <div class="slide-icon">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <h1>You're All Set!</h1>
+            <p>
+                Need help anytime? We've got you covered with these resources.
+            </p>
+            <div class="feature-cards">
+                <div class="feature-card" onclick="openAppFromWalkthrough('support')">
+                    <div class="feature-card-icon" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(37, 99, 235, 0.3)); color: #3b82f6;">
+                        <i class="fas fa-headset"></i>
+                    </div>
+                    <div class="feature-card-content">
+                        <h3>Support Center</h3>
+                        <p>Bug reports, feature requests, AI chat & FAQ</p>
+                    </div>
+                    <i class="fas fa-chevron-right" style="color: #888;"></i>
+                </div>
+                <div class="feature-card" onclick="openAppFromWalkthrough('help')">
+                    <div class="feature-card-icon" style="background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(245, 158, 11, 0.3)); color: #fbbf24;">
+                        <i class="fas fa-book-open"></i>
+                    </div>
+                    <div class="feature-card-content">
+                        <h3>Help Guide</h3>
+                        <p>Detailed documentation and tutorials</p>
+                    </div>
+                    <i class="fas fa-chevron-right" style="color: #888;"></i>
+                </div>
+                <div class="feature-card" onclick="openAppFromWalkthrough('veltra-ai')">
+                    <div class="feature-card-icon" style="background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(139, 92, 246, 0.3)); color: #a855f7;">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <div class="feature-card-content">
+                        <h3>Veltra AI</h3>
+                        <p>Your personal AI assistant</p>
+                    </div>
+                    <i class="fas fa-chevron-right" style="color: #888;"></i>
+                </div>
+            </div>
+            <div class="progress-dots">
+                <div class="progress-dot completed"></div>
+                <div class="progress-dot completed"></div>
+                <div class="progress-dot completed"></div>
+                <div class="progress-dot completed"></div>
+                <div class="progress-dot active"></div>
+            </div>
+            <div class="nav-buttons">
+                <button class="nav-btn nav-btn-secondary" onclick="prevSlide()">
+                    <i class="fas fa-arrow-left"></i> Back
+                </button>
+                <button class="nav-btn nav-btn-primary" onclick="finishWalkthrough()">
+                    <i class="fas fa-rocket"></i> Start Using Veltra
+                </button>
+            </div>
+            <label class="dont-show-again">
+                <input type="checkbox" id="dontShowAgain" onchange="toggleDontShow()">
+                Don't show this again
+            </label>
+        </div>
+    </div>
+
+    <script>
+        let currentSlide = 0;
+        const totalSlides = 5;
+
+        // Create particles
+        function createParticles() {
+            const container = document.getElementById('particles');
+            for (let i = 0; i < 30; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.animationDelay = Math.random() * 15 + 's';
+                particle.style.animationDuration = (10 + Math.random() * 10) + 's';
+                container.appendChild(particle);
+            }
+        }
+        createParticles();
+
+        function nextSlide() {
+            if (currentSlide < totalSlides - 1) {
+                document.getElementById(`slide-${currentSlide}`).classList.remove('active');
+                document.getElementById(`slide-${currentSlide}`).classList.add('exit');
+                currentSlide++;
+                setTimeout(() => {
+                    document.getElementById(`slide-${currentSlide - 1}`).classList.remove('exit');
+                    document.getElementById(`slide-${currentSlide}`).classList.add('active');
+                }, 100);
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlide > 0) {
+                document.getElementById(`slide-${currentSlide}`).classList.remove('active');
+                currentSlide--;
+                document.getElementById(`slide-${currentSlide}`).classList.add('active');
+            }
+        }
+
+        function skipWalkthrough() {
+            finishWalkthrough();
+        }
+
+        function finishWalkthrough() {
+            // Save completion status
+            localStorage.setItem('Veltra_walkthroughComplete', 'true');
+            
+            if (document.getElementById('dontShowAgain').checked) {
+                localStorage.setItem('Veltra_showWalkthrough', 'false');
+            }
+            
+            // Close the walkthrough window
+            if (window.parent && window.parent.closeApp) {
+                window.parent.closeApp('walkthrough');
+            }
+            
+            if (window.parent && window.parent.showToast) {
+                window.parent.showToast('Welcome to Veltra! Enjoy exploring.', 'fa-rocket');
+            }
+        }
+
+        function toggleDontShow() {
+            const checked = document.getElementById('dontShowAgain').checked;
+            localStorage.setItem('Veltra_showWalkthrough', checked ? 'false' : 'true');
+        }
+
+        function installFromWalkthrough(appName) {
+            const btn = document.getElementById('installUV');
+            
+            if (window.parent && window.parent.installApp) {
+                window.parent.installApp(appName);
+                btn.textContent = 'Installed';
+                btn.classList.add('installed');
+                btn.disabled = true;
+            }
+        }
+
+        function openAppFromWalkthrough(appName) {
+            if (window.parent && window.parent.openApp) {
+                window.parent.openApp(appName);
+            }
+        }
+
+        // Check if UV is already installed
+        document.addEventListener('DOMContentLoaded', () => {
+            try {
+                const installedApps = JSON.parse(localStorage.getItem('Veltra_installedApps') || '[]');
+                if (installedApps.includes('uv')) {
+                    const btn = document.getElementById('installUV');
+                    if (btn) {
+                        btn.textContent = 'Installed';
+                        btn.classList.add('installed');
+                        btn.disabled = true;
+                    }
+                }
+            } catch (e) {}
+        });
+    </script>
+</body>
+</html>

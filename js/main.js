@@ -1374,29 +1374,22 @@ async function getMelodifyBackendUrl() {
   try {
     const response = await fetch(MELODIFY_FIREBASE_URL);
     const data = await response.json();
-    if (data?.url) {
-      // Test if server is actually responding
-      try {
-        const testResp = await fetch(data.url + '/api/health', { method: 'HEAD', signal: AbortSignal.timeout(3000) });
-        if (testResp.ok) {
-          melodifyBackendCache = { url: data.url, lastFetch: now };
-          MUSIC_SERVER_URL = data.url;
-          console.log('[Melodify] Using Firebase backend:', data.url);
-          return data.url;
-        }
-      } catch (e) {
-        console.warn('[Melodify] Firebase backend not responding:', e.message);
-      }
+    if (data?.url && data?.status === 'online') {
+      // Firebase confirms server is online, trust it without health check
+      melodifyBackendCache = { url: data.url, lastFetch: now };
+      MUSIC_SERVER_URL = data.url;
+      console.log('[Melodify] Using Firebase backend:', data.url);
+      return data.url;
     }
   } catch (err) {
     console.warn('[Melodify] Firebase fetch failed:', err.message);
   }
   
-  // Try fallback servers
+  // Try fallback servers with simple GET test
   for (const fallback of MELODIFY_FALLBACK_SERVERS) {
     try {
-      const testResp = await fetch(fallback + '/api/health', { method: 'HEAD', signal: AbortSignal.timeout(3000) });
-      if (testResp.ok) {
+      const testResp = await fetch(fallback, { method: 'HEAD', signal: AbortSignal.timeout(3000) });
+      if (testResp.ok || testResp.status < 500) {
         console.log('[Melodify] Using fallback backend:', fallback);
         melodifyBackendCache = { url: fallback, lastFetch: now };
         MUSIC_SERVER_URL = fallback;

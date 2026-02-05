@@ -73,12 +73,7 @@
         </div>
         <div class="startup-content">
             <div class="startup-logo-container">
-                <div class="startup-logo-ring"></div>
-                <div class="startup-logo-ring delay-1"></div>
-                <div class="startup-logo-ring delay-2"></div>
-                <div class="startup-logo">
-                    <img src="logo.png" alt="Veltra" style="width: 50px; height: 50px; object-fit: contain;">
-                </div>
+                <img src="logo.png" alt="Veltra" class="startup-logo-img" style="width: 120px; height: 120px; object-fit: contain; animation: startupLogoPulse 2s ease-in-out infinite;">
             </div>
             <h1 class="startup-title">Veltra</h1>
             <p class="startup-subtitle">Initializing your workspace...</p>
@@ -89,7 +84,7 @@
     </div>
 
     <div id="bootloader">
-        <div class="boot-logo"><img src="logo.png" alt="Veltra" style="width: 80px; height: 80px; object-fit: contain;"></div>
+        <div class="boot-logo"><img src="logo.png" alt="Veltra" style="width: 120px; height: 120px; object-fit: contain;"></div>
         <h1 class="boot-title"><b>Veltra</b></h1>
         <div class="boot-version">Version 1.5</div>
         <div class="boot-options" id="bootOptions">
@@ -202,7 +197,7 @@
             <div style="text-align: center; margin-bottom: 2.5rem;">
                 <div
                     style="width: 100px; height: 100px; background: linear-gradient(135deg, var(--accent), var(--accent-hover)); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; animation: float 3s ease-in-out infinite;">
-                    <img src="logo.png" alt="Veltra" style="width: 60px; height: 60px; object-fit: contain;">
+                    <img src="logo.png" alt="Veltra" style="width: 100px; height: 100px; object-fit: contain;">
                 </div>
                 <h2 style="font-size: 2rem; margin-bottom: 0.5rem; color: var(--text-primary); font-family: fontb;">
                     Welcome to Veltra
@@ -436,7 +431,6 @@
 
     <div id="desktop">
         <div class="wallpaper">
-            <img src="logo.png" alt="Veltra" class="wallpaper-icon" style="width: 120px; height: 120px; object-fit: contain;">
             <div class="wallpaper-text">Veltra</div>
             <p class="wallpaper-byline">by dinguschan</p>
         </div>
@@ -508,7 +502,7 @@
         </div>
         <div id="taskbar" class="taskbar">
             <div class="taskbar-icon" onclick="toggleStartMenu()">
-                <img src="logo.png" alt="Veltra" style="width: 24px; height: 24px; object-fit: contain;">
+                <img src="logo.png" alt="Veltra" style="width: 32px; height: 32px; object-fit: contain;">
             </div>
             <div class="taskbar-divider"></div>
             <div class="taskbar-icon" onclick="toggleApp('files')" title="Files" data-app="files">

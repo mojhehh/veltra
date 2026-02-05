@@ -1258,7 +1258,9 @@
         let chatPollingInterval = null;
         
         function checkAdminStatus() {
-            currentUsername = localStorage.getItem('Veltra_username') || '';
+            // Try both cases of username storage
+            currentUsername = localStorage.getItem('Veltra_username') || localStorage.getItem('veltra_username') || '';
+            console.log('Support Center - Current username:', currentUsername, 'isAdmin:', ADMIN_USERS.includes(currentUsername.toLowerCase()));
             isAdmin = ADMIN_USERS.includes(currentUsername.toLowerCase());
             
             const adminTab = document.getElementById('adminTab');

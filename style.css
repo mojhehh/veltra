@@ -8527,6 +8527,12 @@ select {
     margin-bottom: 2rem;
 }
 
+.startup-logo-img {
+    background: transparent !important;
+    border-radius: 0;
+    box-shadow: none;
+}
+
 .startup-logo-ring {
     position: absolute;
     inset: 0;

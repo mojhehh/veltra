@@ -8537,6 +8537,26 @@ select {
     background: transparent !important;
 }
 
+/* Startup fish icon animation */
+.startup-fish-icon {
+    font-size: 5rem !important;
+    color: var(--accent) !important;
+    text-shadow: 0 0 40px rgba(125, 211, 192, 0.6), 0 0 80px rgba(125, 211, 192, 0.3);
+    animation: startupFishFloat 2s ease-in-out infinite !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+@keyframes startupFishFloat {
+    0%, 100% {
+        transform: translateY(0) scale(1);
+    }
+    50% {
+        transform: translateY(-10px) scale(1.05);
+    }
+}
+
 /* Universal fish icon styling - no boxes anywhere */
 i.fa-fish,
 .fa-fish {

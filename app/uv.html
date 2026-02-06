@@ -330,7 +330,7 @@
     <iframe src="" frameborder="0" id="iframe"></iframe>
 
     <script>
-        const se = localStorage.getItem("nOS_searchEngine") || "https://search.brave.com/search?q="
+        const se = localStorage.getItem("veltra_searchEngine") || "https://search.brave.com/search?q="
         const bar = document.getElementById("urlbar")
 
         if (se === "https://duckduckgo.com/search?q=") {
@@ -648,7 +648,7 @@
             let url = i.trim()
 
             if (!url.includes(".") || url.includes(" ")) {
-                const se = localStorage.getItem("nOS_searchEngine") || "https://search.brave.com/search?q="
+                const se = localStorage.getItem("veltra_searchEngine") || "https://search.brave.com/search?q="
                 url = se + encodeURIComponent(url)
             } else {
                 if (!url.startsWith("http://") && !url.startsWith("https://")) {

@@ -1389,15 +1389,23 @@ function closeToast(btn) {
 }
 
 // Startup Animation Handler
+let startupAnimationComplete = false;
+
 function initStartupAnimation() {
   const startupEl = document.getElementById("startupAnimation");
-  if (!startupEl) return;
+  if (!startupEl) {
+    startupAnimationComplete = true;
+    startBootAfterAnimation();
+    return;
+  }
   
   // Check if user disabled startup animation
   const skipStartup = localStorage.getItem("veltra_skipStartupAnimation") === "true";
   
   if (skipStartup) {
     startupEl.classList.add("hidden");
+    startupAnimationComplete = true;
+    startBootAfterAnimation();
     return;
   }
   
@@ -1406,14 +1414,16 @@ function initStartupAnimation() {
     startupEl.classList.add("fade-out");
     setTimeout(() => {
       startupEl.classList.add("hidden");
+      startupAnimationComplete = true;
+      startBootAfterAnimation();
     }, 800);
   }, 3500);
 }
 
-// Initialize startup animation immediately
-document.addEventListener("DOMContentLoaded", initStartupAnimation);
-
-window.addEventListener("DOMContentLoaded", () => {
+// Start boot sequence only after startup animation is done
+function startBootAfterAnimation() {
+  if (!startupAnimationComplete) return;
+  
   const savedBootChoice = localStorage.getItem("Veltra_bootChoice");
   if (savedBootChoice !== null) {
     bootSelectedIndex = parseInt(savedBootChoice, 10);
@@ -1421,7 +1431,10 @@ window.addEventListener("DOMContentLoaded", () => {
   } else {
     startBootCountdown();
   }
-});
+}
+
+// Initialize startup animation immediately
+document.addEventListener("DOMContentLoaded", initStartupAnimation);
 const appMetadata = {
   files: { name: "Files", icon: "fa-folder", preinstalled: true },
   terminal: { name: "Terminal", icon: "fa-terminal", preinstalled: true },

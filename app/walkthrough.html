@@ -434,7 +434,7 @@
                         <h3>Ultraviolet</h3>
                         <p>The best unblocker for YouTube, Discord, social media & more</p>
                     </div>
-                    <button class="install-btn" id="installUV" onclick="installFromWalkthrough('uv')">Install</button>
+                    <span class="feature-badge">Pre-installed</span>
                 </div>
                 <div class="feature-card">
                     <div class="feature-card-icon browser">
@@ -691,13 +691,26 @@
                 localStorage.setItem('Veltra_showWalkthrough', 'false');
             }
             
-            // Close the walkthrough window
+            // Show toast first
+            if (window.parent && window.parent.showToast) {
+                window.parent.showToast('Welcome to Veltra! Enjoy exploring.', 'fa-rocket');
+            }
+            
+            // Close the walkthrough window - try multiple methods
             if (window.parent && window.parent.closeApp) {
                 window.parent.closeApp('walkthrough');
             }
             
-            if (window.parent && window.parent.showToast) {
-                window.parent.showToast('Welcome to Veltra! Enjoy exploring.', 'fa-rocket');
+            // Also try closing via the window element directly
+            if (window.parent && window.parent.document) {
+                const walkthroughWindow = window.parent.document.querySelector('.window[data-app="walkthrough"]');
+                if (walkthroughWindow) {
+                    walkthroughWindow.remove();
+                    // Update taskbar
+                    if (window.parent.updateTaskbar) {
+                        window.parent.updateTaskbar();
+                    }
+                }
             }
         }
 

@@ -39,6 +39,19 @@
     "backends": {
       ".read": true,
       ".write": true
+    },
+    "support": {
+      ".read": true,
+      ".write": true,
+      "requests": {
+        ".read": true,
+        ".write": true,
+        ".indexOn": ["userId", "status", "createdAt"]
+      },
+      "chats": {
+        ".read": true,
+        ".write": true
+      }
     }
   }
 }

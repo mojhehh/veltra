@@ -1253,9 +1253,11 @@
         let isAdmin = false;
         let currentUsername = '';
         let currentChatUserId = null;
+        let currentAdminRequestId = null;
         let allRequests = [];
         let liveChats = {};
         let chatPollingInterval = null;
+        let requestChatPollingInterval = null;
         
         function checkAdminStatus() {
             // Try both cases of username storage
@@ -1565,28 +1567,61 @@
         
         async function sendRequestMessage(requestId) {
             const input = document.getElementById('requestChatInput');
-            const message = input.value.trim();
-            if (!message) return;
+            if (!input) return;
             
+            const message = input.value.trim();
+            
+            // Validation
+            if (!message) return;
+            if (message.length > 2000) {
+                if (window.parent && window.parent.showToast) {
+                    window.parent.showToast('Message too long (max 2000 characters)', 'fa-exclamation-circle');
+                }
+                return;
+            }
+            if (!requestId) {
+                console.warn('No request ID provided');
+                return;
+            }
+            
+            // Disable input while sending
+            input.disabled = true;
+            const savedMessage = message;
             input.value = '';
             
             try {
-                await fetch(`${SUPPORT_FIREBASE_URL}/requests/${requestId}/messages.json`, {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
+                
+                const response = await fetch(`${SUPPORT_FIREBASE_URL}/requests/${requestId}/messages.json`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         from: 'user',
-                        username: currentUsername,
-                        message: message,
+                        username: currentUsername || 'User',
+                        message: savedMessage,
                         timestamp: Date.now()
-                    })
+                    }),
+                    signal: controller.signal
                 });
+                
+                clearTimeout(timeoutId);
+                
+                if (!response.ok) {
+                    throw new Error('Failed to send');
+                }
+                
                 loadRequestMessages(requestId);
             } catch (err) {
                 console.error('Failed to send message:', err);
+                // Restore message on failure
+                input.value = savedMessage;
                 if (window.parent && window.parent.showToast) {
-                    window.parent.showToast('Failed to send message', 'fa-exclamation-circle');
+                    window.parent.showToast('Failed to send message. Please try again.', 'fa-exclamation-circle');
                 }
+            } finally {
+                input.disabled = false;
+                input.focus();
             }
         }
 
@@ -1731,7 +1766,7 @@
             }
             
             container.innerHTML = requests.map(req => `
-                <div class="admin-request-item">
+                <div class="admin-request-item" onclick="openAdminResponse('${req.id}')" style="cursor: pointer;">
                     <div class="admin-request-user">
                         <i class="fas fa-user"></i>
                         ${escapeHtml(req.username || 'Anonymous')}
@@ -1748,7 +1783,7 @@
                     </div>
                     <div class="admin-actions">
                         <button class="admin-action-btn respond" onclick="event.stopPropagation(); openAdminResponse('${req.id}')">
-                            <i class="fas fa-reply"></i> Respond
+                            <i class="fas fa-comments"></i> Chat
                         </button>
                         <button class="admin-action-btn resolve" onclick="event.stopPropagation(); updateRequestStatus('${req.id}', 'resolved')">
                             <i class="fas fa-check"></i> Resolve
@@ -1835,34 +1870,209 @@
             const request = allRequests.find(r => r.id === requestId);
             if (!request) return;
             
-            const response = prompt(`Reply to "${request.title}":\n\nEnter your response to ${request.username}:`);
-            if (!response) return;
+            currentAdminRequestId = requestId;
+            
+            // Hide other admin UI elements
+            document.getElementById('adminRequestsList').style.display = 'none';
+            document.getElementById('adminStats').style.display = 'none';
+            document.getElementById('adminSubTabs').style.display = 'none';
+            document.getElementById('adminFilters').style.display = 'none';
+            
+            // Show the chat view
+            const chatView = document.getElementById('adminChatView');
+            chatView.style.display = 'block';
+            chatView.innerHTML = `
+                <div class="admin-chat-container">
+                    <div class="admin-chat-header">
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <button class="admin-chat-back" onclick="closeAdminRequestChat()">
+                                <i class="fas fa-arrow-left"></i>
+                            </button>
+                            <div class="chat-info" style="flex: 1;">
+                                <h3 style="margin: 0; font-size: 1rem;">${escapeHtml(request.title)}</h3>
+                                <p style="margin: 0; font-size: 0.8rem; color: #888;">From: ${escapeHtml(request.username || 'Anonymous')} • <span class="request-status ${request.status}" style="font-size: 0.75rem;">${request.status.replace('-', ' ')}</span></p>
+                            </div>
+                        </div>
+                        <div class="admin-chat-actions" style="display: flex; gap: 0.5rem;">
+                            <button class="admin-action-btn resolve" onclick="updateRequestStatusFromChat('${requestId}', 'in-progress')" style="padding: 0.4rem 0.75rem; font-size: 0.75rem;">
+                                <i class="fas fa-clock"></i> In Progress
+                            </button>
+                            <button class="admin-action-btn resolve" onclick="updateRequestStatusFromChat('${requestId}', 'resolved')" style="padding: 0.4rem 0.75rem; font-size: 0.75rem;">
+                                <i class="fas fa-check"></i> Resolve
+                            </button>
+                            <button class="admin-action-btn close" onclick="updateRequestStatusFromChat('${requestId}', 'closed')" style="padding: 0.4rem 0.75rem; font-size: 0.75rem;">
+                                <i class="fas fa-times"></i> Close
+                            </button>
+                        </div>
+                    </div>
+                    <div class="request-details-card" style="background: rgba(255,255,255,0.03); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">
+                        <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+                            <span style="background: rgba(139, 92, 246, 0.2); color: var(--accent); padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem;">
+                                <i class="fas fa-${request.type === 'bug' ? 'bug' : request.type === 'feature' ? 'lightbulb' : 'heart'}"></i> ${request.type}
+                            </span>
+                            ${request.severity ? `<span style="background: rgba(239, 68, 68, 0.2); color: #ef4444; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem;"><i class="fas fa-exclamation-circle"></i> ${request.severity}</span>` : ''}
+                        </div>
+                        <p style="margin: 0; color: #ccc; font-size: 0.85rem;">${escapeHtml(request.description || 'No description provided.')}</p>
+                        <p style="margin: 0.5rem 0 0; color: #666; font-size: 0.75rem;"><i class="far fa-clock"></i> ${formatTimeAgo(request.createdAt)}</p>
+                    </div>
+                    <div class="chat-messages" id="adminRequestChatMessages" style="flex: 1; overflow-y: auto; padding: 1rem 0;"></div>
+                    <div class="chat-input-area">
+                        <input type="text" id="adminRequestChatInput" placeholder="Type your response..." onkeypress="if(event.key==='Enter')sendAdminRequestMessage()">
+                        <button class="chat-send-btn" onclick="sendAdminRequestMessage()">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            // Load messages
+            refreshAdminRequestChatMessages();
+            
+            // Start polling for new messages
+            if (requestChatPollingInterval) clearInterval(requestChatPollingInterval);
+            requestChatPollingInterval = setInterval(refreshAdminRequestChatMessages, 3000);
+            
+            // Update status to in-progress if pending
+            if (request.status === 'pending') {
+                await updateRequestStatus(requestId, 'in-progress');
+            }
+        }
+        
+        function closeAdminRequestChat() {
+            if (requestChatPollingInterval) {
+                clearInterval(requestChatPollingInterval);
+                requestChatPollingInterval = null;
+            }
+            currentAdminRequestId = null;
+            
+            document.getElementById('adminChatView').style.display = 'none';
+            document.getElementById('adminRequestsList').style.display = 'block';
+            document.getElementById('adminStats').style.display = 'grid';
+            document.getElementById('adminSubTabs').style.display = 'flex';
+            document.getElementById('adminFilters').style.display = 'flex';
+            
+            loadAdminRequests();
+        }
+        
+        async function refreshAdminRequestChatMessages() {
+            if (!currentAdminRequestId) return;
+            
+            const container = document.getElementById('adminRequestChatMessages');
+            if (!container) return;
             
             try {
-                // Save admin response
-                const message = {
-                    from: 'admin',
-                    adminName: currentUsername,
-                    message: response,
-                    timestamp: Date.now()
-                };
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 8000);
                 
-                await fetch(`${SUPPORT_FIREBASE_URL}/requests/${requestId}/messages.json`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(message)
+                const response = await fetch(`${SUPPORT_FIREBASE_URL}/requests/${currentAdminRequestId}/messages.json`, {
+                    signal: controller.signal
                 });
                 
-                // Update status to in-progress if pending
-                if (request.status === 'pending') {
-                    await updateRequestStatus(requestId, 'in-progress');
+                clearTimeout(timeoutId);
+                
+                if (!response.ok) {
+                    throw new Error('Network response not ok');
                 }
                 
-                if (window.parent && window.parent.showToast) {
-                    window.parent.showToast('Response sent!', 'fa-paper-plane');
+                const data = await response.json();
+                
+                if (data && typeof data === 'object') {
+                    const messages = Object.entries(data).map(([id, msg]) => ({ id, ...msg }));
+                    messages.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+                    
+                    container.innerHTML = messages.map(msg => {
+                        const msgText = typeof msg.message === 'string' ? msg.message : '';
+                        return `
+                            <div class="chat-message ${msg.from === 'admin' ? 'admin' : 'user'}">
+                                ${msg.from === 'admin' ? `<div class="admin-label"><i class="fas fa-shield-alt"></i> ${escapeHtml(msg.adminName || 'Staff')}</div>` : `<div style="font-size: 0.75rem; color: #888; margin-bottom: 0.25rem;"><i class="fas fa-user"></i> ${escapeHtml(msg.username || 'User')}</div>`}
+                                ${escapeHtml(msgText)}
+                                <div style="font-size: 0.7rem; color: #666; margin-top: 0.25rem;">${formatTimeAgo(msg.timestamp)}</div>
+                            </div>
+                        `;
+                    }).join('');
+                    
+                    container.scrollTop = container.scrollHeight;
+                } else {
+                    container.innerHTML = '<div style="text-align: center; color: #888; padding: 2rem;"><i class="fas fa-comments" style="font-size: 2rem; margin-bottom: 0.5rem;"></i><p>No messages yet. Send the first response!</p></div>';
                 }
             } catch (err) {
-                console.error('Failed to send response:', err);
+                if (err.name === 'AbortError') {
+                    console.warn('Request chat refresh timed out');
+                } else {
+                    console.error('Failed to refresh request messages:', err);
+                }
+            }
+        }
+        
+        async function sendAdminRequestMessage() {
+            const input = document.getElementById('adminRequestChatInput');
+            if (!input) return;
+            
+            const message = input.value.trim();
+            
+            // Validation
+            if (!message) return;
+            if (message.length > 2000) {
+                if (window.parent && window.parent.showToast) {
+                    window.parent.showToast('Message too long (max 2000 characters)', 'fa-exclamation-circle');
+                }
+                return;
+            }
+            if (!currentAdminRequestId) {
+                console.warn('No request selected');
+                return;
+            }
+            
+            // Disable input while sending
+            input.disabled = true;
+            const savedMessage = message;
+            input.value = '';
+            
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
+                
+                const response = await fetch(`${SUPPORT_FIREBASE_URL}/requests/${currentAdminRequestId}/messages.json`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        from: 'admin',
+                        adminName: currentUsername,
+                        message: savedMessage,
+                        timestamp: Date.now()
+                    }),
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (!response.ok) {
+                    throw new Error('Failed to send');
+                }
+                
+                refreshAdminRequestChatMessages();
+            } catch (err) {
+                console.error('Failed to send message:', err);
+                // Restore message on failure
+                input.value = savedMessage;
+                if (window.parent && window.parent.showToast) {
+                    window.parent.showToast('Failed to send message. Please try again.', 'fa-exclamation-circle');
+                }
+            } finally {
+                input.disabled = false;
+                input.focus();
+            }
+        }
+        
+        async function updateRequestStatusFromChat(requestId, status) {
+            await updateRequestStatus(requestId, status);
+            // Update the status display in chat header
+            const request = allRequests.find(r => r.id === requestId);
+            if (request) {
+                request.status = status;
+            }
+            if (window.parent && window.parent.showToast) {
+                window.parent.showToast(`Request marked as ${status}`, 'fa-check');
             }
         }
         
@@ -2123,6 +2333,22 @@
         if (isAdmin) {
             console.log('[Support] Admin mode enabled for:', currentUsername);
         }
+        
+        // Cleanup intervals when page is closed/navigated away
+        window.addEventListener('beforeunload', function() {
+            if (chatPollingInterval) {
+                clearInterval(chatPollingInterval);
+                chatPollingInterval = null;
+            }
+            if (requestChatPollingInterval) {
+                clearInterval(requestChatPollingInterval);
+                requestChatPollingInterval = null;
+            }
+            if (userChatPolling) {
+                clearInterval(userChatPolling);
+                userChatPolling = null;
+            }
+        });
     </script>
 </body>
 </html>

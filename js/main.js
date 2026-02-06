@@ -5,9 +5,72 @@
 // Get base path for GitHub Pages compatibility (must be at top level for early access)
 const veltraBasePath = window.location.pathname.includes('/veltra') ? '/veltra' : '';
 
-// ==================== VELTRA USER DATA PERSISTENCE ====================
-// Uses Veltra Firebase (veltra-6fea6) for user data, procces Firebase for backend URLs
+// ==================== VELTRA FIREBASE SYNC SYSTEM ====================
+// ALL data syncs to Firebase - localStorage is just a cache
 const VELTRA_USER_FIREBASE_URL = 'https://veltra-6fea6-default-rtdb.firebaseio.com';
+
+// All keys that should be synced to Firebase
+const VELTRA_SYNC_KEYS = [
+    // Account & Auth
+    'veltra_userId',
+    'Veltra_username',
+    'Veltra_password',
+    'Veltra_isPasswordless',
+    'Veltra_accounts',
+    'Veltra_setupComplete',
+    'Veltra_walkthroughComplete',
+    
+    // Appearance
+    'Veltra_wallpaper',
+    'Veltra_loginBackground',
+    'Veltra_profilePicture',
+    'Veltra_useSameBackground',
+    'Veltra_theme',
+    'Veltra_taskbarStyle',
+    'veltra_taskbarStyle',
+    
+    // Apps & Games
+    'Veltra_installedApps',
+    'Veltra_installedThemes',
+    'Veltra_installedGames',
+    'Veltra_pinnedApps',
+    'Veltra_communityApps',
+    'Veltra_startupApps',
+    'Veltra_desktopIconPositions',
+    
+    // Settings & Preferences
+    'Veltra_showWhatsNew',
+    'Veltra_snapSettings',
+    'Veltra_bootChoice',
+    'Veltra_bypassFileWarning',
+    'Veltra_customWebLLMModel',
+    'veltra_doubleClickSpeed',
+    'veltra_showToasts',
+    'veltra_toastDuration',
+    'veltra_fastMode',
+    'veltra_skipStartupAnimation',
+    
+    // Proxy & Network
+    'veltra_wispUrl',
+    'veltra_bareUrl',
+    'veltra_searchEngine',
+    'veltra_musicServerUrl',
+    'nOS_wispUrl',
+    'nOS_searchEngine',
+    
+    // Melodify
+    'Veltra_melodifyLibrary',
+    'veltra_melodifyVolume',
+    'veltra_melodifyRepeat',
+    'veltra_melodifyShuffle',
+    
+    // Stats & Uptime
+    'veltra_totalUptime',
+    'veltra_lastUptimeCheck',
+    'Veltra_bootTime',
+    
+    // User-specific settings (dynamic keys handled separately)
+];
 
 // Generate or get unique user ID for persistence
 function getVeltraUserId() {
@@ -19,25 +82,184 @@ function getVeltraUserId() {
     return userId;
 }
 
-// ==================== ENHANCED DATA PERSISTENCE SYSTEM ====================
-// Reliable save/load with Firebase + localStorage fallback
+// ==================== FIREBASE SYNC ENGINE ====================
+// Real-time sync with Firebase - localStorage is just a fast cache
 
-// Debounce function to prevent excessive Firebase calls
-const saveDebounceTimers = {};
-function debouncedSave(dataType, data, delay = 2000) {
-    if (saveDebounceTimers[dataType]) {
-        clearTimeout(saveDebounceTimers[dataType]);
-    }
-    // Always save to localStorage immediately
-    localStorage.setItem(`veltra_${dataType}`, JSON.stringify(data));
+let syncDebounceTimer = null;
+let pendingSyncData = {};
+let isSyncing = false;
+let lastSyncTime = 0;
+
+// Wrap localStorage.setItem to auto-sync to Firebase
+const originalSetItem = localStorage.setItem.bind(localStorage);
+const originalRemoveItem = localStorage.removeItem.bind(localStorage);
+
+// Override localStorage.setItem to sync to Firebase
+localStorage.setItem = function(key, value) {
+    originalSetItem(key, value);
     
-    // Debounce Firebase save
-    saveDebounceTimers[dataType] = setTimeout(() => {
-        saveToFirebase(dataType, data);
-    }, delay);
+    // Check if this key should be synced
+    if (shouldSyncKey(key)) {
+        queueFirebaseSync(key, value);
+    }
+};
+
+// Override localStorage.removeItem to sync deletions
+localStorage.removeItem = function(key) {
+    originalRemoveItem(key);
+    
+    if (shouldSyncKey(key)) {
+        queueFirebaseSync(key, null); // null means delete
+    }
+};
+
+// Check if a key should be synced
+function shouldSyncKey(key) {
+    if (VELTRA_SYNC_KEYS.includes(key)) return true;
+    // Also sync dynamic user settings keys
+    if (key.startsWith('Veltra_userSettings_')) return true;
+    if (key.startsWith('veltra_') || key.startsWith('Veltra_')) return true;
+    return false;
 }
 
-// Save directly to Firebase
+// Queue data for Firebase sync (debounced)
+function queueFirebaseSync(key, value) {
+    pendingSyncData[key] = value;
+    
+    if (syncDebounceTimer) {
+        clearTimeout(syncDebounceTimer);
+    }
+    
+    // Sync after 1.5 seconds of inactivity
+    syncDebounceTimer = setTimeout(() => {
+        flushFirebaseSync();
+    }, 1500);
+}
+
+// Flush all pending data to Firebase
+async function flushFirebaseSync() {
+    if (isSyncing || Object.keys(pendingSyncData).length === 0) return;
+    
+    isSyncing = true;
+    const userId = getVeltraUserId();
+    const dataToSync = { ...pendingSyncData };
+    pendingSyncData = {};
+    
+    try {
+        // Get current data from Firebase
+        const response = await fetch(`${VELTRA_USER_FIREBASE_URL}/users/${userId}/data.json`);
+        let currentData = {};
+        if (response.ok) {
+            currentData = await response.json() || {};
+        }
+        
+        // Merge new data
+        for (const [key, value] of Object.entries(dataToSync)) {
+            if (value === null) {
+                delete currentData[key];
+            } else {
+                currentData[key] = value;
+            }
+        }
+        
+        // Save merged data
+        await fetch(`${VELTRA_USER_FIREBASE_URL}/users/${userId}/data.json`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(currentData)
+        });
+        
+        lastSyncTime = Date.now();
+        console.log(`[Veltra Sync] Synced ${Object.keys(dataToSync).length} keys to Firebase`);
+    } catch (err) {
+        console.warn('[Veltra Sync] Firebase sync failed:', err.message);
+        // Re-queue failed data
+        Object.assign(pendingSyncData, dataToSync);
+    } finally {
+        isSyncing = false;
+    }
+}
+
+// Force immediate sync (call before page unload)
+async function forceFirebaseSync() {
+    if (syncDebounceTimer) {
+        clearTimeout(syncDebounceTimer);
+    }
+    await flushFirebaseSync();
+}
+
+// Load ALL data from Firebase on startup
+async function loadAllFromFirebase() {
+    const userId = getVeltraUserId();
+    
+    try {
+        const response = await fetch(`${VELTRA_USER_FIREBASE_URL}/users/${userId}/data.json`);
+        if (response.ok) {
+            const data = await response.json();
+            if (data && typeof data === 'object') {
+                // Restore all keys to localStorage
+                let restoredCount = 0;
+                for (const [key, value] of Object.entries(data)) {
+                    // Only restore if local is empty or Firebase has newer data
+                    const localValue = localStorage.getItem(key);
+                    if (!localValue || localValue !== value) {
+                        originalSetItem(key, value);
+                        restoredCount++;
+                    }
+                }
+                console.log(`[Veltra Sync] Restored ${restoredCount} keys from Firebase`);
+                return true;
+            }
+        }
+    } catch (err) {
+        console.warn('[Veltra Sync] Failed to load from Firebase:', err.message);
+    }
+    return false;
+}
+
+// Sync all current localStorage to Firebase (initial upload)
+async function syncAllToFirebase() {
+    const userId = getVeltraUserId();
+    const allData = {};
+    
+    // Collect all Veltra keys from localStorage
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (shouldSyncKey(key)) {
+            allData[key] = localStorage.getItem(key);
+        }
+    }
+    
+    try {
+        await fetch(`${VELTRA_USER_FIREBASE_URL}/users/${userId}/data.json`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(allData)
+        });
+        console.log(`[Veltra Sync] Uploaded ${Object.keys(allData).length} keys to Firebase`);
+        return true;
+    } catch (err) {
+        console.warn('[Veltra Sync] Failed to upload to Firebase:', err.message);
+        return false;
+    }
+}
+
+// Sync before page unload
+window.addEventListener('beforeunload', () => {
+    if (Object.keys(pendingSyncData).length > 0) {
+        // Use sendBeacon for reliable sync on page close
+        const userId = getVeltraUserId();
+        const blob = new Blob([JSON.stringify(pendingSyncData)], { type: 'application/json' });
+        navigator.sendBeacon(`${VELTRA_USER_FIREBASE_URL}/users/${userId}/pending.json`, blob);
+    }
+});
+
+// Legacy compatibility functions
+const saveDebounceTimers = {};
+function debouncedSave(dataType, data, delay = 2000) {
+    localStorage.setItem(`veltra_${dataType}`, JSON.stringify(data));
+}
+
 async function saveToFirebase(dataType, data) {
     const userId = getVeltraUserId();
     try {
@@ -108,72 +330,14 @@ async function loadVeltraUserData(dataType, defaultValue = null) {
 
 // Sync all user data to Firebase (call on login or periodically)
 async function syncAllUserData() {
-    const userId = getVeltraUserId();
-    const username = localStorage.getItem('Veltra_username') || 'User';
-    
-    const userDataBundle = {
-        installedApps: JSON.parse(localStorage.getItem('Veltra_installedApps') || '[]'),
-        installedThemes: JSON.parse(localStorage.getItem('Veltra_installedThemes') || '[]'),
-        installedGames: JSON.parse(localStorage.getItem('Veltra_installedGames') || '[]'),
-        startupApps: JSON.parse(localStorage.getItem('Veltra_startupApps') || '[]'),
-        theme: localStorage.getItem('Veltra_theme') || 'dark',
-        uptime: parseInt(localStorage.getItem('veltra_totalUptime') || '0'),
-        lastLogin: Date.now(),
-        username: username
-    };
-    
-    try {
-        await fetch(`${VELTRA_USER_FIREBASE_URL}/users/${userId}/profile.json`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(userDataBundle)
-        });
-        console.log('[Veltra] Synced all user data to Firebase');
-    } catch (err) {
-        console.warn('[Veltra] Failed to sync user data:', err.message);
-    }
+    // Use the new comprehensive sync system
+    return await syncAllToFirebase();
 }
 
 // Load all user data from Firebase on startup
 async function loadAllUserData() {
-    const userId = getVeltraUserId();
-    
-    try {
-        const response = await fetch(`${VELTRA_USER_FIREBASE_URL}/users/${userId}/profile.json`);
-        if (response.ok) {
-            const data = await response.json();
-            if (data) {
-                // Restore installed apps if they exist in Firebase but not locally
-                if (data.installedApps && Array.isArray(data.installedApps)) {
-                    const localApps = JSON.parse(localStorage.getItem('Veltra_installedApps') || '[]');
-                    if (localApps.length === 0 && data.installedApps.length > 0) {
-                        localStorage.setItem('Veltra_installedApps', JSON.stringify(data.installedApps));
-                        console.log('[Veltra] Restored installed apps from Firebase');
-                    }
-                }
-                if (data.installedThemes && Array.isArray(data.installedThemes)) {
-                    const localThemes = JSON.parse(localStorage.getItem('Veltra_installedThemes') || '[]');
-                    if (localThemes.length === 0 && data.installedThemes.length > 0) {
-                        localStorage.setItem('Veltra_installedThemes', JSON.stringify(data.installedThemes));
-                    }
-                }
-                if (data.installedGames && Array.isArray(data.installedGames)) {
-                    const localGames = JSON.parse(localStorage.getItem('Veltra_installedGames') || '[]');
-                    if (localGames.length === 0 && data.installedGames.length > 0) {
-                        localStorage.setItem('Veltra_installedGames', JSON.stringify(data.installedGames));
-                    }
-                }
-                if (data.uptime) {
-                    localStorage.setItem('veltra_totalUptime', data.uptime.toString());
-                }
-                console.log('[Veltra] Loaded user data from Firebase');
-                return data;
-            }
-        }
-    } catch (err) {
-        console.warn('[Veltra] Failed to load user data from Firebase:', err.message);
-    }
-    return null;
+    // Use the new comprehensive sync system
+    return await loadAllFromFirebase();
 }
 
 // Fetch Veltra backend URL from Firebase with retry

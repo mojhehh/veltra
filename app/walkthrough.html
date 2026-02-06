@@ -99,6 +99,19 @@
             animation: pulse 2s ease-in-out infinite;
         }
 
+        /* Fish icon should have no box/background */
+        .slide-icon.fish-icon,
+        .slide-icon:has(.fa-fish) {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+        }
+
+        .slide-icon .fa-fish {
+            font-size: 5rem;
+            text-shadow: 0 0 40px rgba(125, 211, 192, 0.6), 0 0 80px rgba(125, 211, 192, 0.3);
+        }
+
         @keyframes pulse {
             0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(125, 211, 192, 0.4); }
             50% { transform: scale(1.05); box-shadow: 0 0 30px 10px rgba(125, 211, 192, 0.2); }
@@ -382,8 +395,8 @@
 
         <!-- Slide 1: Welcome -->
         <div class="slide active" id="slide-0">
-            <div class="slide-icon animate-in" style="background: transparent; border: none;">
-                <i class="fas fa-fish" style="font-size: 5rem; color: var(--accent);"></i>
+            <div class="slide-icon fish-icon animate-in">
+                <i class="fas fa-fish"></i>
             </div>
             <h1 class="animate-in delay-1">Welcome to Veltra!</h1>
             <p class="animate-in delay-2">

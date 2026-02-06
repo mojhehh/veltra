@@ -8526,6 +8526,8 @@ select {
     justify-content: center;
     margin-bottom: 2rem;
     background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
 }
 
 .startup-logo-container i.fa-fish {
@@ -8535,10 +8537,17 @@ select {
     background: transparent !important;
 }
 
+/* Universal fish icon styling - no boxes anywhere */
+i.fa-fish,
+.fa-fish {
+    background: transparent !important;
+}
+
 .startup-logo-img {
     background: transparent !important;
     border-radius: 0;
     box-shadow: none;
+    border: none !important;
 }
 
 .startup-logo-ring {

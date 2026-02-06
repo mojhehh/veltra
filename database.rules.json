@@ -3,7 +3,19 @@
     "users": {
       "$userId": {
         ".read": true,
-        ".write": true
+        ".write": true,
+        "data": {
+          ".read": true,
+          ".write": true
+        },
+        "profile": {
+          ".read": true,
+          ".write": true
+        },
+        "pending": {
+          ".read": true,
+          ".write": true
+        }
       }
     },
     "melodify_libraries": {
@@ -23,6 +35,10 @@
         ".read": true,
         ".write": true
       }
+    },
+    "backends": {
+      ".read": true,
+      ".write": true
     }
   }
 }

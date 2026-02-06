@@ -10,11 +10,13 @@ const veltraBasePath = window.location.pathname.includes('/veltra') ? '/veltra' 
 const VELTRA_USER_FIREBASE_URL = 'https://veltra-6fea6-default-rtdb.firebaseio.com';
 
 // All keys that should be synced to Firebase
+// NOTE: Veltra_username and Veltra_password are NOT synced - they are per-device login credentials
+// The Veltra_accounts array contains all user accounts and IS synced
 const VELTRA_SYNC_KEYS = [
-    // Account & Auth
+    // Account & Auth (NOT username/password - those are per-device)
     'veltra_userId',
-    'Veltra_username',
-    'Veltra_password',
+    // 'Veltra_username' - NOT synced, set at login
+    // 'Veltra_password' - NOT synced, per-device
     'Veltra_isPasswordless',
     'Veltra_accounts',
     'Veltra_setupComplete',
@@ -192,6 +194,9 @@ async function forceFirebaseSync() {
 async function loadAllFromFirebase() {
     const userId = getVeltraUserId();
     
+    // Keys that should NEVER be overwritten from Firebase (per-device credentials)
+    const NEVER_RESTORE_KEYS = ['Veltra_username', 'Veltra_password', 'veltra_userId'];
+    
     try {
         const response = await fetch(`${VELTRA_USER_FIREBASE_URL}/users/${userId}/data.json`);
         if (response.ok) {
@@ -200,6 +205,10 @@ async function loadAllFromFirebase() {
                 // Restore all keys to localStorage
                 let restoredCount = 0;
                 for (const [key, value] of Object.entries(data)) {
+                    // Skip keys that should never be restored
+                    if (NEVER_RESTORE_KEYS.includes(key)) {
+                        continue;
+                    }
                     // Only restore if local is empty or Firebase has newer data
                     const localValue = localStorage.getItem(key);
                     if (!localValue || localValue !== value) {
@@ -4193,6 +4202,9 @@ function login() {
     loadUserSettings(username);
   }
 
+  // Store the current username in localStorage (for this session/device)
+  localStorage.setItem("Veltra_username", username);
+  
   document.getElementById("displayUsername").textContent = username;
 
   if (username.toLowerCase() === "dinguschan" || username.toLowerCase() === "$xor" || username.toLowerCase() === "lanefiedler-731") {
@@ -4209,6 +4221,10 @@ function login() {
   
   // Load user data from Firebase (apps, themes, games, uptime)
   loadAllUserData().then(() => {
+    // Re-set username after Firebase restore to ensure it's correct
+    localStorage.setItem("Veltra_username", username);
+    document.getElementById("displayUsername").textContent = username;
+    
     // Reload installedApps from localStorage after Firebase restore
     const savedApps = localStorage.getItem("Veltra_installedApps");
     if (savedApps) {

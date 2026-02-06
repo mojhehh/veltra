@@ -330,6 +330,30 @@
     <iframe src="" frameborder="0" id="iframe"></iframe>
 
     <script>
+        // Toast notification function for UV
+        function showToast(message, icon = 'fas fa-info-circle', duration = 3000) {
+            // Try parent's showToast first
+            if (window.parent && window.parent.showToast && window.parent !== window) {
+                try {
+                    window.parent.showToast(message, icon.replace('fas ', '').replace('fa-', ''));
+                    return;
+                } catch (e) {}
+            }
+            // Fallback: create own toast
+            let toastContainer = document.getElementById('uv-toast-container');
+            if (!toastContainer) {
+                toastContainer = document.createElement('div');
+                toastContainer.id = 'uv-toast-container';
+                toastContainer.style.cssText = 'position: fixed; bottom: 20px; right: 20px; z-index: 10000;';
+                document.body.appendChild(toastContainer);
+            }
+            const toast = document.createElement('div');
+            toast.style.cssText = 'background: rgba(30, 35, 48, 0.95); color: #fff; padding: 12px 20px; border-radius: 8px; margin-top: 8px; display: flex; align-items: center; gap: 10px; font-family: Inter, sans-serif; font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); border: 1px solid rgba(125, 211, 192, 0.3);';
+            toast.innerHTML = `<i class="${icon}" style="color: #7dd3c0;"></i> ${message}`;
+            toastContainer.appendChild(toast);
+            setTimeout(() => toast.remove(), duration);
+        }
+        
         const se = localStorage.getItem("veltra_searchEngine") || "https://search.brave.com/search?q="
         const bar = document.getElementById("urlbar")
 
@@ -514,7 +538,7 @@
             const tabElement = document.createElement("div")
             tabElement.classList.add("tab")
             tabElement.dataset.tabId = nTab.id
-            tabElement.innerHTML = `<img id="fav" data-fav-id="${nTab.id}" src="https://www.google.com/s2/favicons?domain=https://veltra-os.vercel.app&sz=256"></img>&nbsp;&nbsp;<span class="btitle">New Tab</span> <div class="closetab"><i class="fas fa-times"></i></div>`
+            tabElement.innerHTML = `<img id="fav" data-fav-id="${nTab.id}" src="https://www.google.com/s2/favicons?domain=https://google.com&sz=256"></img>&nbsp;&nbsp;<span class="btitle">New Tab</span> <div class="closetab"><i class="fas fa-times"></i></div>`
 
             tabElement.addEventListener("click", (e) => {
                 if (!e.target.closest(".closetab")) {

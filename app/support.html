@@ -1845,10 +1845,14 @@
         
         async function updateRequestStatus(requestId, newStatus) {
             try {
-                await fetch(`${SUPPORT_FIREBASE_URL}/requests/${requestId}/status.json`, {
-                    method: 'PUT',
+                // Update status and timestamp for notifications
+                await fetch(`${SUPPORT_FIREBASE_URL}/requests/${requestId}.json`, {
+                    method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(newStatus)
+                    body: JSON.stringify({
+                        status: newStatus,
+                        statusChangedAt: Date.now()
+                    })
                 });
                 
                 // Update local data

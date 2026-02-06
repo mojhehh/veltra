@@ -349,6 +349,249 @@ async function loadAllUserData() {
     return await loadAllFromFirebase();
 }
 
+// ==================== SUPPORT NOTIFICATION SYSTEM ====================
+const SUPPORT_FIREBASE_URL = 'https://veltra-6fea6-default-rtdb.firebaseio.com/support';
+let supportNotificationInterval = null;
+let lastSupportCheck = 0;
+
+// Check for unread admin responses on user's support requests
+async function checkSupportNotifications() {
+    const userId = localStorage.getItem('veltra_userId');
+    if (!userId) return { hasUnread: false, count: 0, requests: [] };
+    
+    const lastCheck = parseInt(localStorage.getItem('veltra_lastSupportCheck') || '0');
+    
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        
+        const response = await fetch(`${SUPPORT_FIREBASE_URL}/requests.json?orderBy="userId"&equalTo="${userId}"`, {
+            signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) return { hasUnread: false, count: 0, requests: [] };
+        
+        const data = await response.json();
+        if (!data) return { hasUnread: false, count: 0, requests: [] };
+        
+        let unreadCount = 0;
+        const unreadRequests = [];
+        
+        // Check each request for new admin messages
+        for (const [id, request] of Object.entries(data)) {
+            if (request.messages) {
+                for (const [msgId, msg] of Object.entries(request.messages)) {
+                    if (msg.from === 'admin' && msg.timestamp > lastCheck) {
+                        unreadCount++;
+                        if (!unreadRequests.find(r => r.id === id)) {
+                            unreadRequests.push({
+                                id,
+                                title: request.title,
+                                status: request.status,
+                                latestMessage: msg.message,
+                                adminName: msg.adminName || 'Support'
+                            });
+                        }
+                    }
+                }
+            }
+            // Also check for status changes
+            if (request.statusChangedAt && request.statusChangedAt > lastCheck) {
+                if (!unreadRequests.find(r => r.id === id)) {
+                    unreadRequests.push({
+                        id,
+                        title: request.title,
+                        status: request.status,
+                        statusChange: true
+                    });
+                    unreadCount++;
+                }
+            }
+        }
+        
+        return { hasUnread: unreadCount > 0, count: unreadCount, requests: unreadRequests };
+    } catch (err) {
+        if (err.name !== 'AbortError') {
+            console.warn('[Support] Failed to check notifications:', err.message);
+        }
+        return { hasUnread: false, count: 0, requests: [] };
+    }
+}
+
+// Update the Support Center app badge
+function updateSupportBadge(count) {
+    // Update desktop icon badge
+    const desktopIcon = document.querySelector('.desktop-icon[data-app="support"]');
+    if (desktopIcon) {
+        let badge = desktopIcon.querySelector('.app-badge');
+        if (count > 0) {
+            if (!badge) {
+                badge = document.createElement('div');
+                badge.className = 'app-badge';
+                desktopIcon.appendChild(badge);
+            }
+            badge.textContent = count > 9 ? '9+' : count;
+            badge.style.display = 'flex';
+        } else if (badge) {
+            badge.style.display = 'none';
+        }
+    }
+    
+    // Update taskbar icon if pinned
+    const taskbarIcon = document.querySelector('.pinned-app[data-app="support"]');
+    if (taskbarIcon) {
+        let badge = taskbarIcon.querySelector('.app-badge');
+        if (count > 0) {
+            if (!badge) {
+                badge = document.createElement('div');
+                badge.className = 'app-badge';
+                taskbarIcon.appendChild(badge);
+            }
+            badge.textContent = count > 9 ? '9+' : count;
+            badge.style.display = 'flex';
+        } else if (badge) {
+            badge.style.display = 'none';
+        }
+    }
+    
+    // Update start menu item if visible
+    const startMenuItem = document.querySelector('.start-menu-item[data-app="support"]');
+    if (startMenuItem) {
+        let badge = startMenuItem.querySelector('.app-badge');
+        if (count > 0) {
+            if (!badge) {
+                badge = document.createElement('div');
+                badge.className = 'app-badge start-menu-badge';
+                startMenuItem.appendChild(badge);
+            }
+            badge.textContent = count > 9 ? '9+' : count;
+            badge.style.display = 'flex';
+        } else if (badge) {
+            badge.style.display = 'none';
+        }
+    }
+}
+
+// Show prominent notification popup for support messages
+function showSupportNotificationPopup(requests) {
+    if (!requests || requests.length === 0) return;
+    
+    // Remove any existing popup
+    const existingPopup = document.getElementById('supportNotificationPopup');
+    if (existingPopup) existingPopup.remove();
+    
+    const popup = document.createElement('div');
+    popup.id = 'supportNotificationPopup';
+    popup.className = 'support-notification-popup';
+    
+    const request = requests[0]; // Show the first unread
+    const isStatusChange = request.statusChange;
+    
+    popup.innerHTML = `
+        <div class="support-notification-content">
+            <div class="support-notification-icon">
+                <i class="fas ${isStatusChange ? 'fa-bell' : 'fa-headset'}"></i>
+            </div>
+            <div class="support-notification-body">
+                <div class="support-notification-title">
+                    ${isStatusChange ? 'Request Status Updated' : 'New Support Response!'}
+                </div>
+                <div class="support-notification-subtitle">
+                    ${escapeHtmlSimple(request.title)}
+                </div>
+                <div class="support-notification-message">
+                    ${isStatusChange 
+                        ? `Your request is now: <strong>${request.status.replace('-', ' ')}</strong>` 
+                        : `<strong>${escapeHtmlSimple(request.adminName)}</strong>: "${escapeHtmlSimple(request.latestMessage?.substring(0, 80))}${request.latestMessage?.length > 80 ? '...' : ''}"`
+                    }
+                </div>
+                ${requests.length > 1 ? `<div class="support-notification-more">+${requests.length - 1} more update${requests.length > 2 ? 's' : ''}</div>` : ''}
+            </div>
+            <button class="support-notification-close" onclick="closeSupportNotificationPopup()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="support-notification-actions">
+            <button class="support-notification-btn primary" onclick="openApp('support'); closeSupportNotificationPopup(); markSupportAsRead();">
+                <i class="fas fa-external-link-alt"></i> View Now
+            </button>
+            <button class="support-notification-btn secondary" onclick="closeSupportNotificationPopup(); markSupportAsRead();">
+                Dismiss
+            </button>
+        </div>
+    `;
+    
+    document.body.appendChild(popup);
+    
+    // Animate in
+    requestAnimationFrame(() => {
+        popup.classList.add('visible');
+    });
+    
+    // Auto-dismiss after 15 seconds
+    setTimeout(() => {
+        closeSupportNotificationPopup();
+    }, 15000);
+}
+
+function closeSupportNotificationPopup() {
+    const popup = document.getElementById('supportNotificationPopup');
+    if (popup) {
+        popup.classList.remove('visible');
+        setTimeout(() => popup.remove(), 300);
+    }
+}
+
+function markSupportAsRead() {
+    localStorage.setItem('veltra_lastSupportCheck', Date.now().toString());
+    updateSupportBadge(0);
+}
+
+// Simple HTML escape for notifications
+function escapeHtmlSimple(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Start checking for support notifications (call after login)
+function startSupportNotificationPolling() {
+    // Initial check
+    setTimeout(async () => {
+        const result = await checkSupportNotifications();
+        if (result.hasUnread) {
+            updateSupportBadge(result.count);
+            showSupportNotificationPopup(result.requests);
+        }
+    }, 2000); // Wait 2 seconds after login
+    
+    // Check every 60 seconds
+    if (supportNotificationInterval) clearInterval(supportNotificationInterval);
+    supportNotificationInterval = setInterval(async () => {
+        const result = await checkSupportNotifications();
+        if (result.hasUnread) {
+            updateSupportBadge(result.count);
+            // Only show popup if it's new since last notification
+            const lastNotified = parseInt(localStorage.getItem('veltra_lastSupportNotified') || '0');
+            if (result.requests.some(r => r.latestMessage && Date.now() - lastNotified > 60000)) {
+                showSupportNotificationPopup(result.requests);
+                localStorage.setItem('veltra_lastSupportNotified', Date.now().toString());
+            }
+        }
+    }, 60000);
+}
+
+// Stop polling (call on logout)
+function stopSupportNotificationPolling() {
+    if (supportNotificationInterval) {
+        clearInterval(supportNotificationInterval);
+        supportNotificationInterval = null;
+    }
+}
+
 // Fetch Veltra backend URL from Firebase with retry
 async function fetchVeltraBackend(retries = 3) {
     for (let i = 0; i < retries; i++) {
@@ -4321,6 +4564,9 @@ function login() {
           openApp("whatsnew");
         }, 800);
       }
+      
+      // Start checking for support notifications
+      startSupportNotificationPolling();
     }, 100);
   }, 500);
 }

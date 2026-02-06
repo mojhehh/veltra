@@ -15,11 +15,11 @@ VELTRA BLOCKED BY YOUR SCHOOL?? DOWNLOAD "index.html" from the Veltra-OneFile fo
 
 Make your own vercel.app instance of Veltra with this handy button!
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FVELTRA-os%2FVeltra)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fnautilus-os%2FNautilusOS)
 
 You can also do this with Netlify!
 
-[![Deploy with Netlify](https://netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/VELTRA-os/Veltra)
+[![Deploy with Netlify](https://netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/nautilus-os/NautilusOS)
 
 
 You can also deploy Veltra in a Github Codespace:

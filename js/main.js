@@ -2084,6 +2084,7 @@ let melodifyState = {
   isShuffle: false,
   currentTrack: null,
   queue: [],
+  currentQueueIndex: 0,
   library: [],
   downloads: [],
   userId: getVeltraUserId() // Use shared Veltra user ID
@@ -2230,6 +2231,7 @@ async function searchMelodify(query) {
           </div>
           <span class="melodify-col-duration">${song.duration_string || '--:--'}</span>
           <span class="melodify-col-actions">
+            <button onclick="event.stopPropagation(); addToMelodifyQueue(${i})" title="Add to Queue"><i class="fas fa-plus"></i></button>
             <button onclick="event.stopPropagation(); addToMelodifyLibrary(${i})" title="Add to Library"><i class="far fa-heart"></i></button>
             <button onclick="event.stopPropagation(); startMelodifyDownload(${i})" title="Download"><i class="fas fa-download"></i></button>
           </span>
@@ -2402,11 +2404,44 @@ function melodifyShuffle() {
 
 function melodifyPrev() {
   const audio = document.getElementById('melodifyAudio');
-  if (audio) audio.currentTime = 0;
+  if (!audio) return;
+  
+  // If more than 3 seconds in, restart current track
+  if (audio.currentTime > 3) {
+    audio.currentTime = 0;
+    return;
+  }
+  
+  // Otherwise go to previous in queue
+  if (melodifyState.queue.length === 0 || melodifyState.currentQueueIndex <= 0) {
+    audio.currentTime = 0;
+    return;
+  }
+  
+  melodifyState.currentQueueIndex--;
+  playFromQueue(melodifyState.currentQueueIndex);
 }
 
 function melodifyNext() {
-  showToast('Queue is empty', 'fa-list');
+  if (melodifyState.queue.length === 0) {
+    showToast('Queue is empty', 'fa-list');
+    return;
+  }
+  
+  // Move to next in queue
+  melodifyState.currentQueueIndex++;
+  
+  if (melodifyState.currentQueueIndex >= melodifyState.queue.length) {
+    if (melodifyState.isRepeat) {
+      melodifyState.currentQueueIndex = 0;
+    } else {
+      melodifyState.currentQueueIndex = melodifyState.queue.length - 1;
+      showToast('End of queue', 'fa-list');
+      return;
+    }
+  }
+  
+  playFromQueue(melodifyState.currentQueueIndex);
 }
 
 function seekMelodify(event) {
@@ -2654,16 +2689,134 @@ function updateMelodifyDlStatus(uiId, status, msg) {
 }
 
 function toggleMelodifyQueue() {
-  showToast('Queue feature coming soon', 'fa-list');
+  const queuePanel = document.getElementById('melodifyQueuePanel');
+  if (!queuePanel) return;
+  
+  const isVisible = queuePanel.classList.contains('active');
+  queuePanel.classList.toggle('active', !isVisible);
+  renderMelodifyQueue();
+}
+
+function renderMelodifyQueue() {
+  const container = document.getElementById('melodifyQueueList');
+  if (!container) return;
+  
+  if (melodifyState.queue.length === 0) {
+    container.innerHTML = `
+      <div class="melodify-queue-empty">
+        <i class="fas fa-list"></i>
+        <p>Queue is empty</p>
+        <p style="font-size: 0.8rem; opacity: 0.7;">Add songs from search results</p>
+      </div>
+    `;
+    return;
+  }
+  
+  container.innerHTML = melodifyState.queue.map((track, i) => `
+    <div class="melodify-queue-item ${melodifyState.currentQueueIndex === i ? 'playing' : ''}" onclick="playFromQueue(${i})">
+      <div class="melodify-queue-item-info">
+        <img src="${track.thumbnail || ''}" alt="" onerror="this.style.display='none'">
+        <div>
+          <div class="melodify-queue-item-title">${track.title}</div>
+          <div class="melodify-queue-item-artist">${track.artist}</div>
+        </div>
+      </div>
+      <button class="melodify-queue-remove" onclick="event.stopPropagation(); removeFromQueue(${i})" title="Remove">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+  `).join('');
+}
+
+function addToMelodifyQueue(index) {
+  const song = musicSearchResults[index];
+  if (!song) return;
+  
+  let videoId = song.id;
+  if (!videoId && song.url) {
+    const match = song.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&]+)/);
+    if (match) videoId = match[1];
+  }
+  
+  const track = {
+    title: song.title,
+    artist: song.artist,
+    thumbnail: song.thumbnail,
+    videoId: videoId,
+    duration: song.duration,
+    duration_string: song.duration_string
+  };
+  
+  melodifyState.queue.push(track);
+  showToast(`Added to queue: ${song.title}`, 'fa-plus');
+  renderMelodifyQueue();
+}
+
+function removeFromQueue(index) {
+  if (index < 0 || index >= melodifyState.queue.length) return;
+  
+  const removed = melodifyState.queue.splice(index, 1)[0];
+  
+  // Adjust current index if needed
+  if (melodifyState.currentQueueIndex >= index && melodifyState.currentQueueIndex > 0) {
+    melodifyState.currentQueueIndex--;
+  }
+  
+  showToast(`Removed: ${removed.title}`, 'fa-minus');
+  renderMelodifyQueue();
+}
+
+function playFromQueue(index) {
+  if (index < 0 || index >= melodifyState.queue.length) return;
+  
+  melodifyState.currentQueueIndex = index;
+  const track = melodifyState.queue[index];
+  
+  melodifyState.currentTrack = track;
+  updateMelodifyUI();
+  
+  const audio = document.getElementById('melodifyAudio');
+  if (audio && track.videoId) {
+    initMelodifyAudio();
+    
+    getMelodifyBackendUrl().then(serverUrl => {
+      const streamUrl = `${serverUrl}/api/stream/${track.videoId}`;
+      audio.src = streamUrl;
+      audio.load();
+      audio.play().then(() => {
+        melodifyState.isPlaying = true;
+        updateMelodifyPlayButton();
+        renderMelodifyQueue();
+      }).catch(err => {
+        console.error('Queue play error:', err);
+        playMelodifyYouTubeEmbed(track.videoId);
+      });
+    });
+  }
+}
+
+function clearMelodifyQueue() {
+  melodifyState.queue = [];
+  melodifyState.currentQueueIndex = 0;
+  renderMelodifyQueue();
+  showToast('Queue cleared', 'fa-trash');
 }
 
 // Flag to track if audio events have been initialized
 let melodifyAudioInitialized = false;
 
+// Reset audio initialization - call this when Melodify window opens
+function resetMelodifyAudio() {
+  melodifyAudioInitialized = false;
+  // Give DOM time to render, then init
+  setTimeout(() => initMelodifyAudio(), 100);
+}
+
 // Initialize melodify audio events - call this when audio element becomes available
 function initMelodifyAudio() {
   const audio = document.getElementById('melodifyAudio');
-  if (!audio || melodifyAudioInitialized) return;
+  if (!audio) return;
+  if (melodifyAudioInitialized) return;
   
   melodifyAudioInitialized = true;
   
@@ -7071,10 +7224,29 @@ alt="favicon">
             </div>
           </div>
 
+          <!-- Queue Panel -->
+          <div class="melodify-queue-panel" id="melodifyQueuePanel">
+            <div class="melodify-queue-header">
+              <h3><i class="fas fa-list"></i> Queue</h3>
+              <div class="melodify-queue-actions">
+                <button onclick="clearMelodifyQueue()" title="Clear Queue"><i class="fas fa-trash"></i></button>
+                <button onclick="toggleMelodifyQueue()" title="Close"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+            <div class="melodify-queue-list" id="melodifyQueueList">
+              <div class="melodify-queue-empty">
+                <i class="fas fa-list"></i>
+                <p>Queue is empty</p>
+                <p style="font-size: 0.8rem; opacity: 0.7;">Add songs from search results</p>
+              </div>
+            </div>
+          </div>
+
           <audio id="melodifyAudio"></audio>
         </div>
       `,
       noPadding: true,
+      onOpen: function() { resetMelodifyAudio(); },
       width: 1100,
       height: 700,
     },
@@ -8803,6 +8975,12 @@ print(f'Sum: {sum(numbers)}')
     if (appName === "web-app-creator") {
       setTimeout(() => {
         refreshCustomWebAppsList();
+      }, 50);
+    }
+
+    if (appName === "melodify") {
+      setTimeout(() => {
+        resetMelodifyAudio();
       }, 50);
     }
 

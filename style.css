@@ -4717,6 +4717,8 @@ select:focus {
     background: #121212;
     color: #fff;
     font-family: 'Segoe UI', -apple-system, sans-serif;
+    position: relative;
+    overflow: hidden;
 }
 
 .melodify-sidebar {
@@ -5252,6 +5254,145 @@ select:focus {
 
 .melodify-volume:hover .melodify-volume-slider::-webkit-slider-thumb {
     opacity: 1;
+}
+
+/* Melodify Queue Panel */
+.melodify-queue-panel {
+    position: absolute;
+    top: 0;
+    right: -320px;
+    width: 320px;
+    height: calc(100% - 90px);
+    background: #121212;
+    border-left: 1px solid #282828;
+    display: flex;
+    flex-direction: column;
+    transition: right 0.3s ease;
+    z-index: 100;
+}
+
+.melodify-queue-panel.active {
+    right: 0;
+}
+
+.melodify-queue-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    border-bottom: 1px solid #282828;
+}
+
+.melodify-queue-header h3 {
+    margin: 0;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.melodify-queue-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.melodify-queue-actions button {
+    background: none;
+    border: none;
+    color: #b3b3b3;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.melodify-queue-actions button:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.melodify-queue-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+}
+
+.melodify-queue-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: #b3b3b3;
+}
+
+.melodify-queue-empty i {
+    font-size: 2rem;
+    margin-bottom: 12px;
+    opacity: 0.5;
+}
+
+.melodify-queue-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.melodify-queue-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.melodify-queue-item.playing {
+    background: rgba(29, 185, 84, 0.2);
+}
+
+.melodify-queue-item-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    flex: 1;
+}
+
+.melodify-queue-item-info img {
+    width: 40px;
+    height: 40px;
+    border-radius: 4px;
+    object-fit: cover;
+}
+
+.melodify-queue-item-title {
+    font-size: 0.9rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.melodify-queue-item-artist {
+    font-size: 0.75rem;
+    color: #b3b3b3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.melodify-queue-remove {
+    background: none;
+    border: none;
+    color: #b3b3b3;
+    cursor: pointer;
+    padding: 8px;
+    opacity: 0;
+    transition: all 0.2s;
+}
+
+.melodify-queue-item:hover .melodify-queue-remove {
+    opacity: 1;
+}
+
+.melodify-queue-remove:hover {
+    color: #e91e63;
 }
 
 /* Melodify Downloads */

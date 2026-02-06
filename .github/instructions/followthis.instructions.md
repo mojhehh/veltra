@@ -49,4 +49,6 @@ You are building a **web-based online operating system**. Users can interact wit
    - Suggest safer, more maintainable alternatives.  
 
 **Goal:**  
-Generate **production-ready, secure, and maintainable online OS code** that is resilient to user errors, attacks, and browser limitations. The AI should actively think like a senior engineer, simulating problems before writing any code.
+Generate **production-ready, secure, and maintainable online OS code** that is resilient to user errors, attacks, and browser limitations.  Always think like a user, a security researcher, and a professional developer to ensure the best possible outcome.
+
+

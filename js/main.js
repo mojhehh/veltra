@@ -1775,6 +1775,12 @@ const appMetadata = {
     icon: "fa-puzzle-piece",
     preinstalled: true,
   },
+  "youtube": {
+    name: "YouTube",
+    icon: "fa-play-circle",
+    preinstalled: true,
+    description: "Watch videos, browse trending, and more"
+  },
 };
 
 // ==================== MUSIC DOWNLOAD APP ====================
@@ -2110,8 +2116,10 @@ async function loadMelodifyLibrary() {
 
 // Save library to Firebase and localStorage
 async function saveMelodifyLibrary() {
-  // Always save to localStorage first
-  localStorage.setItem('melodify_library', JSON.stringify(melodifyState.library));
+  // Save to both localStorage keys for compatibility
+  const libraryJson = JSON.stringify(melodifyState.library);
+  localStorage.setItem('melodify_library', libraryJson);
+  localStorage.setItem('Veltra_melodifyLibrary', libraryJson);
   
   // Try to save to Firebase
   try {
@@ -2149,6 +2157,8 @@ function melodifyShowTab(tab) {
     else if (hour < 18) greeting = 'Good afternoon';
     const greetingEl = document.querySelector('.melodify-greeting');
     if (greetingEl) greetingEl.textContent = greeting;
+    // Load recommendations
+    loadMelodifyRecommendations();
   }
 }
 
@@ -2192,7 +2202,8 @@ async function searchMelodify(query) {
   statusDiv.textContent = 'Searching...';
   
   try {
-    const response = await fetch(`${MUSIC_SERVER_URL}/api/search?q=${encodeURIComponent(query)}&max=20`);
+    const serverUrl = await getMelodifyBackendUrl();
+    const response = await fetch(`${serverUrl}/api/search?q=${encodeURIComponent(query)}&max=20`);
     const data = await response.json();
     
     if (data.error) {
@@ -2331,10 +2342,30 @@ function playMelodifyTrack(index) {
 
 // Fallback YouTube embed player
 function playMelodifyYouTubeEmbed(videoId) {
-  const artworkDiv = document.getElementById('melodifyArtwork');
-  if (artworkDiv) {
-    artworkDiv.innerHTML = `<iframe width="56" height="56" src="https://www.youtube.com/embed/${videoId}?autoplay=1&controls=0" frameborder="0" allow="autoplay" style="border-radius: 4px; pointer-events: none;"></iframe>`;
+  // Sanitize videoId to prevent XSS - only allow alphanumeric, hyphens, underscores
+  if (!videoId || !/^[a-zA-Z0-9_-]{5,20}$/.test(videoId)) {
+    showToast('Invalid video ID', 'fa-exclamation-triangle');
+    return;
   }
+  
+  // Create a hidden but functional YouTube embed that autoplays audio
+  const artworkDiv = document.getElementById('melodifyArtwork');
+  if (artworkDiv && melodifyState.currentTrack?.thumbnail) {
+    artworkDiv.innerHTML = `<img src="${melodifyState.currentTrack.thumbnail}" alt="">`;
+  }
+  
+  // Use a hidden iframe for audio - YouTube embed handles audio playback
+  let ytEmbed = document.getElementById('melodifyYTEmbed');
+  if (!ytEmbed) {
+    ytEmbed = document.createElement('iframe');
+    ytEmbed.id = 'melodifyYTEmbed';
+    ytEmbed.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;';
+    ytEmbed.allow = 'autoplay';
+    ytEmbed.frameBorder = '0';
+    document.querySelector('.melodify-app')?.appendChild(ytEmbed);
+  }
+  ytEmbed.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&controls=0`;
+  
   melodifyState.isPlaying = true;
   updateMelodifyPlayButton();
   showToast('Playing via YouTube (streaming unavailable)', 'fa-youtube');
@@ -2393,12 +2424,16 @@ function toggleMelodifyRepeat() {
   
   const audio = document.getElementById('melodifyAudio');
   if (audio) audio.loop = melodifyState.isRepeat;
+  
+  localStorage.setItem('veltra_melodifyRepeat', String(melodifyState.isRepeat));
 }
 
 function melodifyShuffle() {
   melodifyState.isShuffle = !melodifyState.isShuffle;
   const btn = document.getElementById('melodifyShuffleBtn');
   if (btn) btn.classList.toggle('active', melodifyState.isShuffle);
+  
+  localStorage.setItem('veltra_melodifyShuffle', String(melodifyState.isShuffle));
   showToast(melodifyState.isShuffle ? 'Shuffle enabled' : 'Shuffle disabled', 'fa-random');
 }
 
@@ -2428,8 +2463,20 @@ function melodifyNext() {
     return;
   }
   
-  // Move to next in queue
-  melodifyState.currentQueueIndex++;
+  if (melodifyState.isShuffle) {
+    // Pick a random track that isn't the current one
+    let nextIndex;
+    if (melodifyState.queue.length === 1) {
+      nextIndex = 0;
+    } else {
+      do {
+        nextIndex = Math.floor(Math.random() * melodifyState.queue.length);
+      } while (nextIndex === melodifyState.currentQueueIndex);
+    }
+    melodifyState.currentQueueIndex = nextIndex;
+  } else {
+    melodifyState.currentQueueIndex++;
+  }
   
   if (melodifyState.currentQueueIndex >= melodifyState.queue.length) {
     if (melodifyState.isRepeat) {
@@ -2457,6 +2504,9 @@ function seekMelodify(event) {
 function changeMelodifyVolume(value) {
   const audio = document.getElementById('melodifyAudio');
   if (audio) audio.volume = value / 100;
+  
+  // Save volume preference
+  localStorage.setItem('veltra_melodifyVolume', String(value / 100));
   
   const icon = document.getElementById('melodifyVolumeIcon');
   if (icon) {
@@ -2532,9 +2582,46 @@ function updateMelodifyLibraryUI() {
 
 function playFromLibrary(index) {
   const song = melodifyState.library[index];
-  if (song) {
-    musicSearchResults = [song];
-    playMelodifyTrack(0);
+  if (!song) return;
+  
+  let videoId = song.id || song.videoId;
+  if (!videoId && song.url) {
+    const match = song.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&]+)/);
+    if (match) videoId = match[1];
+  }
+  
+  if (!videoId) {
+    showToast('Cannot play this track', 'fa-exclamation-circle');
+    return;
+  }
+  
+  melodifyState.currentTrack = {
+    title: song.title,
+    artist: song.artist,
+    thumbnail: song.thumbnail,
+    videoId: videoId,
+    duration: song.duration,
+    duration_string: song.duration_string
+  };
+  
+  updateMelodifyUI();
+  
+  const audio = document.getElementById('melodifyAudio');
+  if (audio) {
+    initMelodifyAudio();
+    getMelodifyBackendUrl().then(serverUrl => {
+      const streamUrl = `${serverUrl}/api/stream/${videoId}`;
+      audio.src = streamUrl;
+      audio.load();
+      audio.play().then(() => {
+        melodifyState.isPlaying = true;
+        updateMelodifyPlayButton();
+        showToast('Playing: ' + song.title, 'fa-music');
+      }).catch(err => {
+        console.error('Library play error:', err);
+        playMelodifyYouTubeEmbed(videoId);
+      });
+    });
   }
 }
 
@@ -2859,7 +2946,38 @@ function initMelodifyAudio() {
     }
   });
   
-  audio.volume = 0.7;
+  // Restore saved volume, repeat, shuffle states
+  const savedVolume = localStorage.getItem('veltra_melodifyVolume');
+  const savedRepeat = localStorage.getItem('veltra_melodifyRepeat');
+  const savedShuffle = localStorage.getItem('veltra_melodifyShuffle');
+  
+  if (savedVolume !== null) {
+    const vol = parseFloat(savedVolume);
+    audio.volume = isNaN(vol) ? 0.7 : Math.max(0, Math.min(1, vol));
+    const slider = document.getElementById('melodifyVolumeSlider');
+    if (slider) slider.value = Math.round(audio.volume * 100);
+    const icon = document.getElementById('melodifyVolumeIcon');
+    if (icon) {
+      if (audio.volume === 0) icon.className = 'fas fa-volume-mute';
+      else if (audio.volume < 0.5) icon.className = 'fas fa-volume-down';
+      else icon.className = 'fas fa-volume-up';
+    }
+  } else {
+    audio.volume = 0.7;
+  }
+  
+  if (savedRepeat === 'true') {
+    melodifyState.isRepeat = true;
+    audio.loop = true;
+    const btn = document.getElementById('melodifyRepeatBtn');
+    if (btn) btn.classList.add('active');
+  }
+  
+  if (savedShuffle === 'true') {
+    melodifyState.isShuffle = true;
+    const btn = document.getElementById('melodifyShuffleBtn');
+    if (btn) btn.classList.add('active');
+  }
 }
 
 // Also try to init on DOMContentLoaded in case element exists
@@ -2870,6 +2988,1154 @@ function formatMusicTime(seconds) {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+// ==================== MELODIFY RECOMMENDATIONS ====================
+const MELODIFY_TRENDING_QUERIES = [
+  'trending music 2026', 'top hits today', 'viral songs',
+  'new music friday', 'popular songs right now'
+];
+
+const MELODIFY_RECOMMEND_QUERIES = [
+  'chill vibes playlist', 'workout music energy', 'study beats focus',
+  'feel good songs', 'late night drives music', 'acoustic covers popular'
+];
+
+let melodifyRecommendCache = { trending: null, recommended: null, lastFetch: 0 };
+
+async function loadMelodifyRecommendations() {
+  const now = Date.now();
+  const CACHE_TTL = 15 * 60 * 1000; // 15 min cache
+  
+  if (melodifyRecommendCache.trending && now - melodifyRecommendCache.lastFetch < CACHE_TTL) {
+    renderMelodifyRecommendations(melodifyRecommendCache.trending, 'melodifyTrending');
+    renderMelodifyRecommendations(melodifyRecommendCache.recommended, 'melodifyRecommended');
+    return;
+  }
+  
+  try {
+    const serverUrl = await getMelodifyBackendUrl();
+    
+    // Fetch trending
+    const trendingQuery = MELODIFY_TRENDING_QUERIES[Math.floor(Math.random() * MELODIFY_TRENDING_QUERIES.length)];
+    const trendingResp = await fetch(`${serverUrl}/api/search?q=${encodeURIComponent(trendingQuery)}&max=8`);
+    const trendingData = await trendingResp.json();
+    const trending = trendingData.results || [];
+    
+    // Fetch recommended
+    const recQuery = MELODIFY_RECOMMEND_QUERIES[Math.floor(Math.random() * MELODIFY_RECOMMEND_QUERIES.length)];
+    const recResp = await fetch(`${serverUrl}/api/search?q=${encodeURIComponent(recQuery)}&max=8`);
+    const recData = await recResp.json();
+    const recommended = recData.results || [];
+    
+    melodifyRecommendCache = { trending, recommended, lastFetch: now };
+    
+    renderMelodifyRecommendations(trending, 'melodifyTrending');
+    renderMelodifyRecommendations(recommended, 'melodifyRecommended');
+  } catch (err) {
+    console.warn('[Melodify] Recommendations load failed:', err.message);
+    const trendingDiv = document.getElementById('melodifyTrending');
+    const recDiv = document.getElementById('melodifyRecommended');
+    if (trendingDiv) trendingDiv.innerHTML = '<p style="color: #b3b3b3; padding: 1rem;">Could not load recommendations</p>';
+    if (recDiv) recDiv.innerHTML = '<p style="color: #b3b3b3; padding: 1rem;">Could not load recommendations</p>';
+  }
+}
+
+function renderMelodifyRecommendations(songs, containerId) {
+  const container = document.getElementById(containerId);
+  if (!container || !songs || songs.length === 0) {
+    if (container) container.innerHTML = '<p style="color: #b3b3b3; padding: 1rem;">No recommendations available</p>';
+    return;
+  }
+  
+  // Store in a global for playback
+  window[`_melodify_${containerId}`] = songs;
+  
+  container.innerHTML = songs.map((song, i) => `
+    <div class="melodify-recommend-card" onclick="playMelodifyRecommendation('${containerId}', ${i})">
+      <img src="${song.thumbnail}" alt="" class="melodify-recommend-img" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 80 80%22><rect fill=%22%23282828%22 width=%2280%22 height=%2280%22/><text x=%2240%22 y=%2240%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23555%22 font-size=%2230%22>♪</text></svg>'">
+      <div class="melodify-recommend-info">
+        <div class="melodify-recommend-title">${escapeHtml(song.title)}</div>
+        <div class="melodify-recommend-artist">${escapeHtml(song.artist)}</div>
+      </div>
+      <button class="melodify-recommend-play" onclick="event.stopPropagation(); playMelodifyRecommendation('${containerId}', ${i})">
+        <i class="fas fa-play"></i>
+      </button>
+    </div>
+  `).join('');
+}
+
+function playMelodifyRecommendation(containerId, index) {
+  const songs = window[`_melodify_${containerId}`];
+  if (!songs || !songs[index]) return;
+  
+  musicSearchResults = songs;
+  playMelodifyTrack(index);
+}
+
+function melodifySearchGenre(genre) {
+  melodifyShowTab('search');
+  const input = document.getElementById('melodifySearchInput');
+  if (input) {
+    input.value = genre;
+    searchMelodify(genre);
+  }
+}
+
+// ==================== YOUTUBE APP ====================
+// Uses the same Melodify backend for video search/playback
+const YOUTUBE_FIREBASE_URL = VELTRA_USER_FIREBASE_URL + '/youtube_data';
+
+let youtubeState = {
+  currentVideo: null,
+  searchResults: [],
+  history: [],
+  watchLater: [],
+  isTheater: false,
+  userId: getVeltraUserId()
+};
+
+// Trending video queries for recommendations
+const YT_TRENDING_QUERIES = [
+  'trending videos today', 'most popular videos', 'viral videos 2026',
+  'top videos this week', 'popular right now'
+];
+
+const YT_CATEGORY_QUERIES = {
+  music: 'music videos official',
+  gaming: 'gaming videos popular',
+  comedy: 'funny videos comedy',
+  tech: 'tech review latest',
+  sports: 'sports highlights today',
+  news: 'breaking news today',
+  education: 'educational videos interesting',
+  entertainment: 'entertainment videos trending'
+};
+
+let ytRecommendCache = { trending: null, lastFetch: 0 };
+
+// Load YouTube user data from Firebase
+async function loadYoutubeData() {
+  try {
+    const response = await fetch(`${YOUTUBE_FIREBASE_URL}/${youtubeState.userId}.json`);
+    const data = await response.json();
+    if (data) {
+      youtubeState.history = data.history || [];
+      youtubeState.watchLater = data.watchLater || [];
+      console.log('[YouTube] Data loaded from Firebase');
+    }
+  } catch (err) {
+    console.warn('[YouTube] Firebase load failed:', err.message);
+  }
+  // Fallback to localStorage
+  if (youtubeState.history.length === 0) {
+    youtubeState.history = JSON.parse(localStorage.getItem('Veltra_youtubeHistory') || '[]');
+  }
+  if (youtubeState.watchLater.length === 0) {
+    youtubeState.watchLater = JSON.parse(localStorage.getItem('Veltra_youtubeWatchLater') || '[]');
+  }
+}
+
+// Save YouTube user data
+async function saveYoutubeData() {
+  const data = {
+    history: youtubeState.history.slice(-50), // Keep last 50
+    watchLater: youtubeState.watchLater
+  };
+  
+  localStorage.setItem('Veltra_youtubeHistory', JSON.stringify(data.history));
+  localStorage.setItem('Veltra_youtubeWatchLater', JSON.stringify(data.watchLater));
+  
+  try {
+    await fetch(`${YOUTUBE_FIREBASE_URL}/${youtubeState.userId}.json`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+  } catch (err) {
+    console.warn('[YouTube] Firebase save failed:', err.message);
+  }
+}
+
+// Initialize YouTube data
+loadYoutubeData();
+
+function youtubeShowTab(tab) {
+  document.querySelectorAll('.youtube-tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.youtube-nav-item').forEach(n => n.classList.remove('active'));
+  
+  const tabEl = document.getElementById(`yt-${tab}`);
+  if (tabEl) tabEl.classList.add('active');
+  
+  document.querySelectorAll('.youtube-nav-item').forEach(n => {
+    if (n.dataset.tab === tab) n.classList.add('active');
+  });
+  
+  if (tab === 'home') loadYoutubeTrending();
+  if (tab === 'history') renderYoutubeHistory();
+  if (tab === 'watchlater') renderYoutubeWatchLater();
+  if (tab === 'subscriptions') renderYoutubeSubscriptions();
+  if (tab === 'notifications') { loadYoutubeNotifications().then(() => renderYoutubeNotifications()); }
+}
+
+async function searchYoutube(query) {
+  if (!query || !query.trim()) return;
+  
+  const resultsDiv = document.getElementById('ytSearchResults');
+  if (!resultsDiv) return;
+  
+  resultsDiv.innerHTML = '<div class="yt-loading"><i class="fas fa-spinner fa-spin fa-2x"></i><p>Searching...</p></div>';
+  
+  try {
+    const serverUrl = await getMelodifyBackendUrl();
+    const response = await fetch(`${serverUrl}/api/search?q=${encodeURIComponent(query.trim())}&max=20`);
+    const data = await response.json();
+    
+    if (data.error) {
+      resultsDiv.innerHTML = `<div class="yt-empty"><i class="fas fa-exclamation-circle"></i><p>${escapeHtml(data.error)}</p></div>`;
+      return;
+    }
+    
+    youtubeState.searchResults = data.results || [];
+    
+    if (youtubeState.searchResults.length === 0) {
+      resultsDiv.innerHTML = '<div class="yt-empty"><i class="fas fa-search"></i><p>No results found</p></div>';
+      return;
+    }
+    
+    resultsDiv.innerHTML = renderYoutubeVideoGrid(youtubeState.searchResults, 'search');
+    
+    // Switch to search tab
+    youtubeShowTab('search');
+    
+  } catch (err) {
+    console.error('[YouTube] Search error:', err);
+    resultsDiv.innerHTML = `<div class="yt-empty"><i class="fas fa-wifi"></i><p>Could not connect to server</p></div>`;
+  }
+}
+
+function renderYoutubeVideoGrid(videos, source) {
+  if (!videos || videos.length === 0) return '<div class="yt-empty"><i class="fas fa-video"></i><p>No videos available</p></div>';
+  
+  // Store videos globally for playback reference
+  window[`_yt_${source}`] = videos;
+  
+  return `<div class="yt-video-grid">${videos.map((video, i) => {
+    const safeTitle = escapeHtml(video.title || 'Untitled');
+    const safeArtist = escapeHtml(video.artist || video.channel || 'Unknown');
+    return `
+      <div class="yt-video-card" onclick="playYoutubeVideo('${source}', ${i})">
+        <div class="yt-video-thumb-wrap">
+          <img src="${video.thumbnail}" alt="" class="yt-video-thumb" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 320 180%22><rect fill=%22%23181818%22 width=%22320%22 height=%22180%22/><text x=%22160%22 y=%2290%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23555%22 font-size=%2240%22>▶</text></svg>'">
+          <span class="yt-video-duration">${video.duration_string || ''}</span>
+          <div class="yt-video-play-overlay"><i class="fas fa-play"></i></div>
+        </div>
+        <div class="yt-video-info">
+          <div class="yt-video-title">${safeTitle}</div>
+          <div class="yt-video-channel">${safeArtist}</div>
+        </div>
+        <div class="yt-video-actions">
+          <button onclick="event.stopPropagation(); addToYoutubeWatchLater('${source}', ${i})" title="Watch Later">
+            <i class="fas fa-clock"></i>
+          </button>
+        </div>
+      </div>`;
+  }).join('')}</div>`;
+}
+
+function playYoutubeVideo(source, index) {
+  const videos = window[`_yt_${source}`];
+  if (!videos || !videos[index]) return;
+  
+  const video = videos[index];
+  let videoId = video.id;
+  if (!videoId && video.url) {
+    const match = video.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&]+)/);
+    if (match) videoId = match[1];
+  }
+  
+  // Sanitize videoId
+  if (!videoId || !/^[a-zA-Z0-9_-]{5,20}$/.test(videoId)) {
+    showToast('Invalid video', 'fa-exclamation-triangle');
+    return;
+  }
+  
+  youtubeState.currentVideo = {
+    title: video.title,
+    artist: video.artist || video.channel,
+    thumbnail: video.thumbnail,
+    videoId: videoId,
+    duration_string: video.duration_string
+  };
+  
+  // Add to history
+  const historyEntry = { ...youtubeState.currentVideo, watchedAt: Date.now() };
+  youtubeState.history = youtubeState.history.filter(h => h.videoId !== videoId);
+  youtubeState.history.unshift(historyEntry);
+  if (youtubeState.history.length > 50) youtubeState.history = youtubeState.history.slice(0, 50);
+  saveYoutubeData();
+  
+  // Show player
+  const playerSection = document.getElementById('ytPlayerSection');
+  const playerIframe = document.getElementById('ytPlayerIframe');
+  const playerTitle = document.getElementById('ytPlayerTitle');
+  const playerChannel = document.getElementById('ytPlayerChannel');
+  
+  if (playerSection && playerIframe) {
+    playerIframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`;
+    if (playerTitle) playerTitle.textContent = video.title;
+    if (playerChannel) playerChannel.textContent = video.artist || video.channel || '';
+    playerSection.classList.add('active');
+    
+    // Update subscribe button for this channel
+    const channelName = video.artist || video.channel || '';
+    const subBtn = document.getElementById('ytSubscribeBtn');
+    if (subBtn && channelName) {
+      const key = channelName.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+      const subscribed = isSubscribedToChannel(channelName);
+      subBtn.setAttribute('data-channel-key', key);
+      subBtn.setAttribute('onclick', `toggleYoutubeSubscribe('${escapeHtml(channelName)}')`);
+      subBtn.className = 'yt-subscribe-btn' + (subscribed ? ' subscribed' : '');
+      subBtn.innerHTML = subscribed
+        ? '<i class="fas fa-bell"></i> Subscribed'
+        : '<i class="fas fa-user-plus"></i> Subscribe';
+      subBtn.style.display = channelName ? 'inline-flex' : 'none';
+    }
+    
+    // Update like/dislike buttons
+    updateYoutubeLikeButtons(videoId);
+    loadVideoLikeCounts(videoId);
+    
+    // Load comments
+    loadYoutubeComments(videoId);
+    
+    // Load related videos (prefer same creator)
+    loadYoutubeRelatedByCreator(channelName || video.title, videoId);
+  }
+}
+
+function closeYoutubePlayer() {
+  const playerSection = document.getElementById('ytPlayerSection');
+  const playerIframe = document.getElementById('ytPlayerIframe');
+  if (playerSection) playerSection.classList.remove('active');
+  if (playerIframe) playerIframe.src = '';
+  youtubeState.currentVideo = null;
+}
+
+function toggleYoutubeTheater() {
+  youtubeState.isTheater = !youtubeState.isTheater;
+  const playerSection = document.getElementById('ytPlayerSection');
+  if (playerSection) playerSection.classList.toggle('theater', youtubeState.isTheater);
+}
+
+async function loadYoutubeTrending() {
+  const container = document.getElementById('ytTrendingGrid');
+  if (!container) return;
+  
+  const now = Date.now();
+  if (ytRecommendCache.trending && now - ytRecommendCache.lastFetch < 10 * 60 * 1000) {
+    container.innerHTML = renderYoutubeVideoGrid(ytRecommendCache.trending, 'trending');
+    return;
+  }
+  
+  container.innerHTML = '<div class="yt-loading"><i class="fas fa-spinner fa-spin fa-2x"></i><p>Loading trending videos...</p></div>';
+  
+  try {
+    const serverUrl = await getMelodifyBackendUrl();
+    const query = YT_TRENDING_QUERIES[Math.floor(Math.random() * YT_TRENDING_QUERIES.length)];
+    const response = await fetch(`${serverUrl}/api/search?q=${encodeURIComponent(query)}&max=12`);
+    const data = await response.json();
+    
+    const videos = data.results || [];
+    ytRecommendCache = { trending: videos, lastFetch: now };
+    container.innerHTML = renderYoutubeVideoGrid(videos, 'trending');
+  } catch (err) {
+    container.innerHTML = '<div class="yt-empty"><i class="fas fa-wifi"></i><p>Could not load trending videos</p></div>';
+  }
+}
+
+async function loadYoutubeRelated(query) {
+  const container = document.getElementById('ytRelatedVideos');
+  if (!container) return;
+  
+  container.innerHTML = '<div class="yt-loading"><i class="fas fa-spinner fa-spin"></i><p>Loading related...</p></div>';
+  
+  try {
+    const serverUrl = await getMelodifyBackendUrl();
+    // Search for related videos based on current title keywords
+    const keywords = query.split(' ').slice(0, 3).join(' ');
+    const response = await fetch(`${serverUrl}/api/search?q=${encodeURIComponent(keywords)}&max=8`);
+    const data = await response.json();
+    
+    const videos = (data.results || []).filter(v => {
+      const vid = v.id || '';
+      return vid !== youtubeState.currentVideo?.videoId;
+    });
+    
+    window._yt_related = videos;
+    
+    if (videos.length === 0) {
+      container.innerHTML = '<p style="color: #aaa; padding: 1rem;">No related videos found</p>';
+      return;
+    }
+    
+    container.innerHTML = videos.map((video, i) => `
+      <div class="yt-related-item" onclick="playYoutubeVideo('related', ${i})">
+        <img src="${video.thumbnail}" alt="" class="yt-related-thumb" onerror="this.style.display='none'">
+        <div class="yt-related-info">
+          <div class="yt-related-title">${escapeHtml(video.title)}</div>
+          <div class="yt-related-channel">${escapeHtml(video.artist || '')}</div>
+          <div class="yt-related-duration">${video.duration_string || ''}</div>
+        </div>
+      </div>
+    `).join('');
+  } catch (err) {
+    container.innerHTML = '<p style="color: #aaa; padding: 1rem;">Could not load related videos</p>';
+  }
+}
+
+async function searchYoutubeCategory(category) {
+  const query = YT_CATEGORY_QUERIES[category] || category;
+  const input = document.getElementById('ytSearchInput');
+  if (input) input.value = query;
+  await searchYoutube(query);
+}
+
+function addToYoutubeWatchLater(source, index) {
+  const videos = window[`_yt_${source}`];
+  if (!videos || !videos[index]) return;
+  
+  const video = videos[index];
+  let videoId = video.id;
+  if (!videoId && video.url) {
+    const match = video.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&]+)/);
+    if (match) videoId = match[1];
+  }
+  
+  const exists = youtubeState.watchLater.some(v => v.videoId === videoId);
+  if (exists) {
+    showToast('Already in Watch Later', 'fa-clock');
+    return;
+  }
+  
+  youtubeState.watchLater.unshift({
+    title: video.title,
+    artist: video.artist || video.channel,
+    thumbnail: video.thumbnail,
+    videoId: videoId,
+    duration_string: video.duration_string,
+    addedAt: Date.now()
+  });
+  
+  saveYoutubeData();
+  showToast('Added to Watch Later', 'fa-clock');
+}
+
+function removeFromYoutubeWatchLater(index) {
+  if (index < 0 || index >= youtubeState.watchLater.length) return;
+  const removed = youtubeState.watchLater.splice(index, 1)[0];
+  saveYoutubeData();
+  renderYoutubeWatchLater();
+  showToast('Removed: ' + (removed?.title || ''), 'fa-trash');
+}
+
+function renderYoutubeHistory() {
+  const container = document.getElementById('ytHistoryGrid');
+  if (!container) return;
+  
+  if (youtubeState.history.length === 0) {
+    container.innerHTML = '<div class="yt-empty"><i class="fas fa-history"></i><p>No watch history yet</p><p style="font-size:0.85rem;">Videos you watch will appear here</p></div>';
+    return;
+  }
+  
+  window._yt_history = youtubeState.history;
+  container.innerHTML = renderYoutubeVideoGrid(youtubeState.history, 'history');
+}
+
+function renderYoutubeWatchLater() {
+  const container = document.getElementById('ytWatchLaterGrid');
+  if (!container) return;
+  
+  if (youtubeState.watchLater.length === 0) {
+    container.innerHTML = '<div class="yt-empty"><i class="fas fa-clock"></i><p>Watch Later is empty</p><p style="font-size:0.85rem;">Save videos to watch them later</p></div>';
+    return;
+  }
+  
+  window._yt_watchlater = youtubeState.watchLater;
+  container.innerHTML = renderYoutubeVideoGrid(youtubeState.watchLater, 'watchlater');
+}
+
+function clearYoutubeHistory() {
+  youtubeState.history = [];
+  saveYoutubeData();
+  renderYoutubeHistory();
+  showToast('History cleared', 'fa-trash');
+}
+
+// ==================== YOUTUBE SOCIAL FEATURES ====================
+// Comments, Likes/Dislikes, Subscribing, Replies, Notifications
+// Comments are stored in a SHARED Firebase path so all users can see them
+// User-specific data (subscriptions, liked videos, notifications) are per-user
+
+const YT_COMMENTS_FIREBASE = VELTRA_USER_FIREBASE_URL + '/youtube_comments';
+const YT_SOCIAL_FIREBASE = VELTRA_USER_FIREBASE_URL + '/youtube_social';
+
+// Get the current Veltra username for YouTube display
+function getYoutubeUsername() {
+  return localStorage.getItem('Veltra_username') || 'Anonymous';
+}
+
+// ---- SUBSCRIPTIONS ----
+
+async function loadYoutubeSubscriptions() {
+  try {
+    const resp = await fetch(`${YT_SOCIAL_FIREBASE}/${youtubeState.userId}/subscriptions.json`);
+    const data = await resp.json();
+    youtubeState.subscriptions = data || {};
+  } catch (e) {
+    console.warn('[YouTube] Failed to load subscriptions:', e.message);
+    youtubeState.subscriptions = JSON.parse(localStorage.getItem('Veltra_ytSubscriptions') || '{}');
+  }
+}
+
+async function saveYoutubeSubscriptions() {
+  localStorage.setItem('Veltra_ytSubscriptions', JSON.stringify(youtubeState.subscriptions));
+  try {
+    await fetch(`${YT_SOCIAL_FIREBASE}/${youtubeState.userId}/subscriptions.json`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(youtubeState.subscriptions)
+    });
+  } catch (e) {
+    console.warn('[YouTube] Failed to save subscriptions:', e.message);
+  }
+}
+
+function toggleYoutubeSubscribe(channelName) {
+  if (!channelName || typeof channelName !== 'string') return;
+  const key = channelName.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+  if (!key) return;
+  
+  if (youtubeState.subscriptions[key]) {
+    delete youtubeState.subscriptions[key];
+    showToast('Unsubscribed from ' + escapeHtml(channelName), 'fa-user-minus');
+  } else {
+    youtubeState.subscriptions[key] = {
+      name: channelName.trim(),
+      subscribedAt: Date.now()
+    };
+    showToast('Subscribed to ' + escapeHtml(channelName), 'fa-user-plus');
+  }
+  saveYoutubeSubscriptions();
+  updateYoutubeSubscribeButtons(channelName);
+}
+
+function isSubscribedToChannel(channelName) {
+  if (!channelName) return false;
+  const key = channelName.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+  return !!youtubeState.subscriptions[key];
+}
+
+function updateYoutubeSubscribeButtons(channelName) {
+  const key = channelName.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+  const subscribed = !!youtubeState.subscriptions[key];
+  document.querySelectorAll(`.yt-subscribe-btn[data-channel-key="${key}"]`).forEach(btn => {
+    btn.classList.toggle('subscribed', subscribed);
+    btn.innerHTML = subscribed
+      ? '<i class="fas fa-bell"></i> Subscribed'
+      : '<i class="fas fa-user-plus"></i> Subscribe';
+  });
+}
+
+function renderYoutubeSubscriptions() {
+  const container = document.getElementById('ytSubscriptionsGrid');
+  if (!container) return;
+  
+  const subs = Object.values(youtubeState.subscriptions || {});
+  if (subs.length === 0) {
+    container.innerHTML = '<div class="yt-empty"><i class="fas fa-user-plus"></i><p>No subscriptions yet</p><p style="font-size:0.85rem;">Subscribe to channels while watching videos</p></div>';
+    return;
+  }
+  
+  container.innerHTML = subs.map(sub => `
+    <div class="yt-sub-card" onclick="searchYoutube('${escapeHtml(sub.name)}')">
+      <div class="yt-sub-avatar"><i class="fas fa-user-circle"></i></div>
+      <div class="yt-sub-info">
+        <div class="yt-sub-name">${escapeHtml(sub.name)}</div>
+      </div>
+      <button class="yt-subscribe-btn subscribed" onclick="event.stopPropagation(); toggleYoutubeSubscribe('${escapeHtml(sub.name)}')" 
+        data-channel-key="${sub.name.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_')}">
+        <i class="fas fa-bell"></i> Subscribed
+      </button>
+    </div>
+  `).join('');
+}
+
+// ---- LIKES / DISLIKES ----
+
+async function loadYoutubeLikes() {
+  try {
+    const resp = await fetch(`${YT_SOCIAL_FIREBASE}/${youtubeState.userId}/likes.json`);
+    const data = await resp.json();
+    youtubeState.likes = data || {};
+  } catch (e) {
+    youtubeState.likes = JSON.parse(localStorage.getItem('Veltra_ytLikes') || '{}');
+  }
+}
+
+async function saveYoutubeLikes() {
+  localStorage.setItem('Veltra_ytLikes', JSON.stringify(youtubeState.likes));
+  try {
+    await fetch(`${YT_SOCIAL_FIREBASE}/${youtubeState.userId}/likes.json`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(youtubeState.likes)
+    });
+  } catch (e) {
+    console.warn('[YouTube] Failed to save likes:', e.message);
+  }
+}
+
+function toggleYoutubeLike(videoId) {
+  if (!videoId || !/^[a-zA-Z0-9_-]{5,20}$/.test(videoId)) return;
+  
+  const current = youtubeState.likes[videoId];
+  if (current === 'like') {
+    delete youtubeState.likes[videoId]; // Unlike
+  } else {
+    youtubeState.likes[videoId] = 'like';
+  }
+  saveYoutubeLikes();
+  updateYoutubeLikeButtons(videoId);
+  updateVideoLikeCount(videoId, current === 'like' ? -1 : 1, 0);
+}
+
+function toggleYoutubeDislike(videoId) {
+  if (!videoId || !/^[a-zA-Z0-9_-]{5,20}$/.test(videoId)) return;
+  
+  const current = youtubeState.likes[videoId];
+  if (current === 'dislike') {
+    delete youtubeState.likes[videoId]; // Un-dislike
+  } else {
+    youtubeState.likes[videoId] = 'dislike';
+  }
+  saveYoutubeLikes();
+  updateYoutubeLikeButtons(videoId);
+  updateVideoLikeCount(videoId, 0, current === 'dislike' ? -1 : 1);
+}
+
+// Update global like/dislike counts in shared Firebase
+async function updateVideoLikeCount(videoId, likeDelta, dislikeDelta) {
+  try {
+    const url = `${YT_SOCIAL_FIREBASE}/videostats/${videoId}.json`;
+    const resp = await fetch(url);
+    const data = (await resp.json()) || { likes: 0, dislikes: 0 };
+    
+    data.likes = Math.max(0, (data.likes || 0) + likeDelta);
+    data.dislikes = Math.max(0, (data.dislikes || 0) + dislikeDelta);
+    
+    await fetch(url, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    
+    // Update UI
+    const likeCountEl = document.getElementById('ytLikeCount');
+    const dislikeCountEl = document.getElementById('ytDislikeCount');
+    if (likeCountEl) likeCountEl.textContent = data.likes || 0;
+    if (dislikeCountEl) dislikeCountEl.textContent = data.dislikes || 0;
+  } catch (e) {
+    console.warn('[YouTube] Failed to update like counts:', e.message);
+  }
+}
+
+async function loadVideoLikeCounts(videoId) {
+  try {
+    const resp = await fetch(`${YT_SOCIAL_FIREBASE}/videostats/${videoId}.json`);
+    const data = (await resp.json()) || { likes: 0, dislikes: 0 };
+    const likeCountEl = document.getElementById('ytLikeCount');
+    const dislikeCountEl = document.getElementById('ytDislikeCount');
+    if (likeCountEl) likeCountEl.textContent = data.likes || 0;
+    if (dislikeCountEl) dislikeCountEl.textContent = data.dislikes || 0;
+  } catch (e) {
+    console.warn('[YouTube] Failed to load like counts');
+  }
+}
+
+function updateYoutubeLikeButtons(videoId) {
+  const state = youtubeState.likes[videoId];
+  const likeBtn = document.getElementById('ytLikeBtn');
+  const dislikeBtn = document.getElementById('ytDislikeBtn');
+  if (likeBtn) likeBtn.classList.toggle('active', state === 'like');
+  if (dislikeBtn) dislikeBtn.classList.toggle('active', state === 'dislike');
+}
+
+// ---- COMMENTS SYSTEM ----
+// Comments are stored in a shared Firebase location so all users see them
+// Path: youtube_comments/{videoId}/{commentId}
+
+async function loadYoutubeComments(videoId) {
+  if (!videoId || !/^[a-zA-Z0-9_-]{5,20}$/.test(videoId)) return;
+  
+  const container = document.getElementById('ytCommentsSection');
+  if (!container) return;
+  
+  container.innerHTML = `
+    <div class="yt-comments-header">
+      <h3><i class="fas fa-comments"></i> Comments</h3>
+    </div>
+    <div class="yt-comment-form">
+      <div class="yt-comment-avatar"><i class="fas fa-user-circle"></i></div>
+      <div class="yt-comment-input-wrap">
+        <input type="text" id="ytCommentInput" class="yt-comment-input" placeholder="Add a comment..." 
+          maxlength="500" onkeydown="if(event.key === 'Enter') postYoutubeComment('${videoId}')">
+        <div class="yt-comment-input-actions">
+          <span class="yt-comment-username">${escapeHtml(getYoutubeUsername())}</span>
+          <button class="yt-comment-submit" onclick="postYoutubeComment('${videoId}')">
+            <i class="fas fa-paper-plane"></i> Comment
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="yt-comments-list" id="ytCommentsList">
+      <div class="yt-loading"><i class="fas fa-spinner fa-spin"></i><p>Loading comments...</p></div>
+    </div>`;
+  
+  try {
+    const resp = await fetch(`${YT_COMMENTS_FIREBASE}/${videoId}.json`);
+    const data = (await resp.json()) || {};
+    
+    const comments = Object.entries(data)
+      .map(([id, c]) => ({ ...c, id }))
+      .filter(c => !c.parentId) // Only top-level comments
+      .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    
+    const allComments = Object.entries(data).map(([id, c]) => ({ ...c, id }));
+    
+    const listEl = document.getElementById('ytCommentsList');
+    if (!listEl) return;
+    
+    if (comments.length === 0) {
+      listEl.innerHTML = '<div class="yt-empty" style="padding:1rem;"><p>No comments yet. Be the first!</p></div>';
+      return;
+    }
+    
+    listEl.innerHTML = comments.map(comment => renderYoutubeComment(comment, allComments, videoId)).join('');
+  } catch (e) {
+    console.warn('[YouTube] Failed to load comments:', e.message);
+    const listEl = document.getElementById('ytCommentsList');
+    if (listEl) listEl.innerHTML = '<div class="yt-empty"><p>Could not load comments</p></div>';
+  }
+}
+
+function renderYoutubeComment(comment, allComments, videoId) {
+  const isOwn = comment.userId === youtubeState.userId;
+  const timeAgo = formatYoutubeTimeAgo(comment.timestamp);
+  const replies = allComments
+    .filter(c => c.parentId === comment.id)
+    .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+  
+  const userLiked = comment.likedBy && comment.likedBy[youtubeState.userId];
+  const likeCount = comment.likedBy ? Object.keys(comment.likedBy).length : 0;
+  
+  return `
+    <div class="yt-comment ${isOwn ? 'own' : ''}" data-comment-id="${comment.id}">
+      <div class="yt-comment-avatar"><i class="fas fa-user-circle"></i></div>
+      <div class="yt-comment-body">
+        <div class="yt-comment-meta">
+          <span class="yt-comment-author ${isOwn ? 'you' : ''}">${escapeHtml(comment.username || 'Anonymous')}</span>
+          <span class="yt-comment-time">${timeAgo}</span>
+        </div>
+        <div class="yt-comment-text">${escapeHtml(comment.text || '')}</div>
+        <div class="yt-comment-actions">
+          <button class="yt-comment-action-btn ${userLiked ? 'active' : ''}" onclick="likeYoutubeComment('${videoId}', '${comment.id}')">
+            <i class="fas fa-thumbs-up"></i> <span>${likeCount || ''}</span>
+          </button>
+          <button class="yt-comment-action-btn" onclick="showYoutubeReplyForm('${videoId}', '${comment.id}')">
+            <i class="fas fa-reply"></i> Reply
+          </button>
+          ${isOwn ? `<button class="yt-comment-action-btn delete" onclick="deleteYoutubeComment('${videoId}', '${comment.id}')"><i class="fas fa-trash"></i></button>` : ''}
+        </div>
+        <div class="yt-reply-form" id="ytReplyForm_${comment.id}" style="display:none;">
+          <input type="text" class="yt-reply-input" id="ytReplyInput_${comment.id}" placeholder="Reply to ${escapeHtml(comment.username || 'Anonymous')}..." 
+            maxlength="500" onkeydown="if(event.key === 'Enter') postYoutubeReply('${videoId}', '${comment.id}')">
+          <div class="yt-reply-actions">
+            <button class="yt-btn-cancel" onclick="document.getElementById('ytReplyForm_${comment.id}').style.display='none'">Cancel</button>
+            <button class="yt-btn-reply" onclick="postYoutubeReply('${videoId}', '${comment.id}')"><i class="fas fa-paper-plane"></i> Reply</button>
+          </div>
+        </div>
+        ${replies.length > 0 ? `
+          <div class="yt-replies">
+            <button class="yt-show-replies" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'block' : 'none'; this.textContent = this.nextElementSibling.style.display === 'none' ? '▶ ${replies.length} repl${replies.length === 1 ? 'y' : 'ies'}' : '▼ Hide replies'">
+              ▶ ${replies.length} repl${replies.length === 1 ? 'y' : 'ies'}
+            </button>
+            <div class="yt-replies-list" style="display:none;">
+              ${replies.map(reply => renderYoutubeComment(reply, allComments, videoId)).join('')}
+            </div>
+          </div>` : ''}
+      </div>
+    </div>`;
+}
+
+async function postYoutubeComment(videoId) {
+  const input = document.getElementById('ytCommentInput');
+  if (!input) return;
+  
+  const text = input.value.trim();
+  if (!text) return;
+  if (text.length > 500) {
+    showToast('Comment too long (max 500 chars)', 'fa-exclamation-triangle');
+    return;
+  }
+  
+  const commentId = 'c_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 6);
+  const comment = {
+    userId: youtubeState.userId,
+    username: getYoutubeUsername(),
+    text: text,
+    timestamp: Date.now(),
+    likedBy: {}
+  };
+  
+  input.value = '';
+  input.disabled = true;
+  
+  try {
+    await fetch(`${YT_COMMENTS_FIREBASE}/${videoId}/${commentId}.json`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(comment)
+    });
+    
+    showToast('Comment posted', 'fa-comment');
+    loadYoutubeComments(videoId); // Reload comments
+  } catch (e) {
+    showToast('Failed to post comment', 'fa-exclamation-triangle');
+    input.value = text; // Restore text on failure
+  } finally {
+    input.disabled = false;
+  }
+}
+
+async function postYoutubeReply(videoId, parentCommentId) {
+  const input = document.getElementById('ytReplyInput_' + parentCommentId);
+  if (!input) return;
+  
+  const text = input.value.trim();
+  if (!text) return;
+  if (text.length > 500) {
+    showToast('Reply too long (max 500 chars)', 'fa-exclamation-triangle');
+    return;
+  }
+  
+  const replyId = 'r_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 6);
+  
+  // Get the parent comment to find who to notify
+  let parentComment = null;
+  try {
+    const parentResp = await fetch(`${YT_COMMENTS_FIREBASE}/${videoId}/${parentCommentId}.json`);
+    parentComment = await parentResp.json();
+  } catch (e) { /* Non-critical */ }
+  
+  const reply = {
+    userId: youtubeState.userId,
+    username: getYoutubeUsername(),
+    text: text,
+    timestamp: Date.now(),
+    parentId: parentCommentId,
+    likedBy: {}
+  };
+  
+  input.value = '';
+  input.disabled = true;
+  
+  try {
+    await fetch(`${YT_COMMENTS_FIREBASE}/${videoId}/${replyId}.json`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(reply)
+    });
+    
+    // Send notification to parent comment author (if not self)
+    if (parentComment && parentComment.userId && parentComment.userId !== youtubeState.userId) {
+      sendYoutubeNotification(parentComment.userId, {
+        type: 'reply',
+        from: getYoutubeUsername(),
+        videoId: videoId,
+        commentId: parentCommentId,
+        replyId: replyId,
+        preview: text.substring(0, 100),
+        timestamp: Date.now()
+      });
+    }
+    
+    showToast('Reply posted', 'fa-reply');
+    loadYoutubeComments(videoId);
+  } catch (e) {
+    showToast('Failed to post reply', 'fa-exclamation-triangle');
+    input.value = text;
+  } finally {
+    input.disabled = false;
+  }
+}
+
+function showYoutubeReplyForm(videoId, commentId) {
+  const form = document.getElementById('ytReplyForm_' + commentId);
+  if (form) {
+    form.style.display = form.style.display === 'none' ? 'flex' : 'none';
+    if (form.style.display !== 'none') {
+      const input = document.getElementById('ytReplyInput_' + commentId);
+      if (input) input.focus();
+    }
+  }
+}
+
+async function likeYoutubeComment(videoId, commentId) {
+  try {
+    const path = `${YT_COMMENTS_FIREBASE}/${videoId}/${commentId}/likedBy/${youtubeState.userId}.json`;
+    const resp = await fetch(path);
+    const liked = await resp.json();
+    
+    if (liked) {
+      // Unlike
+      await fetch(path, { method: 'DELETE' });
+    } else {
+      // Like
+      await fetch(path, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: 'true' });
+    }
+    
+    loadYoutubeComments(videoId);
+  } catch (e) {
+    showToast('Could not like comment', 'fa-exclamation-triangle');
+  }
+}
+
+async function deleteYoutubeComment(videoId, commentId) {
+  try {
+    await fetch(`${YT_COMMENTS_FIREBASE}/${videoId}/${commentId}.json`, { method: 'DELETE' });
+    showToast('Comment deleted', 'fa-trash');
+    loadYoutubeComments(videoId);
+  } catch (e) {
+    showToast('Could not delete comment', 'fa-exclamation-triangle');
+  }
+}
+
+// ---- NOTIFICATIONS ----
+
+async function loadYoutubeNotifications() {
+  try {
+    const resp = await fetch(`${YT_SOCIAL_FIREBASE}/${youtubeState.userId}/notifications.json`);
+    const data = (await resp.json()) || {};
+    youtubeState.notifications = Object.entries(data)
+      .map(([id, n]) => ({ ...n, id }))
+      .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+      .slice(0, 50); // Keep last 50
+  } catch (e) {
+    youtubeState.notifications = [];
+  }
+  updateYoutubeNotificationBadge();
+}
+
+async function sendYoutubeNotification(targetUserId, notification) {
+  if (!targetUserId) return;
+  const notifId = 'n_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 6);
+  try {
+    await fetch(`${YT_SOCIAL_FIREBASE}/${targetUserId}/notifications/${notifId}.json`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...notification, read: false })
+    });
+  } catch (e) {
+    console.warn('[YouTube] Failed to send notification:', e.message);
+  }
+}
+
+function updateYoutubeNotificationBadge() {
+  const unread = (youtubeState.notifications || []).filter(n => !n.read).length;
+  const badge = document.getElementById('ytNotifBadge');
+  if (badge) {
+    badge.textContent = unread > 9 ? '9+' : unread;
+    badge.style.display = unread > 0 ? 'flex' : 'none';
+  }
+}
+
+function renderYoutubeNotifications() {
+  const container = document.getElementById('ytNotificationsGrid');
+  if (!container) return;
+  
+  const notifs = youtubeState.notifications || [];
+  if (notifs.length === 0) {
+    container.innerHTML = '<div class="yt-empty"><i class="fas fa-bell"></i><p>No notifications</p></div>';
+    return;
+  }
+  
+  container.innerHTML = notifs.map(notif => {
+    const timeAgo = formatYoutubeTimeAgo(notif.timestamp);
+    const icon = notif.type === 'reply' ? 'fa-reply' : notif.type === 'like' ? 'fa-thumbs-up' : 'fa-bell';
+    const message = notif.type === 'reply'
+      ? `<strong>${escapeHtml(notif.from)}</strong> replied to your comment`
+      : notif.type === 'like'
+      ? `<strong>${escapeHtml(notif.from)}</strong> liked your comment`
+      : escapeHtml(notif.preview || 'New notification');
+    
+    return `
+      <div class="yt-notif-item ${notif.read ? '' : 'unread'}" onclick="handleYoutubeNotifClick('${notif.videoId || ''}', '${notif.id}')">
+        <div class="yt-notif-icon"><i class="fas ${icon}"></i></div>
+        <div class="yt-notif-body">
+          <div class="yt-notif-message">${message}</div>
+          ${notif.preview ? `<div class="yt-notif-preview">"${escapeHtml(notif.preview)}"</div>` : ''}
+          <div class="yt-notif-time">${timeAgo}</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function handleYoutubeNotifClick(videoId, notifId) {
+  // Mark as read
+  if (notifId) {
+    try {
+      await fetch(`${YT_SOCIAL_FIREBASE}/${youtubeState.userId}/notifications/${notifId}/read.json`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: 'true'
+      });
+      const notif = youtubeState.notifications.find(n => n.id === notifId);
+      if (notif) notif.read = true;
+      updateYoutubeNotificationBadge();
+      renderYoutubeNotifications();
+    } catch (e) { /* Non-critical */ }
+  }
+  
+  // Navigate to video if available
+  if (videoId && /^[a-zA-Z0-9_-]{5,20}$/.test(videoId)) {
+    // Play the video directly
+    youtubeState.currentVideo = { videoId };
+    const playerSection = document.getElementById('ytPlayerSection');
+    const playerIframe = document.getElementById('ytPlayerIframe');
+    if (playerSection && playerIframe) {
+      playerIframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`;
+      playerSection.classList.add('active');
+      loadYoutubeComments(videoId);
+      loadVideoLikeCounts(videoId);
+    }
+  }
+}
+
+async function clearYoutubeNotifications() {
+  try {
+    await fetch(`${YT_SOCIAL_FIREBASE}/${youtubeState.userId}/notifications.json`, { method: 'DELETE' });
+    youtubeState.notifications = [];
+    updateYoutubeNotificationBadge();
+    renderYoutubeNotifications();
+    showToast('Notifications cleared', 'fa-bell-slash');
+  } catch (e) {
+    showToast('Could not clear notifications', 'fa-exclamation-triangle');
+  }
+}
+
+// ---- TIME FORMATTING ----
+
+function formatYoutubeTimeAgo(timestamp) {
+  if (!timestamp) return '';
+  const diff = Date.now() - timestamp;
+  const seconds = Math.floor(diff / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return minutes + 'm ago';
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return hours + 'h ago';
+  const days = Math.floor(hours / 24);
+  if (days < 30) return days + 'd ago';
+  const months = Math.floor(days / 30);
+  if (months < 12) return months + 'mo ago';
+  return Math.floor(months / 12) + 'y ago';
+}
+
+// ---- SAME-CREATOR RELATED VIDEOS ----
+
+async function loadYoutubeRelatedByCreator(channelName, currentVideoId) {
+  const container = document.getElementById('ytRelatedVideos');
+  if (!container || !channelName) return;
+  
+  container.innerHTML = '<div class="yt-loading"><i class="fas fa-spinner fa-spin"></i><p>Loading related...</p></div>';
+  
+  try {
+    const serverUrl = await getMelodifyBackendUrl();
+    // Search for more videos by same creator
+    const resp = await fetch(`${serverUrl}/api/search?q=${encodeURIComponent(channelName)}&max=10`);
+    const data = await resp.json();
+    
+    let videos = (data.results || []).filter(v => {
+      const vid = v.id || '';
+      return vid !== currentVideoId;
+    });
+    
+    // If we got results from same creator, also search by title keywords for variety
+    if (videos.length < 4 && youtubeState.currentVideo?.title) {
+      const keywords = youtubeState.currentVideo.title.split(' ').slice(0, 3).join(' ');
+      try {
+        const resp2 = await fetch(`${serverUrl}/api/search?q=${encodeURIComponent(keywords)}&max=6`);
+        const data2 = await resp2.json();
+        const extra = (data2.results || []).filter(v => {
+          const vid = v.id || '';
+          return vid !== currentVideoId && !videos.some(ev => ev.id === vid);
+        });
+        videos = [...videos, ...extra];
+      } catch (e) { /* Non-critical */ }
+    }
+    
+    window._yt_related = videos;
+    
+    if (videos.length === 0) {
+      container.innerHTML = '<p style="color: #aaa; padding: 1rem;">No related videos found</p>';
+      return;
+    }
+    
+    container.innerHTML = videos.slice(0, 10).map((video, i) => `
+      <div class="yt-related-item" onclick="playYoutubeVideo('related', ${i})">
+        <img src="${video.thumbnail}" alt="" class="yt-related-thumb" onerror="this.style.display='none'">
+        <div class="yt-related-info">
+          <div class="yt-related-title">${escapeHtml(video.title)}</div>
+          <div class="yt-related-channel">${escapeHtml(video.artist || video.channel || '')}</div>
+          <div class="yt-related-duration">${video.duration_string || ''}</div>
+        </div>
+      </div>
+    `).join('');
+  } catch (err) {
+    container.innerHTML = '<p style="color: #aaa; padding: 1rem;">Could not load related videos</p>';
+  }
+}
+
+// ---- INIT SOCIAL DATA ----
+
+async function initYoutubeSocial() {
+  youtubeState.subscriptions = {};
+  youtubeState.likes = {};
+  youtubeState.notifications = [];
+  
+  await Promise.all([
+    loadYoutubeSubscriptions(),
+    loadYoutubeLikes(),
+    loadYoutubeNotifications()
+  ]);
+  
+  console.log('[YouTube] Social data loaded');
+}
+
+// Start polling for notifications every 30 seconds while YouTube app is open
+let ytNotifPollInterval = null;
+function startYoutubeNotifPolling() {
+  stopYoutubeNotifPolling();
+  ytNotifPollInterval = setInterval(() => {
+    loadYoutubeNotifications();
+  }, 30000);
+}
+function stopYoutubeNotifPolling() {
+  if (ytNotifPollInterval) {
+    clearInterval(ytNotifPollInterval);
+    ytNotifPollInterval = null;
+  }
 }
 
 function getDefaultSnapSettings() {
@@ -5245,6 +6511,13 @@ function closeWindow(btn, appName) {
     }
   }
 
+  // Generic onClose callback for any app
+  try {
+    // Find the app definition to call onClose
+    const openAppFunc = window._veltraOnClose;
+    if (typeof openAppFunc === 'function') openAppFunc();
+  } catch(e) { console.warn('[Veltra] onClose error:', e); }
+
   window.style.animation = "windowMinimize 0.25s ease forwards";
   setTimeout(() => {
     window.remove();
@@ -7137,6 +8410,47 @@ alt="favicon">
                   </div>
                 </div>
               </div>
+              <div class="melodify-section">
+                <h2><i class="fas fa-fire" style="color: #ff6b35;"></i> Trending Now</h2>
+                <div id="melodifyTrending" class="melodify-recommend-grid">
+                  <div class="melodify-loading"><i class="fas fa-spinner fa-spin"></i><p>Loading recommendations...</p></div>
+                </div>
+              </div>
+              <div class="melodify-section">
+                <h2><i class="fas fa-star" style="color: #ffd700;"></i> Recommended For You</h2>
+                <div id="melodifyRecommended" class="melodify-recommend-grid">
+                  <div class="melodify-loading"><i class="fas fa-spinner fa-spin"></i><p>Loading...</p></div>
+                </div>
+              </div>
+              <div class="melodify-section">
+                <h2><i class="fas fa-headphones" style="color: #1DB954;"></i> Popular Genres</h2>
+                <div class="melodify-genre-grid">
+                  <div class="melodify-genre-card" onclick="melodifySearchGenre('pop hits 2026')" style="background: linear-gradient(135deg, #E91E63, #FF5722);">
+                    <i class="fas fa-music"></i><span>Pop</span>
+                  </div>
+                  <div class="melodify-genre-card" onclick="melodifySearchGenre('hip hop rap trending')" style="background: linear-gradient(135deg, #FF9800, #F44336);">
+                    <i class="fas fa-microphone"></i><span>Hip Hop</span>
+                  </div>
+                  <div class="melodify-genre-card" onclick="melodifySearchGenre('rock classic hits')" style="background: linear-gradient(135deg, #607D8B, #455A64);">
+                    <i class="fas fa-guitar"></i><span>Rock</span>
+                  </div>
+                  <div class="melodify-genre-card" onclick="melodifySearchGenre('electronic EDM dance')" style="background: linear-gradient(135deg, #00BCD4, #009688);">
+                    <i class="fas fa-bolt"></i><span>Electronic</span>
+                  </div>
+                  <div class="melodify-genre-card" onclick="melodifySearchGenre('lo-fi chill beats study')" style="background: linear-gradient(135deg, #9C27B0, #673AB7);">
+                    <i class="fas fa-cloud-moon"></i><span>Lo-Fi</span>
+                  </div>
+                  <div class="melodify-genre-card" onclick="melodifySearchGenre('R&B soul smooth')" style="background: linear-gradient(135deg, #3F51B5, #2196F3);">
+                    <i class="fas fa-heart"></i><span>R&B</span>
+                  </div>
+                  <div class="melodify-genre-card" onclick="melodifySearchGenre('latin reggaeton')" style="background: linear-gradient(135deg, #4CAF50, #8BC34A);">
+                    <i class="fas fa-fire"></i><span>Latin</span>
+                  </div>
+                  <div class="melodify-genre-card" onclick="melodifySearchGenre('jazz smooth instrumental')" style="background: linear-gradient(135deg, #795548, #A1887F);">
+                    <i class="fas fa-saxophone"></i><span>Jazz</span>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <!-- Search Tab -->
@@ -7246,9 +8560,180 @@ alt="favicon">
         </div>
       `,
       noPadding: true,
-      onOpen: function() { resetMelodifyAudio(); },
+      onOpen: function() { resetMelodifyAudio(); updateMelodifyLibraryUI(); loadMelodifyRecommendations(); },
       width: 1100,
       height: 700,
+    },
+    youtube: {
+      title: "YouTube",
+      icon: "fas fa-play-circle",
+      content: `
+        <div class="youtube-app">
+          <!-- Video Player Section (hidden until video plays) -->
+          <div class="yt-player-section" id="ytPlayerSection">
+            <div class="yt-player-wrapper">
+              <div class="yt-player-container">
+                <iframe id="ytPlayerIframe" src="" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen frameborder="0"></iframe>
+              </div>
+              <div class="yt-player-controls-bar">
+                <div class="yt-player-info">
+                  <h3 id="ytPlayerTitle">Video Title</h3>
+                  <span id="ytPlayerChannel">Channel</span>
+                </div>
+                <div class="yt-player-btns">
+                  <button id="ytSubscribeBtn" class="yt-subscribe-btn" style="display:none;">
+                    <i class="fas fa-user-plus"></i> Subscribe
+                  </button>
+                  <button onclick="toggleYoutubeTheater()" title="Theater Mode"><i class="fas fa-expand"></i></button>
+                  <button onclick="closeYoutubePlayer()" title="Close"><i class="fas fa-times"></i></button>
+                </div>
+              </div>
+              <div class="yt-player-social-bar">
+                <div class="yt-like-dislike">
+                  <button id="ytLikeBtn" class="yt-like-btn" onclick="toggleYoutubeLike(youtubeState.currentVideo?.videoId)">
+                    <i class="fas fa-thumbs-up"></i> <span id="ytLikeCount">0</span>
+                  </button>
+                  <button id="ytDislikeBtn" class="yt-dislike-btn" onclick="toggleYoutubeDislike(youtubeState.currentVideo?.videoId)">
+                    <i class="fas fa-thumbs-down"></i> <span id="ytDislikeCount">0</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="yt-player-bottom">
+              <div class="yt-comments-section-wrap" id="ytCommentsSection">
+                <!-- Comments loaded dynamically -->
+              </div>
+              <div class="yt-related-section">
+                <h4>Related Videos</h4>
+                <div id="ytRelatedVideos" class="yt-related-list"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Navigation Bar -->
+          <div class="youtube-nav">
+            <div class="youtube-nav-left">
+              <div class="youtube-logo">
+                <i class="fab fa-youtube" style="color: #ff0000;"></i>
+                <span>YouTube</span>
+              </div>
+            </div>
+            <div class="youtube-search-bar">
+              <input type="text" id="ytSearchInput" placeholder="Search videos..." 
+                onkeydown="if(event.key === 'Enter') searchYoutube(this.value)">
+              <button onclick="searchYoutube(document.getElementById('ytSearchInput').value)">
+                <i class="fas fa-search"></i>
+              </button>
+            </div>
+            <div class="youtube-nav-right">
+              <div class="youtube-nav-item active" data-tab="home" onclick="youtubeShowTab('home')">
+                <i class="fas fa-home"></i> <span>Home</span>
+              </div>
+              <div class="youtube-nav-item" data-tab="search" onclick="youtubeShowTab('search')">
+                <i class="fas fa-search"></i> <span>Search</span>
+              </div>
+              <div class="youtube-nav-item" data-tab="subscriptions" onclick="youtubeShowTab('subscriptions')">
+                <i class="fas fa-users"></i> <span>Subs</span>
+              </div>
+              <div class="youtube-nav-item" data-tab="notifications" onclick="youtubeShowTab('notifications')">
+                <i class="fas fa-bell"></i> <span>Notifs</span>
+                <span class="yt-notif-badge" id="ytNotifBadge" style="display:none;">0</span>
+              </div>
+              <div class="youtube-nav-item" data-tab="history" onclick="youtubeShowTab('history')">
+                <i class="fas fa-history"></i> <span>History</span>
+              </div>
+              <div class="youtube-nav-item" data-tab="watchlater" onclick="youtubeShowTab('watchlater')">
+                <i class="fas fa-clock"></i> <span>Later</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Content Area -->
+          <div class="youtube-content">
+            <!-- Home Tab -->
+            <div class="youtube-tab-content active" id="yt-home">
+              <div class="yt-section">
+                <h2><i class="fas fa-fire" style="color: #ff4500;"></i> Trending</h2>
+                <div id="ytTrendingGrid"></div>
+              </div>
+              <div class="yt-section">
+                <h2><i class="fas fa-compass" style="color: #1e90ff;"></i> Explore Categories</h2>
+                <div class="yt-category-grid">
+                  <div class="yt-category-card" onclick="searchYoutubeCategory('music')" style="background: linear-gradient(135deg, #e91e63, #9c27b0);">
+                    <i class="fas fa-music"></i><span>Music</span>
+                  </div>
+                  <div class="yt-category-card" onclick="searchYoutubeCategory('gaming')" style="background: linear-gradient(135deg, #1DB954, #00897B);">
+                    <i class="fas fa-gamepad"></i><span>Gaming</span>
+                  </div>
+                  <div class="yt-category-card" onclick="searchYoutubeCategory('comedy')" style="background: linear-gradient(135deg, #ff9800, #f44336);">
+                    <i class="fas fa-laugh"></i><span>Comedy</span>
+                  </div>
+                  <div class="yt-category-card" onclick="searchYoutubeCategory('tech')" style="background: linear-gradient(135deg, #2196f3, #00bcd4);">
+                    <i class="fas fa-microchip"></i><span>Tech</span>
+                  </div>
+                  <div class="yt-category-card" onclick="searchYoutubeCategory('sports')" style="background: linear-gradient(135deg, #4caf50, #8bc34a);">
+                    <i class="fas fa-football-ball"></i><span>Sports</span>
+                  </div>
+                  <div class="yt-category-card" onclick="searchYoutubeCategory('news')" style="background: linear-gradient(135deg, #607d8b, #455a64);">
+                    <i class="fas fa-newspaper"></i><span>News</span>
+                  </div>
+                  <div class="yt-category-card" onclick="searchYoutubeCategory('education')" style="background: linear-gradient(135deg, #3f51b5, #7986cb);">
+                    <i class="fas fa-graduation-cap"></i><span>Education</span>
+                  </div>
+                  <div class="yt-category-card" onclick="searchYoutubeCategory('entertainment')" style="background: linear-gradient(135deg, #9c27b0, #e040fb);">
+                    <i class="fas fa-star"></i><span>Entertainment</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Search Tab -->
+            <div class="youtube-tab-content" id="yt-search">
+              <div id="ytSearchResults">
+                <div class="yt-empty">
+                  <i class="fas fa-search" style="font-size: 3rem; margin-bottom: 1rem;"></i>
+                  <p>Search for videos</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Subscriptions Tab -->
+            <div class="youtube-tab-content" id="yt-subscriptions">
+              <h2><i class="fas fa-users"></i> Subscriptions</h2>
+              <div id="ytSubscriptionsGrid"></div>
+            </div>
+
+            <!-- Notifications Tab -->
+            <div class="youtube-tab-content" id="yt-notifications">
+              <div class="yt-section-header">
+                <h2><i class="fas fa-bell"></i> Notifications</h2>
+                <button class="yt-clear-btn" onclick="clearYoutubeNotifications()"><i class="fas fa-trash"></i> Clear All</button>
+              </div>
+              <div id="ytNotificationsGrid"></div>
+            </div>
+
+            <!-- History Tab -->
+            <div class="youtube-tab-content" id="yt-history">
+              <div class="yt-section-header">
+                <h2><i class="fas fa-history"></i> Watch History</h2>
+                <button class="yt-clear-btn" onclick="clearYoutubeHistory()"><i class="fas fa-trash"></i> Clear</button>
+              </div>
+              <div id="ytHistoryGrid"></div>
+            </div>
+
+            <!-- Watch Later Tab -->
+            <div class="youtube-tab-content" id="yt-watchlater">
+              <h2><i class="fas fa-clock"></i> Watch Later</h2>
+              <div id="ytWatchLaterGrid"></div>
+            </div>
+          </div>
+        </div>
+      `,
+      noPadding: true,
+      onOpen: function() { loadYoutubeTrending(); initYoutubeSocial(); startYoutubeNotifPolling(); },
+      onClose: function() { stopYoutubeNotifPolling(); },
+      width: 1100,
+      height: 750,
     },
     photos: {
       title: "Photos",
@@ -8981,7 +10466,28 @@ print(f'Sum: {sum(numbers)}')
     if (appName === "melodify") {
       setTimeout(() => {
         resetMelodifyAudio();
+        updateMelodifyLibraryUI();
+        loadMelodifyRecommendations();
       }, 50);
+    }
+
+    if (appName === "youtube") {
+      setTimeout(() => {
+        loadYoutubeTrending();
+      }, 50);
+    }
+
+    // Generic onOpen callback for any app
+    if (app.onOpen && typeof app.onOpen === 'function') {
+      setTimeout(() => {
+        try { app.onOpen(); } catch(e) { console.warn('[Veltra] onOpen error:', e); }
+      }, 100);
+    }
+
+    // Attach onClose callback to window element for cleanup
+    if (app.onClose && typeof app.onClose === 'function') {
+      const winEl = windows[appName];
+      if (winEl) winEl._veltraOnClose = app.onClose;
     }
 
     if (appName === "uv") {

@@ -40,6 +40,55 @@
       ".read": true,
       ".write": true
     },
+    "youtube_data": {
+      "$userId": {
+        ".read": true,
+        ".write": true
+      }
+    },
+    "youtube_comments": {
+      ".read": true,
+      "$videoId": {
+        ".read": true,
+        ".write": true,
+        "$commentId": {
+          ".read": true,
+          ".write": true
+        }
+      }
+    },
+    "youtube_social": {
+      ".read": true,
+      ".write": true,
+      "videostats": {
+        ".read": true,
+        ".write": true,
+        "$videoId": {
+          ".read": true,
+          ".write": true
+        }
+      },
+      "$userId": {
+        ".read": true,
+        ".write": true,
+        "subscriptions": {
+          ".read": true,
+          ".write": true
+        },
+        "likes": {
+          ".read": true,
+          ".write": true
+        },
+        "notifications": {
+          ".read": true,
+          ".write": true,
+          "$notifId": {
+            ".read": true,
+            ".write": true
+          }
+        }
+      }
+    },
     "support": {
       ".read": true,
       ".write": true,

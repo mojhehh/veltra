@@ -2234,7 +2234,7 @@ async function searchMelodify(query) {
             <button class="melodify-row-play" onclick="playMelodifyTrack(${i})"><i class="fas fa-play"></i></button>
           </span>
           <div class="melodify-col-title">
-            <img src="${song.thumbnail}" class="melodify-track-img" onerror="this.style.display='none'">
+            <img src="${song.thumbnail}" class="melodify-track-img" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 40 40%22><rect fill=%22%23282828%22 width=%2240%22 height=%2240%22/><text x=%2220%22 y=%2220%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23555%22 font-size=%2216%22>♪</text></svg>'">
             <div>
               <div class="melodify-track-name">${escapeHtml(song.title)}</div>
               <div class="melodify-track-artist">${escapeHtml(song.artist)}</div>
@@ -2351,7 +2351,7 @@ function playMelodifyYouTubeEmbed(videoId) {
   // Create a hidden but functional YouTube embed that autoplays audio
   const artworkDiv = document.getElementById('melodifyArtwork');
   if (artworkDiv && melodifyState.currentTrack?.thumbnail) {
-    artworkDiv.innerHTML = `<img src="${melodifyState.currentTrack.thumbnail}" alt="">`;
+    artworkDiv.innerHTML = `<img src="${melodifyState.currentTrack.thumbnail}" alt="" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22><rect fill=%22%23282828%22 width=%22200%22 height=%22200%22/><text x=%22100%22 y=%22100%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23555%22 font-size=%2260%22>♪</text></svg>'">`;
   }
   
   // Use a hidden iframe for audio - YouTube embed handles audio playback
@@ -2385,7 +2385,7 @@ function updateMelodifyUI() {
   if (titleEl) titleEl.textContent = track.title;
   if (artistEl) artistEl.textContent = track.artist;
   if (artworkEl && track.thumbnail) {
-    artworkEl.innerHTML = `<img src="${track.thumbnail}" alt="">`;
+    artworkEl.innerHTML = `<img src="${track.thumbnail}" alt="" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22><rect fill=%22%23282828%22 width=%22200%22 height=%22200%22/><text x=%22100%22 y=%22100%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23555%22 font-size=%2260%22>♪</text></svg>'">`;
   }
   
   // Show API-provided duration immediately while audio loads
@@ -2566,7 +2566,7 @@ function updateMelodifyLibraryUI() {
         <button class="melodify-row-play" onclick="playFromLibrary(${i})"><i class="fas fa-play"></i></button>
       </span>
       <div class="melodify-col-title">
-        <img src="${song.thumbnail}" class="melodify-track-img" onerror="this.style.display='none'">
+        <img src="${song.thumbnail}" class="melodify-track-img" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 40 40%22><rect fill=%22%23282828%22 width=%2240%22 height=%2240%22/><text x=%2220%22 y=%2220%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23555%22 font-size=%2216%22>♪</text></svg>'">
         <div>
           <div class="melodify-track-name">${escapeHtml(song.title)}</div>
           <div class="melodify-track-artist">${escapeHtml(song.artist)}</div>
@@ -2650,7 +2650,7 @@ async function startMelodifyDownload(index, format = null) {
   item.className = 'melodify-download-item';
   item.id = downloadId;
   item.innerHTML = `
-    <img src="${song.thumbnail}" class="melodify-dl-img" onerror="this.style.display='none'">
+    <img src="${song.thumbnail}" class="melodify-dl-img" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 50 50%22><rect fill=%22%23282828%22 width=%2250%22 height=%2250%22/><text x=%2225%22 y=%2225%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23555%22 font-size=%2220%22>♪</text></svg>'">
     <div class="melodify-dl-info">
       <div class="melodify-dl-title">${escapeHtml(song.title)}</div>
       <div class="melodify-dl-format" style="font-size: 0.75rem; color: #1DB954; margin-bottom: 0.25rem;">${format.toUpperCase()} - Best Quality</div>
@@ -2802,7 +2802,7 @@ function renderMelodifyQueue() {
   container.innerHTML = melodifyState.queue.map((track, i) => `
     <div class="melodify-queue-item ${melodifyState.currentQueueIndex === i ? 'playing' : ''}" onclick="playFromQueue(${i})">
       <div class="melodify-queue-item-info">
-        <img src="${track.thumbnail || ''}" alt="" onerror="this.style.display='none'">
+        <img src="${track.thumbnail || ''}" alt="" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 40 40%22><rect fill=%22%23282828%22 width=%2240%22 height=%2240%22/><text x=%2220%22 y=%2220%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23555%22 font-size=%2216%22>♪</text></svg>'">
         <div>
           <div class="melodify-queue-item-title">${track.title}</div>
           <div class="melodify-queue-item-artist">${track.artist}</div>
@@ -3214,6 +3214,74 @@ async function searchYoutube(query) {
   }
 }
 
+// Smart thumbnail URL: try multiple YouTube thumbnail resolutions
+function getYoutubeThumbnailUrl(video) {
+  if (!video) return '';
+  // If we have a video ID, build reliable thumbnail URLs
+  let videoId = video.id;
+  if (!videoId && video.url) {
+    const match = video.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&]+)/);
+    if (match) videoId = match[1];
+  }
+  if (videoId && /^[a-zA-Z0-9_-]{5,20}$/.test(videoId)) {
+    // Use hqdefault (always exists) instead of maxresdefault (often 404s)
+    return `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+  }
+  return video.thumbnail || '';
+}
+
+// Thumbnail fallback chain: hqdefault -> mqdefault -> SVG placeholder
+function handleYtThumbError(img, videoId) {
+  if (!img._fallbackAttempt) {
+    img._fallbackAttempt = 1;
+    if (videoId) {
+      img.src = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
+      return;
+    }
+  }
+  if (img._fallbackAttempt === 1) {
+    img._fallbackAttempt = 2;
+    if (videoId) {
+      img.src = `https://i.ytimg.com/vi/${videoId}/default.jpg`;
+      return;
+    }
+  }
+  img.src = 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 320 180%22><rect fill=%22%23181818%22 width=%22320%22 height=%22180%22/><text x=%22160%22 y=%2290%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23555%22 font-size=%2240%22>▶</text></svg>';
+}
+
+// Format view count like YouTube (1.2M, 450K, etc.)
+function formatYoutubeViewCount(count) {
+  if (!count || isNaN(count)) return '';
+  const n = parseInt(count);
+  if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M views';
+  if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K views';
+  return n + ' views';
+}
+
+// Format upload date for display
+function formatYoutubeUploadDate(dateStr) {
+  if (!dateStr) return '';
+  try {
+    // Handle YYYYMMDD format from yt-dlp
+    let date;
+    if (/^\d{8}$/.test(dateStr)) {
+      date = new Date(dateStr.slice(0,4) + '-' + dateStr.slice(4,6) + '-' + dateStr.slice(6,8));
+    } else {
+      date = new Date(dateStr);
+    }
+    if (isNaN(date.getTime())) return '';
+    const now = new Date();
+    const diffMs = now - date;
+    const diffDays = Math.floor(diffMs / 86400000);
+    if (diffDays < 1) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return diffDays + ' days ago';
+    if (diffDays < 30) return Math.floor(diffDays / 7) + ' weeks ago';
+    if (diffDays < 365) return Math.floor(diffDays / 30) + ' months ago';
+    return Math.floor(diffDays / 365) + ' years ago';
+  } catch (e) { return ''; }
+}
+
 function renderYoutubeVideoGrid(videos, source) {
   if (!videos || videos.length === 0) return '<div class="yt-empty"><i class="fas fa-video"></i><p>No videos available</p></div>';
   
@@ -3223,16 +3291,30 @@ function renderYoutubeVideoGrid(videos, source) {
   return `<div class="yt-video-grid">${videos.map((video, i) => {
     const safeTitle = escapeHtml(video.title || 'Untitled');
     const safeArtist = escapeHtml(video.artist || video.channel || 'Unknown');
+    const thumbUrl = getYoutubeThumbnailUrl(video);
+    let videoId = video.id;
+    if (!videoId && video.url) {
+      const match = video.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&]+)/);
+      if (match) videoId = match[1];
+    }
+    const viewCount = formatYoutubeViewCount(video.view_count);
+    const uploadDate = formatYoutubeUploadDate(video.upload_date);
+    const metaParts = [viewCount, uploadDate].filter(Boolean);
+    const metaLine = metaParts.length > 0 ? metaParts.join(' • ') : '';
     return `
       <div class="yt-video-card" onclick="playYoutubeVideo('${source}', ${i})">
         <div class="yt-video-thumb-wrap">
-          <img src="${video.thumbnail}" alt="" class="yt-video-thumb" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 320 180%22><rect fill=%22%23181818%22 width=%22320%22 height=%22180%22/><text x=%22160%22 y=%2290%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23555%22 font-size=%2240%22>▶</text></svg>'">
+          <img src="${thumbUrl}" alt="" class="yt-video-thumb" onerror="handleYtThumbError(this, '${videoId || ''}')">
           <span class="yt-video-duration">${video.duration_string || ''}</span>
           <div class="yt-video-play-overlay"><i class="fas fa-play"></i></div>
         </div>
         <div class="yt-video-info">
-          <div class="yt-video-title">${safeTitle}</div>
-          <div class="yt-video-channel">${safeArtist}</div>
+          <div class="yt-video-avatar"><i class="fas fa-user-circle"></i></div>
+          <div class="yt-video-meta">
+            <div class="yt-video-title">${safeTitle}</div>
+            <div class="yt-video-channel">${safeArtist}</div>
+            ${metaLine ? `<div class="yt-video-stats">${metaLine}</div>` : ''}
+          </div>
         </div>
         <div class="yt-video-actions">
           <button onclick="event.stopPropagation(); addToYoutubeWatchLater('${source}', ${i})" title="Watch Later">
@@ -3335,6 +3417,11 @@ async function loadYoutubeTrending() {
   const now = Date.now();
   if (ytRecommendCache.trending && now - ytRecommendCache.lastFetch < 10 * 60 * 1000) {
     container.innerHTML = renderYoutubeVideoGrid(ytRecommendCache.trending, 'trending');
+    // Also render personalized section from cache
+    const forYouContainer = document.getElementById('ytForYouGrid');
+    if (forYouContainer && ytRecommendCache.forYou) {
+      forYouContainer.innerHTML = renderYoutubeVideoGrid(ytRecommendCache.forYou, 'foryou');
+    }
     return;
   }
   
@@ -3347,10 +3434,89 @@ async function loadYoutubeTrending() {
     const data = await response.json();
     
     const videos = data.results || [];
-    ytRecommendCache = { trending: videos, lastFetch: now };
+    ytRecommendCache.trending = videos;
+    ytRecommendCache.lastFetch = now;
     container.innerHTML = renderYoutubeVideoGrid(videos, 'trending');
+    
+    // Load personalized "For You" section based on subscriptions and history
+    loadYoutubeForYou(serverUrl);
   } catch (err) {
     container.innerHTML = '<div class="yt-empty"><i class="fas fa-wifi"></i><p>Could not load trending videos</p></div>';
+  }
+}
+
+// Personalized "For You" feed based on subscriptions + watch history
+async function loadYoutubeForYou(serverUrl) {
+  const container = document.getElementById('ytForYouGrid');
+  if (!container) return;
+  
+  // Build search queries from subscriptions and recent history
+  const queries = [];
+  
+  // Add subscription channel names as search queries
+  const subs = Object.values(youtubeState.subscriptions || {});
+  for (const sub of subs.slice(0, 5)) {
+    if (sub.name) queries.push(sub.name);
+  }
+  
+  // Add keywords from recent watch history
+  const recentHistory = (youtubeState.history || []).slice(0, 8);
+  for (const entry of recentHistory) {
+    if (entry.title) {
+      // Extract meaningful keywords (skip common words)
+      const keywords = entry.title.split(/\s+/).filter(w => 
+        w.length > 3 && !/^(the|and|for|with|from|this|that|what|how|why|official|video|music|full)$/i.test(w)
+      ).slice(0, 2).join(' ');
+      if (keywords) queries.push(keywords);
+    }
+    if (entry.artist && !queries.includes(entry.artist)) {
+      queries.push(entry.artist);
+    }
+  }
+  
+  if (queries.length === 0) {
+    container.innerHTML = '<div class="yt-empty"><i class="fas fa-user-circle"></i><p>Watch videos and subscribe to channels to get personalized recommendations</p></div>';
+    return;
+  }
+  
+  container.innerHTML = '<div class="yt-loading"><i class="fas fa-spinner fa-spin"></i><p>Loading your recommendations...</p></div>';
+  
+  try {
+    // Pick 3 random queries from our pool for variety
+    const shuffled = queries.sort(() => 0.5 - Math.random()).slice(0, 3);
+    const allVideos = [];
+    const seenIds = new Set();
+    
+    // Fetch videos from multiple queries in parallel
+    const fetches = shuffled.map(q => 
+      fetch(`${serverUrl}/api/search?q=${encodeURIComponent(q)}&max=6`)
+        .then(r => r.json())
+        .catch(() => ({ results: [] }))
+    );
+    
+    const results = await Promise.all(fetches);
+    for (const data of results) {
+      for (const video of (data.results || [])) {
+        const vid = video.id || '';
+        if (vid && !seenIds.has(vid)) {
+          seenIds.add(vid);
+          allVideos.push(video);
+        }
+      }
+    }
+    
+    // Shuffle results so it's not all from one query
+    const forYou = allVideos.sort(() => 0.5 - Math.random()).slice(0, 12);
+    ytRecommendCache.forYou = forYou;
+    
+    if (forYou.length === 0) {
+      container.innerHTML = '<div class="yt-empty"><i class="fas fa-user-circle"></i><p>No recommendations yet — keep watching!</p></div>';
+      return;
+    }
+    
+    container.innerHTML = renderYoutubeVideoGrid(forYou, 'foryou');
+  } catch (err) {
+    container.innerHTML = '<div class="yt-empty"><i class="fas fa-wifi"></i><p>Could not load recommendations</p></div>';
   }
 }
 
@@ -3379,16 +3545,22 @@ async function loadYoutubeRelated(query) {
       return;
     }
     
-    container.innerHTML = videos.map((video, i) => `
+    container.innerHTML = videos.map((video, i) => {
+      const relThumb = getYoutubeThumbnailUrl(video);
+      let rvId = video.id || '';
+      if (!rvId && video.url) { const m = video.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&]+)/); if (m) rvId = m[1]; }
+      return `
       <div class="yt-related-item" onclick="playYoutubeVideo('related', ${i})">
-        <img src="${video.thumbnail}" alt="" class="yt-related-thumb" onerror="this.style.display='none'">
+        <div class="yt-related-thumb-wrap">
+          <img src="${relThumb}" alt="" class="yt-related-thumb" onerror="handleYtThumbError(this, '${rvId}')">
+          <span class="yt-related-duration-badge">${video.duration_string || ''}</span>
+        </div>
         <div class="yt-related-info">
           <div class="yt-related-title">${escapeHtml(video.title)}</div>
           <div class="yt-related-channel">${escapeHtml(video.artist || '')}</div>
-          <div class="yt-related-duration">${video.duration_string || ''}</div>
         </div>
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
   } catch (err) {
     container.innerHTML = '<p style="color: #aaa; padding: 1rem;">Could not load related videos</p>';
   }
@@ -4092,16 +4264,26 @@ async function loadYoutubeRelatedByCreator(channelName, currentVideoId) {
       return;
     }
     
-    container.innerHTML = videos.slice(0, 10).map((video, i) => `
+    container.innerHTML = videos.slice(0, 10).map((video, i) => {
+      const relatedThumb = getYoutubeThumbnailUrl(video);
+      let relVid = video.id || '';
+      if (!relVid && video.url) { const m = video.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&]+)/); if (m) relVid = m[1]; }
+      const relViews = formatYoutubeViewCount(video.view_count);
+      const relDate = formatYoutubeUploadDate(video.upload_date);
+      const relMeta = [relViews, relDate].filter(Boolean).join(' • ');
+      return `
       <div class="yt-related-item" onclick="playYoutubeVideo('related', ${i})">
-        <img src="${video.thumbnail}" alt="" class="yt-related-thumb" onerror="this.style.display='none'">
+        <div class="yt-related-thumb-wrap">
+          <img src="${relatedThumb}" alt="" class="yt-related-thumb" onerror="handleYtThumbError(this, '${relVid}')">
+          <span class="yt-related-duration-badge">${video.duration_string || ''}</span>
+        </div>
         <div class="yt-related-info">
           <div class="yt-related-title">${escapeHtml(video.title)}</div>
           <div class="yt-related-channel">${escapeHtml(video.artist || video.channel || '')}</div>
-          <div class="yt-related-duration">${video.duration_string || ''}</div>
+          ${relMeta ? `<div class="yt-related-meta">${relMeta}</div>` : ''}
         </div>
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
   } catch (err) {
     container.innerHTML = '<p style="color: #aaa; padding: 1rem;">Could not load related videos</p>';
   }
@@ -8652,6 +8834,10 @@ alt="favicon">
           <div class="youtube-content">
             <!-- Home Tab -->
             <div class="youtube-tab-content active" id="yt-home">
+              <div class="yt-section">
+                <h2><i class="fas fa-magic" style="color: #ff6b9d;"></i> For You</h2>
+                <div id="ytForYouGrid"></div>
+              </div>
               <div class="yt-section">
                 <h2><i class="fas fa-fire" style="color: #ff4500;"></i> Trending</h2>
                 <div id="ytTrendingGrid"></div>

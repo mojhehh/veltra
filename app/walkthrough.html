@@ -696,21 +696,9 @@
                 window.parent.showToast('Welcome to Veltra! Enjoy exploring.', 'fa-rocket');
             }
             
-            // Close the walkthrough window - try multiple methods
-            if (window.parent && window.parent.closeApp) {
-                window.parent.closeApp('walkthrough');
-            }
-            
-            // Also try closing via the window element directly
-            if (window.parent && window.parent.document) {
-                const walkthroughWindow = window.parent.document.querySelector('.window[data-app="walkthrough"]');
-                if (walkthroughWindow) {
-                    walkthroughWindow.remove();
-                    // Update taskbar
-                    if (window.parent.updateTaskbar) {
-                        window.parent.updateTaskbar();
-                    }
-                }
+            // Close the walkthrough window
+            if (window.parent && window.parent.closeWindowByAppName) {
+                window.parent.closeWindowByAppName('walkthrough');
             }
         }
 

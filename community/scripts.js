@@ -1,4 +1,4 @@
-// Lightweight tabs + live catalog loader + GitHub issue link builder
+    // Lightweight tabs + live catalog loader + GitHub issue link builder
 // Catalog loader
 async function loadCatalogs(){
 const catalogs = $all('.catalog');

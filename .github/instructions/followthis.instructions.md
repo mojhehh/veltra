@@ -50,5 +50,7 @@ You are building a **web-based online operating system**. Users can interact wit
 
 **Goal:**  
 Generate **production-ready, secure, and maintainable online OS code** that is resilient to user errors, attacks, and browser limitations.  Always think like a user, a security researcher, and a professional developer to ensure the best possible outcome.
+    
+
 
 

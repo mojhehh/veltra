@@ -83,12 +83,37 @@ const VELTRA_SYNC_KEYS = [
 
 // Generate or get unique user ID for persistence
 function getVeltraUserId() {
+    // Build user ID from username so each account gets its own data
+    const username = localStorage.getItem('Veltra_username');
+    if (username) {
+        return 'user_' + username.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+    }
+    // Fallback for before login
     let userId = localStorage.getItem('veltra_userId');
     if (!userId) {
         userId = 'user_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
         localStorage.setItem('veltra_userId', userId);
     }
     return userId;
+}
+
+// Call after login to refresh all user-specific state for the new account
+function refreshUserIdForAccount() {
+    const newId = getVeltraUserId();
+    if (typeof youtubeState !== 'undefined') youtubeState.userId = newId;
+    if (typeof melodifyState !== 'undefined') melodifyState.userId = newId;
+    // Clear recommendation caches so new account gets fresh personalized results
+    if (typeof ytRecommendCache !== 'undefined') {
+        ytRecommendCache.trending = null;
+        ytRecommendCache.forYou = null;
+        ytRecommendCache.lastFetch = 0;
+    }
+    if (typeof melodifyRecommendCache !== 'undefined') {
+        melodifyRecommendCache.trending = null;
+        melodifyRecommendCache.recommended = null;
+        melodifyRecommendCache.lastFetch = 0;
+    }
+    console.log('[Veltra] Refreshed user ID for account:', newId);
 }
 
 // ==================== FIREBASE SYNC ENGINE ====================
@@ -3310,7 +3335,6 @@ function youtubeShowTab(tab) {
   });
   
   if (tab === 'home') loadYoutubeTrending();
-  if (tab === 'shorts') { loadYoutubeShorts(); initShortsSwipe(); }
   if (tab === 'history') renderYoutubeHistory();
   if (tab === 'watchlater') renderYoutubeWatchLater();
   if (tab === 'subscriptions') renderYoutubeSubscriptions();
@@ -3558,356 +3582,6 @@ function toggleYoutubeTheater() {
   youtubeState.isTheater = !youtubeState.isTheater;
   const playerSection = document.getElementById('ytPlayerSection');
   if (playerSection) playerSection.classList.toggle('theater', youtubeState.isTheater);
-}
-
-// ==================== YOUTUBE SHORTS ====================
-const YT_SHORTS_QUERIES = [
-  'shorts viral today', 'shorts trending now', 'shorts funny moments',
-  'shorts satisfying', 'shorts gaming clips', 'shorts music popular',
-  'shorts comedy', 'shorts memes today', 'shorts cute animals',
-  'shorts life hacks', 'shorts dance challenge', 'shorts asmr',
-  'shorts epic fails', 'shorts wholesome', 'shorts amazing talent',
-  'shorts sports highlights', 'shorts cooking quick', 'shorts prank funny'
-];
-
-let ytShortsState = {
-  videos: [],
-  currentIndex: 0,
-  isPlaying: false
-};
-
-async function loadYoutubeShorts() {
-  const container = document.getElementById('ytShortsContainer');
-  if (!container) return;
-  
-  container.innerHTML = `
-    <div class="yt-shorts-loading">
-      <div class="yt-shorts-loading-spinner">
-        <div class="yt-shorts-loading-reel"></div>
-        <div class="yt-shorts-loading-reel"></div>
-        <div class="yt-shorts-loading-reel"></div>
-      </div>
-      <p style="margin-top:16px;font-size:0.95rem;opacity:0.8;">Finding Shorts for you...</p>
-    </div>`;
-  
-  try {
-    const serverUrl = await getMelodifyBackendUrl();
-    
-    // Build queries from subs + generic shorts
-    const queries = [...YT_SHORTS_QUERIES];
-    const subs = Object.values(youtubeState.subscriptions || {});
-    for (const sub of subs.slice(0, 3)) {
-      if (sub.name) queries.push(sub.name + ' shorts');
-    }
-    
-    // Also add liked video artists for shorts discovery
-    const likedChannels = new Set();
-    for (const [vid, val] of Object.entries(youtubeState.likes || {})) {
-      if (val === 'like') {
-        const h = youtubeState.history.find(h => h.videoId === vid);
-        if (h && h.artist) likedChannels.add(h.artist);
-      }
-    }
-    for (const ch of [...likedChannels].slice(0, 2)) {
-      queries.push(ch + ' shorts');
-    }
-    
-    // Pick 3 random queries for more variety
-    const picked = queries.sort(() => 0.5 - Math.random()).slice(0, 3);
-    const allVideos = [];
-    const seenIds = new Set();
-    
-    const fetches = picked.map(q =>
-      fetch(`${serverUrl}/api/search?q=${encodeURIComponent(q)}&max=12`)
-        .then(r => r.json())
-        .catch(() => ({ results: [] }))
-    );
-    
-    const results = await Promise.all(fetches);
-    for (const data of results) {
-      for (const video of (data.results || [])) {
-        const vid = video.id || '';
-        if (!vid || seenIds.has(vid)) continue;
-        
-        // Only accept videos that have /shorts/ in their URL
-        // This is the definitive way to identify actual YouTube Shorts
-        const url = video.url || video.webpage_url || video.original_url || '';
-        if (!url.includes('/shorts/')) continue;
-        
-        seenIds.add(vid);
-        allVideos.push(video);
-      }
-    }
-    
-    ytShortsState.videos = allVideos.sort(() => 0.5 - Math.random());
-    ytShortsState.currentIndex = 0;
-    
-    if (ytShortsState.videos.length === 0) {
-      container.innerHTML = `
-        <div class="yt-shorts-loading">
-          <i class="fas fa-film" style="font-size:3rem;opacity:0.4;margin-bottom:12px;"></i>
-          <p>No Shorts found</p>
-          <button onclick="loadYoutubeShorts()" style="margin-top:12px;padding:8px 20px;border:1px solid rgba(255,255,255,0.3);border-radius:20px;background:none;color:#fff;cursor:pointer;font-size:0.85rem;">
-            <i class="fas fa-redo"></i> Try Again
-          </button>
-        </div>`;
-      return;
-    }
-    
-    renderCurrentShort();
-  } catch (err) {
-    container.innerHTML = `
-      <div class="yt-shorts-loading">
-        <i class="fas fa-wifi" style="font-size:2.5rem;opacity:0.4;margin-bottom:12px;"></i>
-        <p>Could not load Shorts</p>
-        <button onclick="loadYoutubeShorts()" style="margin-top:12px;padding:8px 20px;border:1px solid rgba(255,255,255,0.3);border-radius:20px;background:none;color:#fff;cursor:pointer;font-size:0.85rem;">
-          <i class="fas fa-redo"></i> Retry
-        </button>
-      </div>`;
-  }
-}
-
-function renderCurrentShort() {
-  const container = document.getElementById('ytShortsContainer');
-  if (!container || ytShortsState.videos.length === 0) return;
-  
-  const video = ytShortsState.videos[ytShortsState.currentIndex];
-  if (!video) return;
-  
-  let videoId = video.id;
-  if (!videoId && video.url) {
-    const match = video.url.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([^&?/]+)/);
-    if (match) videoId = match[1];
-  }
-  
-  if (!videoId || !/^[a-zA-Z0-9_-]{5,20}$/.test(videoId)) {
-    nextYoutubeShort();
-    return;
-  }
-  
-  const safeTitle = escapeHtml(video.title || 'Untitled');
-  const safeChannel = escapeHtml(video.artist || video.channel || 'Unknown');
-  const rawChannel = video.artist || video.channel || '';
-  const isLiked = youtubeState.likes?.[videoId] === 'like';
-  const isDisliked = youtubeState.likes?.[videoId] === 'dislike';
-  const isSubbed = isSubscribedToChannel(rawChannel);
-  const isInWatchLater = youtubeState.watchLater.some(v => v.videoId === videoId);
-  const viewCount = formatYoutubeViewCount(video.view_count);
-  
-  // Add to history
-  const historyEntry = {
-    title: video.title,
-    artist: rawChannel,
-    thumbnail: video.thumbnail,
-    videoId: videoId,
-    duration_string: video.duration_string,
-    watchedAt: Date.now(),
-    isShort: true
-  };
-  youtubeState.history = youtubeState.history.filter(h => h.videoId !== videoId);
-  youtubeState.history.unshift(historyEntry);
-  if (youtubeState.history.length > 50) youtubeState.history = youtubeState.history.slice(0, 50);
-  saveYoutubeData();
-  
-  // Shorts-optimized embed: youtube.com/embed/{id} with vertical aspect
-  const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&loop=1&playlist=${videoId}&controls=1&modestbranding=1&playsinline=1`;
-  
-  container.innerHTML = `
-    <div class="yt-short-player">
-      <iframe src="${embedUrl}" 
-        allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen frameborder="0" class="yt-short-iframe"></iframe>
-      
-      <div class="yt-short-overlay-top">
-        <span class="yt-short-counter">${ytShortsState.currentIndex + 1} / ${ytShortsState.videos.length}</span>
-        <a href="https://www.youtube.com/shorts/${videoId}" target="_blank" rel="noopener" class="yt-short-open-btn" title="Open on YouTube">
-          <i class="fab fa-youtube"></i>
-        </a>
-      </div>
-      
-      <div class="yt-short-info-overlay">
-        <div class="yt-short-channel-row">
-          <span class="yt-short-channel-name" onclick="event.stopPropagation(); searchYoutubeByChannel('${safeChannel}')">@${safeChannel}</span>
-          <button class="yt-short-sub-btn ${isSubbed ? 'subscribed' : ''}" onclick="toggleYoutubeSubscribe('${escapeHtml(rawChannel)}'); renderCurrentShort();">
-            ${isSubbed ? '<i class="fas fa-check"></i> Subscribed' : '<i class="fas fa-plus"></i> Subscribe'}
-          </button>
-        </div>
-        <div class="yt-short-title">${safeTitle}</div>
-        ${viewCount ? `<div class="yt-short-views">${viewCount}</div>` : ''}
-      </div>
-      
-      <div class="yt-short-actions">
-        <button class="yt-short-action-btn ${isLiked ? 'active' : ''}" onclick="toggleYoutubeLike('${videoId}'); renderCurrentShort();" title="Like">
-          <i class="fas fa-thumbs-up"></i>
-          <span>Like</span>
-        </button>
-        <button class="yt-short-action-btn ${isDisliked ? 'active' : ''}" onclick="toggleYoutubeDislike('${videoId}'); renderCurrentShort();" title="Dislike">
-          <i class="fas fa-thumbs-down"></i>
-          <span>Dislike</span>
-        </button>
-        <button class="yt-short-action-btn" onclick="openShortComments('${videoId}')" title="Comments">
-          <i class="fas fa-comment"></i>
-          <span>Comment</span>
-        </button>
-        <button class="yt-short-action-btn ${isInWatchLater ? 'active' : ''}" onclick="addShortToWatchLater(${ytShortsState.currentIndex})" title="Save">
-          <i class="fas fa-bookmark"></i>
-          <span>Save</span>
-        </button>
-        <button class="yt-short-action-btn" onclick="shareShort('${videoId}', '${escapeHtml(video.title || '')}')" title="Share">
-          <i class="fas fa-share"></i>
-          <span>Share</span>
-        </button>
-      </div>
-      
-      <div class="yt-short-nav left">
-        <button class="yt-short-nav-btn" onclick="prevYoutubeShort()" ${ytShortsState.currentIndex === 0 ? 'style="opacity:0.3;pointer-events:none;"' : ''} title="Previous">
-          <i class="fas fa-chevron-up"></i>
-        </button>
-      </div>
-      <div class="yt-short-nav right">
-        <button class="yt-short-nav-btn" onclick="nextYoutubeShort()" title="Next">
-          <i class="fas fa-chevron-down"></i>
-        </button>
-      </div>
-    </div>
-    
-    <div class="yt-short-comments-panel" id="ytShortCommentsPanel" style="display:none;">
-      <div class="yt-short-comments-header">
-        <h3>Comments</h3>
-        <button onclick="document.getElementById('ytShortCommentsPanel').style.display='none'" class="yt-short-comments-close">
-          <i class="fas fa-times"></i>
-        </button>
-      </div>
-      <div class="yt-short-comments-input">
-        <input type="text" id="ytShortCommentInput" placeholder="Add a comment..." 
-          onkeydown="if(event.key==='Enter'&&this.value.trim()){postYoutubeComment('${videoId}',this.value.trim());this.value='';loadShortComments('${videoId}');}">
-        <button onclick="const inp=document.getElementById('ytShortCommentInput');if(inp.value.trim()){postYoutubeComment('${videoId}',inp.value.trim());inp.value='';loadShortComments('${videoId}');}">
-          <i class="fas fa-paper-plane"></i>
-        </button>
-      </div>
-      <div id="ytShortCommentsList" class="yt-short-comments-list"></div>
-    </div>`;
-}
-
-function openShortComments(videoId) {
-  const panel = document.getElementById('ytShortCommentsPanel');
-  if (!panel) return;
-  panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
-  if (panel.style.display === 'flex') {
-    loadShortComments(videoId);
-  }
-}
-
-async function loadShortComments(videoId) {
-  const list = document.getElementById('ytShortCommentsList');
-  if (!list) return;
-  list.innerHTML = '<div style="text-align:center;padding:1rem;opacity:0.6;"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
-  
-  try {
-    const resp = await fetch(`${VELTRA_USER_FIREBASE_URL}/youtube_comments/${videoId}.json`);
-    const data = await resp.json();
-    if (!data || Object.keys(data).length === 0) {
-      list.innerHTML = '<div style="text-align:center;padding:1rem;opacity:0.5;">No comments yet. Be the first!</div>';
-      return;
-    }
-    const comments = Object.values(data).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-    list.innerHTML = comments.map(c => {
-      const timeAgo = getTimeAgo(c.timestamp);
-      return `<div class="yt-short-comment">
-        <div class="yt-short-comment-header">
-          <span class="yt-short-comment-user">${escapeHtml(c.username || 'Anonymous')}</span>
-          <span class="yt-short-comment-time">${timeAgo}</span>
-        </div>
-        <div class="yt-short-comment-text">${escapeHtml(c.text || '')}</div>
-      </div>`;
-    }).join('');
-  } catch (e) {
-    list.innerHTML = '<div style="text-align:center;padding:1rem;opacity:0.5;">Could not load comments</div>';
-  }
-}
-
-function shareShort(videoId, title) {
-  const url = `https://www.youtube.com/shorts/${videoId}`;
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(url).then(() => {
-      showToast('Short link copied!', 'fa-link');
-    }).catch(() => {
-      prompt('Copy this link:', url);
-    });
-  } else {
-    prompt('Copy this link:', url);
-  }
-}
-
-function getTimeAgo(timestamp) {
-  if (!timestamp) return '';
-  const diff = Date.now() - timestamp;
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return mins + 'm ago';
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return hrs + 'h ago';
-  const days = Math.floor(hrs / 24);
-  if (days < 7) return days + 'd ago';
-  if (days < 30) return Math.floor(days / 7) + 'w ago';
-  return Math.floor(days / 30) + 'mo ago';
-}
-
-function nextYoutubeShort() {
-  if (ytShortsState.currentIndex < ytShortsState.videos.length - 1) {
-    ytShortsState.currentIndex++;
-    renderCurrentShort();
-  } else {
-    // Load more shorts
-    loadYoutubeShorts();
-  }
-}
-
-function prevYoutubeShort() {
-  if (ytShortsState.currentIndex > 0) {
-    ytShortsState.currentIndex--;
-    renderCurrentShort();
-  }
-}
-
-function addShortToWatchLater(index) {
-  const video = ytShortsState.videos[index];
-  if (!video) return;
-  let videoId = video.id;
-  if (!videoId && video.url) {
-    const match = video.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([^&?]+)/);
-    if (match) videoId = match[1];
-  }
-  const exists = youtubeState.watchLater.some(v => v.videoId === videoId);
-  if (exists) { showToast('Already in Watch Later', 'fa-clock'); return; }
-  youtubeState.watchLater.unshift({
-    title: video.title,
-    artist: video.artist || video.channel,
-    thumbnail: video.thumbnail,
-    videoId: videoId,
-    duration_string: video.duration_string,
-    addedAt: Date.now()
-  });
-  saveYoutubeData();
-  showToast('Saved to Watch Later', 'fa-bookmark');
-}
-
-// Handle scroll/swipe on shorts
-function initShortsSwipe() {
-  const container = document.getElementById('ytShortsContainer');
-  if (!container) return;
-  let touchStartY = 0;
-  container.addEventListener('touchstart', e => { touchStartY = e.touches[0].clientY; }, { passive: true });
-  container.addEventListener('touchend', e => {
-    const diff = touchStartY - e.changedTouches[0].clientY;
-    if (Math.abs(diff) > 50) {
-      if (diff > 0) nextYoutubeShort();
-      else prevYoutubeShort();
-    }
-  }, { passive: true });
-  container.addEventListener('wheel', e => {
-    if (e.deltaY > 30) nextYoutubeShort();
-    else if (e.deltaY < -30) prevYoutubeShort();
-  }, { passive: true });
 }
 
 async function loadYoutubeTrending() {
@@ -6629,6 +6303,9 @@ function login() {
 
   // Store the current username in localStorage (for this session/device)
   localStorage.setItem("Veltra_username", username);
+  
+  // Refresh user IDs so YouTube/Melodify data is per-account
+  refreshUserIdForAccount();
   
   document.getElementById("displayUsername").textContent = username;
 
@@ -9411,9 +9088,6 @@ alt="favicon">
               <div class="youtube-nav-item active" data-tab="home" onclick="youtubeShowTab('home')">
                 <i class="fas fa-home"></i> <span>Home</span>
               </div>
-              <div class="youtube-nav-item" data-tab="shorts" onclick="youtubeShowTab('shorts')">
-                <i class="fas fa-bolt"></i> <span>Shorts</span>
-              </div>
               <div class="youtube-nav-item" data-tab="search" onclick="youtubeShowTab('search')">
                 <i class="fas fa-search"></i> <span>Search</span>
               </div>
@@ -9516,15 +9190,6 @@ alt="favicon">
               <div id="ytWatchLaterGrid"></div>
             </div>
 
-            <!-- Shorts Tab -->
-            <div class="youtube-tab-content" id="yt-shorts">
-              <div id="ytShortsContainer" class="yt-shorts-container">
-                <div class="yt-shorts-loading">
-                  <i class="fas fa-spinner fa-spin fa-2x"></i>
-                  <p>Loading Shorts...</p>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       `,

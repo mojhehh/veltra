@@ -62,9 +62,16 @@ const VELTRA_SYNC_KEYS = [
     
     // Melodify
     'Veltra_melodifyLibrary',
+    'melodify_library',
     'veltra_melodifyVolume',
     'veltra_melodifyRepeat',
     'veltra_melodifyShuffle',
+    
+    // YouTube
+    'Veltra_youtubeHistory',
+    'Veltra_youtubeWatchLater',
+    'Veltra_ytSubscriptions',
+    'Veltra_ytLikes',
     
     // Stats & Uptime
     'veltra_totalUptime',
@@ -121,6 +128,7 @@ function shouldSyncKey(key) {
     // Also sync dynamic user settings keys
     if (key.startsWith('Veltra_userSettings_')) return true;
     if (key.startsWith('veltra_') || key.startsWith('Veltra_')) return true;
+    if (key === 'melodify_library') return true;
     return false;
 }
 
@@ -256,10 +264,11 @@ async function syncAllToFirebase() {
 // Sync before page unload
 window.addEventListener('beforeunload', () => {
     if (Object.keys(pendingSyncData).length > 0) {
-        // Use sendBeacon for reliable sync on page close
+        // Use sendBeacon for reliable sync on page close — PATCH to data.json so it merges properly 
         const userId = getVeltraUserId();
         const blob = new Blob([JSON.stringify(pendingSyncData)], { type: 'application/json' });
-        navigator.sendBeacon(`${VELTRA_USER_FIREBASE_URL}/users/${userId}/pending.json`, blob);
+        navigator.sendBeacon(`${VELTRA_USER_FIREBASE_URL}/users/${userId}/data.json`, blob);
+        pendingSyncData = {};
     }
 });
 
@@ -1911,7 +1920,7 @@ function playMusicPreview(index) {
   // Extract video ID from URL
   let videoId = song.id;
   if (!videoId && song.url) {
-    const match = song.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&]+)/);
+    const match = song.url.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([^&?/]+)/);
     if (match) videoId = match[1];
   }
   
@@ -2267,7 +2276,7 @@ function playMelodifyTrack(index) {
   
   let videoId = song.id;
   if (!videoId && song.url) {
-    const match = song.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&]+)/);
+    const match = song.url.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([^&?/]+)/);
     if (match) videoId = match[1];
   }
   
@@ -2586,7 +2595,7 @@ function playFromLibrary(index) {
   
   let videoId = song.id || song.videoId;
   if (!videoId && song.url) {
-    const match = song.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&]+)/);
+    const match = song.url.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([^&?/]+)/);
     if (match) videoId = match[1];
   }
   
@@ -2821,7 +2830,7 @@ function addToMelodifyQueue(index) {
   
   let videoId = song.id;
   if (!videoId && song.url) {
-    const match = song.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&]+)/);
+    const match = song.url.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([^&?/]+)/);
     if (match) videoId = match[1];
   }
   
@@ -3016,17 +3025,115 @@ async function loadMelodifyRecommendations() {
   try {
     const serverUrl = await getMelodifyBackendUrl();
     
-    // Fetch trending
+    // Fetch trending (generic popular music)
     const trendingQuery = MELODIFY_TRENDING_QUERIES[Math.floor(Math.random() * MELODIFY_TRENDING_QUERIES.length)];
     const trendingResp = await fetch(`${serverUrl}/api/search?q=${encodeURIComponent(trendingQuery)}&max=8`);
     const trendingData = await trendingResp.json();
     const trending = trendingData.results || [];
     
-    // Fetch recommended
-    const recQuery = MELODIFY_RECOMMEND_QUERIES[Math.floor(Math.random() * MELODIFY_RECOMMEND_QUERIES.length)];
-    const recResp = await fetch(`${serverUrl}/api/search?q=${encodeURIComponent(recQuery)}&max=8`);
-    const recData = await recResp.json();
-    const recommended = recData.results || [];
+    // Smart "Recommended For You" based on library + listening history
+    let recommended = [];
+    const recQueries = [];
+    
+    // Signal 1: Library artists (strongest signal — user explicitly saved these)
+    const libraryArtists = new Map();
+    for (const song of (melodifyState.library || [])) {
+      if (song.artist) {
+        const a = song.artist.toLowerCase();
+        libraryArtists.set(a, (libraryArtists.get(a) || 0) + 1);
+      }
+    }
+    
+    // Most-saved artists get priority
+    const topLibArtists = [...libraryArtists.entries()]
+      .sort((a, b) => b[1] - a[1]).slice(0, 4);
+    for (const [artist] of topLibArtists) {
+      recQueries.push({ query: artist + ' songs', weight: 5 });
+    }
+    
+    // Signal 2: Library song title keywords (genre/mood inference)
+    const songKeywords = new Map();
+    for (const song of (melodifyState.library || [])) {
+      if (song.title) {
+        const words = song.title.toLowerCase().split(/[\s\-–|:()[\]]+/).filter(w =>
+          w.length > 3 && !/^(official|video|audio|lyrics|remix|feat|full|song|music|version)$/i.test(w)
+        );
+        for (const w of words.slice(0, 2)) {
+          songKeywords.set(w, (songKeywords.get(w) || 0) + 1);
+        }
+      }
+    }
+    const topKeywords = [...songKeywords.entries()]
+      .sort((a, b) => b[1] - a[1]).slice(0, 5);
+    if (topKeywords.length >= 2) {
+      recQueries.push({ query: topKeywords.slice(0, 2).map(k => k[0]).join(' ') + ' music', weight: 3 });
+    }
+    
+    // Signal 3: YouTube watch history artists (cross-app signal)
+    const ytArtists = new Set();
+    for (const h of (youtubeState?.history || []).slice(0, 10)) {
+      if (h.artist && !libraryArtists.has(h.artist.toLowerCase())) {
+        ytArtists.add(h.artist);
+      }
+    }
+    for (const artist of [...ytArtists].slice(0, 2)) {
+      recQueries.push({ query: artist + ' music', weight: 2 });
+    }
+    
+    // Signal 4: Genre diversification (prevent stale recommendations)
+    recQueries.push({
+      query: MELODIFY_RECOMMEND_QUERIES[Math.floor(Math.random() * MELODIFY_RECOMMEND_QUERIES.length)],
+      weight: 1
+    });
+    
+    if (recQueries.length > 0) {
+      // Weighted random pick 3 queries
+      const selected = [];
+      const pool = [...recQueries];
+      for (let i = 0; i < 3 && pool.length > 0; i++) {
+        const totalWeight = pool.reduce((sum, q) => sum + q.weight, 0);
+        let r = Math.random() * totalWeight;
+        let picked = pool[0];
+        for (const item of pool) {
+          r -= item.weight;
+          if (r <= 0) { picked = item; break; }
+        }
+        selected.push(picked.query);
+        pool.splice(pool.indexOf(picked), 1);
+      }
+      
+      const seenIds = new Set();
+      // Exclude songs already in library
+      for (const s of (melodifyState.library || [])) {
+        if (s.id) seenIds.add(s.id);
+      }
+      
+      const fetches = selected.map(q =>
+        fetch(`${serverUrl}/api/search?q=${encodeURIComponent(q)}&max=6`)
+          .then(r => r.json())
+          .catch(() => ({ results: [] }))
+      );
+      
+      const results = await Promise.all(fetches);
+      for (const data of results) {
+        for (const song of (data.results || [])) {
+          const sid = song.id || '';
+          if (sid && !seenIds.has(sid)) {
+            seenIds.add(sid);
+            recommended.push(song);
+          }
+        }
+      }
+      recommended = recommended.sort(() => 0.5 - Math.random()).slice(0, 8);
+    }
+    
+    // Fallback if no personalized results
+    if (recommended.length === 0) {
+      const recQuery = MELODIFY_RECOMMEND_QUERIES[Math.floor(Math.random() * MELODIFY_RECOMMEND_QUERIES.length)];
+      const recResp = await fetch(`${serverUrl}/api/search?q=${encodeURIComponent(recQuery)}&max=8`);
+      const recData = await recResp.json();
+      recommended = recData.results || [];
+    }
     
     melodifyRecommendCache = { trending, recommended, lastFetch: now };
     
@@ -3091,6 +3198,8 @@ let youtubeState = {
   searchResults: [],
   history: [],
   watchLater: [],
+  subscriptions: {},
+  likes: {},
   isTheater: false,
   userId: getVeltraUserId()
 };
@@ -3172,6 +3281,7 @@ function youtubeShowTab(tab) {
   });
   
   if (tab === 'home') loadYoutubeTrending();
+  if (tab === 'shorts') { loadYoutubeShorts(); initShortsSwipe(); }
   if (tab === 'history') renderYoutubeHistory();
   if (tab === 'watchlater') renderYoutubeWatchLater();
   if (tab === 'subscriptions') renderYoutubeSubscriptions();
@@ -3220,7 +3330,7 @@ function getYoutubeThumbnailUrl(video) {
   // If we have a video ID, build reliable thumbnail URLs
   let videoId = video.id;
   if (!videoId && video.url) {
-    const match = video.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&]+)/);
+    const match = video.url.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([^&?/]+)/);
     if (match) videoId = match[1];
   }
   if (videoId && /^[a-zA-Z0-9_-]{5,20}$/.test(videoId)) {
@@ -3294,7 +3404,7 @@ function renderYoutubeVideoGrid(videos, source) {
     const thumbUrl = getYoutubeThumbnailUrl(video);
     let videoId = video.id;
     if (!videoId && video.url) {
-      const match = video.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&]+)/);
+      const match = video.url.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([^&?/]+)/);
       if (match) videoId = match[1];
     }
     const viewCount = formatYoutubeViewCount(video.view_count);
@@ -3332,7 +3442,7 @@ function playYoutubeVideo(source, index) {
   const video = videos[index];
   let videoId = video.id;
   if (!videoId && video.url) {
-    const match = video.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&]+)/);
+    const match = video.url.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([^&?/]+)/);
     if (match) videoId = match[1];
   }
   
@@ -3410,6 +3520,372 @@ function toggleYoutubeTheater() {
   if (playerSection) playerSection.classList.toggle('theater', youtubeState.isTheater);
 }
 
+// ==================== YOUTUBE SHORTS ====================
+const YT_SHORTS_QUERIES = [
+  'shorts viral', 'youtube shorts trending', 'shorts funny',
+  'shorts satisfying', 'shorts gaming clips', 'shorts music',
+  'shorts comedy', 'tiktok compilation', 'shorts memes',
+  'shorts life hacks', 'shorts animals cute', 'shorts dance'
+];
+
+let ytShortsState = {
+  videos: [],
+  currentIndex: 0,
+  isPlaying: false
+};
+
+async function loadYoutubeShorts() {
+  const container = document.getElementById('ytShortsContainer');
+  if (!container) return;
+  
+  container.innerHTML = `
+    <div class="yt-shorts-loading">
+      <div class="yt-shorts-loading-spinner">
+        <div class="yt-shorts-loading-reel"></div>
+        <div class="yt-shorts-loading-reel"></div>
+        <div class="yt-shorts-loading-reel"></div>
+      </div>
+      <p style="margin-top:16px;font-size:0.95rem;opacity:0.8;">Finding Shorts for you...</p>
+    </div>`;
+  
+  try {
+    const serverUrl = await getMelodifyBackendUrl();
+    
+    // Build queries from subs + generic shorts
+    const queries = [...YT_SHORTS_QUERIES];
+    const subs = Object.values(youtubeState.subscriptions || {});
+    for (const sub of subs.slice(0, 3)) {
+      if (sub.name) queries.push(sub.name + ' shorts');
+    }
+    
+    // Also add liked video artists for shorts discovery
+    const likedChannels = new Set();
+    for (const [vid, val] of Object.entries(youtubeState.likes || {})) {
+      if (val === 'like') {
+        const h = youtubeState.history.find(h => h.videoId === vid);
+        if (h && h.artist) likedChannels.add(h.artist);
+      }
+    }
+    for (const ch of [...likedChannels].slice(0, 2)) {
+      queries.push(ch + ' shorts');
+    }
+    
+    // Pick 3 random queries for more variety
+    const picked = queries.sort(() => 0.5 - Math.random()).slice(0, 3);
+    const allVideos = [];
+    const seenIds = new Set();
+    
+    const fetches = picked.map(q =>
+      fetch(`${serverUrl}/api/search?q=${encodeURIComponent(q)}&max=12`)
+        .then(r => r.json())
+        .catch(() => ({ results: [] }))
+    );
+    
+    const results = await Promise.all(fetches);
+    for (const data of results) {
+      for (const video of (data.results || [])) {
+        const vid = video.id || '';
+        if (!vid || seenIds.has(vid)) continue;
+        seenIds.add(vid);
+        
+        // Filter for actual shorts: duration <= 60 seconds, or title/description hints
+        const dur = video.duration || 0;
+        const title = (video.title || '').toLowerCase();
+        const isShort = dur > 0 && dur <= 65;
+        const looksLikeShort = title.includes('short') || title.includes('#shorts');
+        
+        if (isShort || looksLikeShort) {
+          allVideos.push(video);
+        }
+      }
+    }
+    
+    // If not enough shorts found, also include very short videos
+    if (allVideos.length < 5) {
+      for (const data of results) {
+        for (const video of (data.results || [])) {
+          const vid = video.id || '';
+          if (!vid || seenIds.has(vid)) continue;
+          const dur = video.duration || 0;
+          if (dur > 0 && dur <= 120) {
+            seenIds.add(vid);
+            allVideos.push(video);
+          }
+        }
+      }
+    }
+    
+    ytShortsState.videos = allVideos.sort(() => 0.5 - Math.random());
+    ytShortsState.currentIndex = 0;
+    
+    if (ytShortsState.videos.length === 0) {
+      container.innerHTML = `
+        <div class="yt-shorts-loading">
+          <i class="fas fa-film" style="font-size:3rem;opacity:0.4;margin-bottom:12px;"></i>
+          <p>No Shorts found</p>
+          <button onclick="loadYoutubeShorts()" style="margin-top:12px;padding:8px 20px;border:1px solid rgba(255,255,255,0.3);border-radius:20px;background:none;color:#fff;cursor:pointer;font-size:0.85rem;">
+            <i class="fas fa-redo"></i> Try Again
+          </button>
+        </div>`;
+      return;
+    }
+    
+    renderCurrentShort();
+  } catch (err) {
+    container.innerHTML = `
+      <div class="yt-shorts-loading">
+        <i class="fas fa-wifi" style="font-size:2.5rem;opacity:0.4;margin-bottom:12px;"></i>
+        <p>Could not load Shorts</p>
+        <button onclick="loadYoutubeShorts()" style="margin-top:12px;padding:8px 20px;border:1px solid rgba(255,255,255,0.3);border-radius:20px;background:none;color:#fff;cursor:pointer;font-size:0.85rem;">
+          <i class="fas fa-redo"></i> Retry
+        </button>
+      </div>`;
+  }
+}
+
+function renderCurrentShort() {
+  const container = document.getElementById('ytShortsContainer');
+  if (!container || ytShortsState.videos.length === 0) return;
+  
+  const video = ytShortsState.videos[ytShortsState.currentIndex];
+  if (!video) return;
+  
+  let videoId = video.id;
+  if (!videoId && video.url) {
+    const match = video.url.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([^&?/]+)/);
+    if (match) videoId = match[1];
+  }
+  
+  if (!videoId || !/^[a-zA-Z0-9_-]{5,20}$/.test(videoId)) {
+    nextYoutubeShort();
+    return;
+  }
+  
+  const safeTitle = escapeHtml(video.title || 'Untitled');
+  const safeChannel = escapeHtml(video.artist || video.channel || 'Unknown');
+  const rawChannel = video.artist || video.channel || '';
+  const isLiked = youtubeState.likes?.[videoId] === 'like';
+  const isDisliked = youtubeState.likes?.[videoId] === 'dislike';
+  const isSubbed = isSubscribedToChannel(rawChannel);
+  const isInWatchLater = youtubeState.watchLater.some(v => v.videoId === videoId);
+  const viewCount = formatYoutubeViewCount(video.view_count);
+  
+  // Add to history
+  const historyEntry = {
+    title: video.title,
+    artist: rawChannel,
+    thumbnail: video.thumbnail,
+    videoId: videoId,
+    duration_string: video.duration_string,
+    watchedAt: Date.now(),
+    isShort: true
+  };
+  youtubeState.history = youtubeState.history.filter(h => h.videoId !== videoId);
+  youtubeState.history.unshift(historyEntry);
+  if (youtubeState.history.length > 50) youtubeState.history = youtubeState.history.slice(0, 50);
+  saveYoutubeData();
+  
+  // Shorts-optimized embed: youtube.com/embed/{id} with vertical aspect
+  const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&loop=1&playlist=${videoId}&controls=1&modestbranding=1&playsinline=1`;
+  
+  container.innerHTML = `
+    <div class="yt-short-player">
+      <iframe src="${embedUrl}" 
+        allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen frameborder="0" class="yt-short-iframe"></iframe>
+      
+      <div class="yt-short-overlay-top">
+        <span class="yt-short-counter">${ytShortsState.currentIndex + 1} / ${ytShortsState.videos.length}</span>
+        <a href="https://www.youtube.com/shorts/${videoId}" target="_blank" rel="noopener" class="yt-short-open-btn" title="Open on YouTube">
+          <i class="fab fa-youtube"></i>
+        </a>
+      </div>
+      
+      <div class="yt-short-info-overlay">
+        <div class="yt-short-channel-row">
+          <span class="yt-short-channel-name">@${safeChannel}</span>
+          <button class="yt-short-sub-btn ${isSubbed ? 'subscribed' : ''}" onclick="toggleYoutubeSubscribe('${escapeHtml(rawChannel)}'); renderCurrentShort();">
+            ${isSubbed ? '<i class="fas fa-check"></i> Subscribed' : '<i class="fas fa-plus"></i> Subscribe'}
+          </button>
+        </div>
+        <div class="yt-short-title">${safeTitle}</div>
+        ${viewCount ? `<div class="yt-short-views">${viewCount}</div>` : ''}
+      </div>
+      
+      <div class="yt-short-actions">
+        <button class="yt-short-action-btn ${isLiked ? 'active' : ''}" onclick="toggleYoutubeLike('${videoId}'); renderCurrentShort();" title="Like">
+          <i class="fas fa-thumbs-up"></i>
+          <span>Like</span>
+        </button>
+        <button class="yt-short-action-btn ${isDisliked ? 'active' : ''}" onclick="toggleYoutubeDislike('${videoId}'); renderCurrentShort();" title="Dislike">
+          <i class="fas fa-thumbs-down"></i>
+          <span>Dislike</span>
+        </button>
+        <button class="yt-short-action-btn" onclick="openShortComments('${videoId}')" title="Comments">
+          <i class="fas fa-comment"></i>
+          <span>Comment</span>
+        </button>
+        <button class="yt-short-action-btn ${isInWatchLater ? 'active' : ''}" onclick="addShortToWatchLater(${ytShortsState.currentIndex})" title="Save">
+          <i class="fas fa-bookmark"></i>
+          <span>Save</span>
+        </button>
+        <button class="yt-short-action-btn" onclick="shareShort('${videoId}', '${escapeHtml(video.title || '')}')" title="Share">
+          <i class="fas fa-share"></i>
+          <span>Share</span>
+        </button>
+      </div>
+      
+      <div class="yt-short-nav left">
+        <button class="yt-short-nav-btn" onclick="prevYoutubeShort()" ${ytShortsState.currentIndex === 0 ? 'style="opacity:0.3;pointer-events:none;"' : ''} title="Previous">
+          <i class="fas fa-chevron-up"></i>
+        </button>
+      </div>
+      <div class="yt-short-nav right">
+        <button class="yt-short-nav-btn" onclick="nextYoutubeShort()" title="Next">
+          <i class="fas fa-chevron-down"></i>
+        </button>
+      </div>
+    </div>
+    
+    <div class="yt-short-comments-panel" id="ytShortCommentsPanel" style="display:none;">
+      <div class="yt-short-comments-header">
+        <h3>Comments</h3>
+        <button onclick="document.getElementById('ytShortCommentsPanel').style.display='none'" class="yt-short-comments-close">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="yt-short-comments-input">
+        <input type="text" id="ytShortCommentInput" placeholder="Add a comment..." 
+          onkeydown="if(event.key==='Enter'&&this.value.trim()){postYoutubeComment('${videoId}',this.value.trim());this.value='';loadShortComments('${videoId}');}">
+        <button onclick="const inp=document.getElementById('ytShortCommentInput');if(inp.value.trim()){postYoutubeComment('${videoId}',inp.value.trim());inp.value='';loadShortComments('${videoId}');}">
+          <i class="fas fa-paper-plane"></i>
+        </button>
+      </div>
+      <div id="ytShortCommentsList" class="yt-short-comments-list"></div>
+    </div>`;
+}
+
+function openShortComments(videoId) {
+  const panel = document.getElementById('ytShortCommentsPanel');
+  if (!panel) return;
+  panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
+  if (panel.style.display === 'flex') {
+    loadShortComments(videoId);
+  }
+}
+
+async function loadShortComments(videoId) {
+  const list = document.getElementById('ytShortCommentsList');
+  if (!list) return;
+  list.innerHTML = '<div style="text-align:center;padding:1rem;opacity:0.6;"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
+  
+  try {
+    const resp = await fetch(`${VELTRA_USER_FIREBASE_URL}/youtube_comments/${videoId}.json`);
+    const data = await resp.json();
+    if (!data || Object.keys(data).length === 0) {
+      list.innerHTML = '<div style="text-align:center;padding:1rem;opacity:0.5;">No comments yet. Be the first!</div>';
+      return;
+    }
+    const comments = Object.values(data).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    list.innerHTML = comments.map(c => {
+      const timeAgo = getTimeAgo(c.timestamp);
+      return `<div class="yt-short-comment">
+        <div class="yt-short-comment-header">
+          <span class="yt-short-comment-user">${escapeHtml(c.username || 'Anonymous')}</span>
+          <span class="yt-short-comment-time">${timeAgo}</span>
+        </div>
+        <div class="yt-short-comment-text">${escapeHtml(c.text || '')}</div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    list.innerHTML = '<div style="text-align:center;padding:1rem;opacity:0.5;">Could not load comments</div>';
+  }
+}
+
+function shareShort(videoId, title) {
+  const url = `https://www.youtube.com/shorts/${videoId}`;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(url).then(() => {
+      showToast('Short link copied!', 'fa-link');
+    }).catch(() => {
+      prompt('Copy this link:', url);
+    });
+  } else {
+    prompt('Copy this link:', url);
+  }
+}
+
+function getTimeAgo(timestamp) {
+  if (!timestamp) return '';
+  const diff = Date.now() - timestamp;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return mins + 'm ago';
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return hrs + 'h ago';
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return days + 'd ago';
+  if (days < 30) return Math.floor(days / 7) + 'w ago';
+  return Math.floor(days / 30) + 'mo ago';
+}
+
+function nextYoutubeShort() {
+  if (ytShortsState.currentIndex < ytShortsState.videos.length - 1) {
+    ytShortsState.currentIndex++;
+    renderCurrentShort();
+  } else {
+    // Load more shorts
+    loadYoutubeShorts();
+  }
+}
+
+function prevYoutubeShort() {
+  if (ytShortsState.currentIndex > 0) {
+    ytShortsState.currentIndex--;
+    renderCurrentShort();
+  }
+}
+
+function addShortToWatchLater(index) {
+  const video = ytShortsState.videos[index];
+  if (!video) return;
+  let videoId = video.id;
+  if (!videoId && video.url) {
+    const match = video.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([^&?]+)/);
+    if (match) videoId = match[1];
+  }
+  const exists = youtubeState.watchLater.some(v => v.videoId === videoId);
+  if (exists) { showToast('Already in Watch Later', 'fa-clock'); return; }
+  youtubeState.watchLater.unshift({
+    title: video.title,
+    artist: video.artist || video.channel,
+    thumbnail: video.thumbnail,
+    videoId: videoId,
+    duration_string: video.duration_string,
+    addedAt: Date.now()
+  });
+  saveYoutubeData();
+  showToast('Saved to Watch Later', 'fa-bookmark');
+}
+
+// Handle scroll/swipe on shorts
+function initShortsSwipe() {
+  const container = document.getElementById('ytShortsContainer');
+  if (!container) return;
+  let touchStartY = 0;
+  container.addEventListener('touchstart', e => { touchStartY = e.touches[0].clientY; }, { passive: true });
+  container.addEventListener('touchend', e => {
+    const diff = touchStartY - e.changedTouches[0].clientY;
+    if (Math.abs(diff) > 50) {
+      if (diff > 0) nextYoutubeShort();
+      else prevYoutubeShort();
+    }
+  }, { passive: true });
+  container.addEventListener('wheel', e => {
+    if (e.deltaY > 30) nextYoutubeShort();
+    else if (e.deltaY < -30) prevYoutubeShort();
+  }, { passive: true });
+}
+
 async function loadYoutubeTrending() {
   const container = document.getElementById('ytTrendingGrid');
   if (!container) return;
@@ -3445,36 +3921,79 @@ async function loadYoutubeTrending() {
   }
 }
 
-// Personalized "For You" feed based on subscriptions + watch history
+// Personalized "For You" feed — smarter algorithm using weighted signals
 async function loadYoutubeForYou(serverUrl) {
   const container = document.getElementById('ytForYouGrid');
   if (!container) return;
   
-  // Build search queries from subscriptions and recent history
-  const queries = [];
+  // Build weighted query pool from multiple signals
+  const queryPool = []; // { query, weight } — higher weight = more likely to be picked
   
-  // Add subscription channel names as search queries
+  // Signal 1: Subscriptions (highest weight — explicit user interest)
   const subs = Object.values(youtubeState.subscriptions || {});
-  for (const sub of subs.slice(0, 5)) {
-    if (sub.name) queries.push(sub.name);
+  for (const sub of subs) {
+    if (sub.name) {
+      queryPool.push({ query: sub.name + ' new', weight: 5 });
+      queryPool.push({ query: sub.name + ' latest', weight: 3 });
+    }
   }
   
-  // Add keywords from recent watch history
-  const recentHistory = (youtubeState.history || []).slice(0, 8);
+  // Signal 2: Liked video artists/topics (high weight — liked = strong signal)
+  const likedVideoIds = Object.entries(youtubeState.likes || {})
+    .filter(([, v]) => v === 'like').map(([id]) => id);
+  const likedHistory = (youtubeState.history || [])
+    .filter(h => likedVideoIds.includes(h.videoId));
+  const likedArtists = new Set();
+  for (const entry of likedHistory) {
+    if (entry.artist && !likedArtists.has(entry.artist)) {
+      likedArtists.add(entry.artist);
+      queryPool.push({ query: entry.artist, weight: 4 });
+    }
+  }
+  
+  // Signal 3: Watch history (medium weight — frequency-boosted)
+  const recentHistory = (youtubeState.history || []).slice(0, 20);
+  const artistFrequency = {};
+  const topicKeywords = new Set();
+  
   for (const entry of recentHistory) {
-    if (entry.title) {
-      // Extract meaningful keywords (skip common words)
-      const keywords = entry.title.split(/\s+/).filter(w => 
-        w.length > 3 && !/^(the|and|for|with|from|this|that|what|how|why|official|video|music|full)$/i.test(w)
-      ).slice(0, 2).join(' ');
-      if (keywords) queries.push(keywords);
+    if (entry.artist) {
+      artistFrequency[entry.artist] = (artistFrequency[entry.artist] || 0) + 1;
     }
-    if (entry.artist && !queries.includes(entry.artist)) {
-      queries.push(entry.artist);
+    if (entry.title) {
+      // Extract meaningful keywords
+      const words = entry.title.split(/[\s\-–|:]+/).filter(w =>
+        w.length > 3 && !/^(the|and|for|with|from|this|that|what|how|why|official|video|music|full|feat|live|new|best|top)$/i.test(w)
+      );
+      for (const w of words.slice(0, 3)) {
+        topicKeywords.add(w.toLowerCase());
+      }
     }
   }
   
-  if (queries.length === 0) {
+  // Most-watched artists get higher weight
+  const sortedArtists = Object.entries(artistFrequency)
+    .sort((a, b) => b[1] - a[1]).slice(0, 5);
+  for (const [artist, count] of sortedArtists) {
+    if (!likedArtists.has(artist)) {
+      queryPool.push({ query: artist + ' latest', weight: Math.min(count + 1, 4) });
+    }
+  }
+  
+  // Signal 4: Topic keyword combos (low weight — exploratory)
+  const keywordArr = [...topicKeywords].slice(0, 15);
+  if (keywordArr.length >= 2) {
+    for (let i = 0; i < 3; i++) {
+      const shuffled = keywordArr.sort(() => 0.5 - Math.random());
+      queryPool.push({ query: shuffled.slice(0, 2).join(' '), weight: 2 });
+    }
+  }
+  
+  // Signal 5: Category diversification (low weight — prevent filter bubble)
+  const diverseQueries = ['trending new', 'popular today', 'interesting videos'];
+  queryPool.push({ query: diverseQueries[Math.floor(Math.random() * diverseQueries.length)], weight: 1 });
+  
+  if (queryPool.length === 0) {
     container.innerHTML = '<div class="yt-empty"><i class="fas fa-user-circle"></i><p>Watch videos and subscribe to channels to get personalized recommendations</p></div>';
     return;
   }
@@ -3482,13 +4001,29 @@ async function loadYoutubeForYou(serverUrl) {
   container.innerHTML = '<div class="yt-loading"><i class="fas fa-spinner fa-spin"></i><p>Loading your recommendations...</p></div>';
   
   try {
-    // Pick 3 random queries from our pool for variety
-    const shuffled = queries.sort(() => 0.5 - Math.random()).slice(0, 3);
+    // Weighted random selection: pick 4 queries weighted by their score
+    const selected = [];
+    const pool = [...queryPool];
+    for (let i = 0; i < 4 && pool.length > 0; i++) {
+      const totalWeight = pool.reduce((sum, q) => sum + q.weight, 0);
+      let r = Math.random() * totalWeight;
+      let picked = pool[0];
+      for (const item of pool) {
+        r -= item.weight;
+        if (r <= 0) { picked = item; break; }
+      }
+      selected.push(picked.query);
+      pool.splice(pool.indexOf(picked), 1);
+    }
+    
     const allVideos = [];
     const seenIds = new Set();
+    // Also exclude videos already in recent history
+    for (const h of recentHistory.slice(0, 10)) {
+      if (h.videoId) seenIds.add(h.videoId);
+    }
     
-    // Fetch videos from multiple queries in parallel
-    const fetches = shuffled.map(q => 
+    const fetches = selected.map(q =>
       fetch(`${serverUrl}/api/search?q=${encodeURIComponent(q)}&max=6`)
         .then(r => r.json())
         .catch(() => ({ results: [] }))
@@ -3505,8 +4040,30 @@ async function loadYoutubeForYou(serverUrl) {
       }
     }
     
-    // Shuffle results so it's not all from one query
-    const forYou = allVideos.sort(() => 0.5 - Math.random()).slice(0, 12);
+    // Score and sort results by relevance
+    const scoredVideos = allVideos.map(video => {
+      let score = Math.random() * 2; // small randomness for variety
+      const artist = (video.artist || video.channel || '').toLowerCase();
+      const title = (video.title || '').toLowerCase();
+      
+      // Boost if from a subscribed channel
+      if (subs.some(s => artist.includes(s.name.toLowerCase()))) score += 5;
+      // Boost if from a liked channel
+      if ([...likedArtists].some(a => artist.includes(a.toLowerCase()))) score += 3;
+      // Boost if from a frequently watched channel
+      if (sortedArtists.some(([a]) => artist.includes(a.toLowerCase()))) score += 2;
+      // Boost if title contains watched topics
+      for (const kw of topicKeywords) {
+        if (title.includes(kw)) { score += 1; break; }
+      }
+      // Boost videos with high view counts
+      if (video.view_count > 1000000) score += 1;
+      
+      return { video, score };
+    });
+    
+    scoredVideos.sort((a, b) => b.score - a.score);
+    const forYou = scoredVideos.slice(0, 16).map(s => s.video);
     ytRecommendCache.forYou = forYou;
     
     if (forYou.length === 0) {
@@ -3548,7 +4105,7 @@ async function loadYoutubeRelated(query) {
     container.innerHTML = videos.map((video, i) => {
       const relThumb = getYoutubeThumbnailUrl(video);
       let rvId = video.id || '';
-      if (!rvId && video.url) { const m = video.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&]+)/); if (m) rvId = m[1]; }
+      if (!rvId && video.url) { const m = video.url.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([^&?/]+)/); if (m) rvId = m[1]; }
       return `
       <div class="yt-related-item" onclick="playYoutubeVideo('related', ${i})">
         <div class="yt-related-thumb-wrap">
@@ -3580,7 +4137,7 @@ function addToYoutubeWatchLater(source, index) {
   const video = videos[index];
   let videoId = video.id;
   if (!videoId && video.url) {
-    const match = video.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&]+)/);
+    const match = video.url.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([^&?/]+)/);
     if (match) videoId = match[1];
   }
   
@@ -4267,7 +4824,7 @@ async function loadYoutubeRelatedByCreator(channelName, currentVideoId) {
     container.innerHTML = videos.slice(0, 10).map((video, i) => {
       const relatedThumb = getYoutubeThumbnailUrl(video);
       let relVid = video.id || '';
-      if (!relVid && video.url) { const m = video.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&]+)/); if (m) relVid = m[1]; }
+      if (!relVid && video.url) { const m = video.url.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([^&?/]+)/); if (m) relVid = m[1]; }
       const relViews = formatYoutubeViewCount(video.view_count);
       const relDate = formatYoutubeUploadDate(video.upload_date);
       const relMeta = [relViews, relDate].filter(Boolean).join(' • ');
@@ -6086,6 +6643,12 @@ function login() {
         console.warn('[Veltra] Failed to parse installed games:', e);
       }
     }
+    
+    // Re-load YouTube & Melodify data after Firebase restore so state objects are up to date
+    loadYoutubeData().catch(e => console.warn('[Veltra Sync] YouTube reload failed:', e.message));
+    loadMelodifyLibrary().catch(e => console.warn('[Veltra Sync] Melodify reload failed:', e.message));
+    loadYoutubeSubscriptions().catch(e => console.warn('[Veltra Sync] YouTube subs reload failed:', e.message));
+    
     console.log('[Veltra] User data loaded, apps:', installedApps);
   });
 
@@ -8811,6 +9374,9 @@ alt="favicon">
               <div class="youtube-nav-item active" data-tab="home" onclick="youtubeShowTab('home')">
                 <i class="fas fa-home"></i> <span>Home</span>
               </div>
+              <div class="youtube-nav-item" data-tab="shorts" onclick="youtubeShowTab('shorts')">
+                <i class="fas fa-bolt"></i> <span>Shorts</span>
+              </div>
               <div class="youtube-nav-item" data-tab="search" onclick="youtubeShowTab('search')">
                 <i class="fas fa-search"></i> <span>Search</span>
               </div>
@@ -8911,6 +9477,16 @@ alt="favicon">
             <div class="youtube-tab-content" id="yt-watchlater">
               <h2><i class="fas fa-clock"></i> Watch Later</h2>
               <div id="ytWatchLaterGrid"></div>
+            </div>
+
+            <!-- Shorts Tab -->
+            <div class="youtube-tab-content" id="yt-shorts">
+              <div id="ytShortsContainer" class="yt-shorts-container">
+                <div class="yt-shorts-loading">
+                  <i class="fas fa-spinner fa-spin fa-2x"></i>
+                  <p>Loading Shorts...</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>

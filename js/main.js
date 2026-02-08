@@ -3043,7 +3043,7 @@ let melodifyForYouInterval = null;
 
 async function loadMelodifyRecommendations() {
   const now = Date.now();
-  const CACHE_TTL = 10 * 1000; // 10 second refresh
+  const CACHE_TTL = 3 * 60 * 1000; // 3 minute refresh
   
   if (melodifyRecommendCache.trending && now - melodifyRecommendCache.lastFetch < CACHE_TTL) {
     renderMelodifyRecommendations(melodifyRecommendCache.trending, 'melodifyTrending');
@@ -3562,10 +3562,12 @@ function toggleYoutubeTheater() {
 
 // ==================== YOUTUBE SHORTS ====================
 const YT_SHORTS_QUERIES = [
-  'youtube shorts viral today', 'youtube shorts trending now', 'youtube shorts funny moments',
-  'youtube shorts satisfying videos', 'youtube shorts gaming clips', 'youtube shorts music',
-  'youtube shorts comedy skit', 'youtube shorts memes compilation', 'youtube shorts animals cute',
-  'youtube shorts life hacks quick', 'youtube shorts dance challenge', 'youtube shorts asmr'
+  'shorts viral today', 'shorts trending now', 'shorts funny moments',
+  'shorts satisfying', 'shorts gaming clips', 'shorts music popular',
+  'shorts comedy', 'shorts memes today', 'shorts cute animals',
+  'shorts life hacks', 'shorts dance challenge', 'shorts asmr',
+  'shorts epic fails', 'shorts wholesome', 'shorts amazing talent',
+  'shorts sports highlights', 'shorts cooking quick', 'shorts prank funny'
 ];
 
 let ytShortsState = {
@@ -3627,28 +3629,13 @@ async function loadYoutubeShorts() {
         const vid = video.id || '';
         if (!vid || seenIds.has(vid)) continue;
         
-        // STRICT filter: only accept videos with duration <= 60 seconds
-        // This ensures we only get actual short-form content
-        const dur = video.duration || 0;
-        if (dur <= 0 || dur > 60) continue;
+        // Only accept videos that have /shorts/ in their URL
+        // This is the definitive way to identify actual YouTube Shorts
+        const url = video.url || video.webpage_url || video.original_url || '';
+        if (!url.includes('/shorts/')) continue;
         
         seenIds.add(vid);
         allVideos.push(video);
-      }
-    }
-    
-    // If not enough found, slightly relax to 90 seconds max
-    if (allVideos.length < 4) {
-      for (const data of results) {
-        for (const video of (data.results || [])) {
-          const vid = video.id || '';
-          if (!vid || seenIds.has(vid)) continue;
-          const dur = video.duration || 0;
-          if (dur > 0 && dur <= 90) {
-            seenIds.add(vid);
-            allVideos.push(video);
-          }
-        }
       }
     }
     
@@ -3928,7 +3915,7 @@ async function loadYoutubeTrending() {
   if (!container) return;
   
   const now = Date.now();
-  if (ytRecommendCache.trending && now - ytRecommendCache.lastFetch < 10 * 1000) {
+  if (ytRecommendCache.trending && now - ytRecommendCache.lastFetch < 3 * 60 * 1000) {
     container.innerHTML = renderYoutubeVideoGrid(ytRecommendCache.trending, 'trending');
     // Also render personalized section from cache
     const forYouContainer = document.getElementById('ytForYouGrid');
@@ -9343,12 +9330,12 @@ alt="favicon">
       `,
       noPadding: true,
       onOpen: function() { resetMelodifyAudio(); updateMelodifyLibraryUI(); loadMelodifyRecommendations();
-        // Auto-refresh For You every 10 seconds
+        // Auto-refresh For You every 3 minutes
         if (melodifyForYouInterval) clearInterval(melodifyForYouInterval);
         melodifyForYouInterval = setInterval(() => {
           melodifyRecommendCache.lastFetch = 0;
           loadMelodifyRecommendations();
-        }, 10000);
+        }, 3 * 60 * 1000);
       },
       onClose: function() {
         if (melodifyForYouInterval) { clearInterval(melodifyForYouInterval); melodifyForYouInterval = null; }
@@ -9543,12 +9530,12 @@ alt="favicon">
       `,
       noPadding: true,
       onOpen: function() { loadYoutubeTrending(); initYoutubeSocial(); startYoutubeNotifPolling();
-        // Auto-refresh For You every 10 seconds
+        // Auto-refresh For You every 3 minutes
         if (window._ytForYouInterval) clearInterval(window._ytForYouInterval);
         window._ytForYouInterval = setInterval(() => {
           ytRecommendCache.lastFetch = 0;
           loadYoutubeTrending();
-        }, 10000);
+        }, 3 * 60 * 1000);
       },
       onClose: function() { stopYoutubeNotifPolling();
         if (window._ytForYouInterval) { clearInterval(window._ytForYouInterval); window._ytForYouInterval = null; }

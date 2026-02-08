@@ -1,32 +1,35 @@
+Unchecked runtime.lastError: The page keeping the extension port is moved into back/forward cache, so the message channel is closed.
 uv.bundle.js:7 bare-mux: running v2.1.6 (build 4b7607b)
 index.js:1 bare-mux: running v2.1.7 (build c56d286)
 cache-detector.js:20 V86 version mismatch: stored=null, current=2.0.0
 cache-detector.js:98 V86 cache issue detected, showing notification...
 index.js:1 bare-mux: setting localStorage bare-mux-path to /veltra/baremux/worker.js
-main.js:13660 <link rel=​"stylesheet" href=​"/​veltra/​style.css" id=​"themeLink">​
+main.js:13719 <link rel=​"stylesheet" href=​"/​veltra/​style.css" id=​"themeLink">​
 main.js:931 Database opened successfully.
-main.js:2116 [Melodify] Library loaded from Firebase: 1 songs
-main.js:3234 [YouTube] Data loaded from Firebase
+main.js:2119 [Melodify] Library loaded from Firebase: 1 songs
+main.js:3263 [YouTube] Data loaded from Firebase
 main.js:1825 [Melodify] Using Firebase backend: https://exceptional-postcards-marilyn-origins.trycloudflare.com
 veltra/:752 ✅ UV Service Worker registered with scope: https://mojhehh.github.io/veltra/uv/service/
 main.js:183 [Veltra Sync] Synced 2 keys to Firebase
-main.js:5892 [BOOT LOG] 2026-02-08T00:19:16.947Z: Starting boot sequence
-main.js:5881 Fullscreen request failed: TypeError: Permissions check failed
+main.js:5929 [BOOT LOG] 2026-02-08T00:40:31.322Z: Starting boot sequence
+content-scripts.js:2 TSS: Caught suspicious full screen spamming
+content-scripts.js:2 TSS: Checking if repeated 10 times for interval 10000 against data:  Object
 main.js:183 [Veltra Sync] Synced 1 keys to Firebase
-main.js:5940 [BOOT LOG] 2026-02-08T00:19:19.953Z: Boot sequence complete, hiding bootloader
-main.js:5967 [BOOT LOG] 2026-02-08T00:19:21.654Z: Showing login screen
+main.js:5977 [BOOT LOG] 2026-02-08T00:40:34.324Z: Boot sequence complete, hiding bootloader
+main.js:6004 [BOOT LOG] 2026-02-08T00:40:36.042Z: Showing login screen
 main.js:183 [Veltra Sync] Synced 1 keys to Firebase
-main.js:6525 [LOGIN LOG] 2026-02-08T00:19:23.455Z: Login function called
+main.js:6562 [LOGIN LOG] 2026-02-08T00:40:38.165Z: Login function called
 main.js:1430 [Account] Loaded settings for mojheh
-main.js:6660 [LOGIN LOG] 2026-02-08T00:19:23.457Z: Starting desktop transition
+main.js:6697 [LOGIN LOG] 2026-02-08T00:40:38.165Z: Starting desktop transition
 main.js:227 [Veltra Sync] Restored 1 keys from Firebase
-main.js:6652 [Veltra] User data loaded, apps: Array(0)
-main.js:2116 [Melodify] Library loaded from Firebase: 1 songs
-main.js:3234 [YouTube] Data loaded from Firebase
-main.js:6668 [LOGIN LOG] 2026-02-08T00:19:24.058Z: Desktop active, starting clock and initialization
-main.js:6726 [LOGIN LOG] 2026-02-08T00:19:24.059Z: Opening What's New app
+main.js:6689 [Veltra] User data loaded, apps: Array(0)
+main.js:3263 [YouTube] Data loaded from Firebase
+main.js:2119 [Melodify] Library loaded from Firebase: 1 songs
+main.js:6705 [LOGIN LOG] 2026-02-08T00:40:38.775Z: Desktop active, starting clock and initialization
+main.js:6763 [LOGIN LOG] 2026-02-08T00:40:38.776Z: Opening What's New app
 main.js:183 [Veltra Sync] Synced 18 keys to Firebase
 main.js:183 [Veltra Sync] Synced 1 keys to Firebase
+main.js:4899 [YouTube] Social data loaded
 main.js:183 [Veltra Sync] Synced 1 keys to Firebase
 Tracking Prevention blocked access to storage for <URL>.
 Tracking Prevention blocked access to storage for <URL>.
@@ -1048,37 +1051,24 @@ Tracking Prevention blocked access to storage for <URL>.
 Tracking Prevention blocked access to storage for <URL>.
 Tracking Prevention blocked access to storage for <URL>.
 Tracking Prevention blocked access to storage for <URL>.
-maxresdefault.jpg:1   Failed to load resource: the server responded with a status of 404 ()
-main.js:183 [Veltra Sync] Synced 1 keys to Firebase
-maxresdefault.jpg:1   Failed to load resource: the server responded with a status of 404 ()
-maxresdefault.jpg:1   Failed to load resource: the server responded with a status of 404 ()
-maxresdefault.jpg:1   Failed to load resource: the server responded with a status of 404 ()
-main.js:2310 [Melodify] Streaming timeout, using YouTube embed
+Tracking Prevention blocked access to storage for <URL>.
+Tracking Prevention blocked access to storage for <URL>.
+Tracking Prevention blocked access to storage for <URL>.
+Tracking Prevention blocked access to storage for <URL>.
+Tracking Prevention blocked access to storage for <URL>.
+Tracking Prevention blocked access to storage for <URL>.
+Tracking Prevention blocked access to storage for <URL>.
 veltra/:1  Tracking Prevention blocked an XHR request to https://googleads.g.doubleclick.net/pagead/id.
 veltra/:1  Tracking Prevention blocked a Script resource from loading https://static.doubleclick.net/instream/ad_status.js.
+main.js:183 [Veltra Sync] Synced 3 keys to Firebase
+maxresdefault.jpg:1   Failed to load resource: the server responded with a status of 404 ()
 main.js:183 [Veltra Sync] Synced 1 keys to Firebase
 veltra/:1  Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
-veltra/:1  Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
-veltra/:1  Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
-main.js:183 [Veltra Sync] Synced 1 keys to Firebase
-main.js:4862 [YouTube] Social data loaded
-main.js:183 [Veltra Sync] Synced 1 keys to Firebase
 main.js:183 [Veltra Sync] Synced 1 keys to Firebase
 veltra/:1  Tracking Prevention blocked an XHR request to https://googleads.g.doubleclick.net/pagead/id.
 veltra/:1  Tracking Prevention blocked a Script resource from loading https://static.doubleclick.net/instream/ad_status.js.
-googleads.g.doubleclick.net/pagead/id:1   Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
-static.doubleclick.net/instream/ad_status.js:1   Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
 main.js:183 [Veltra Sync] Synced 2 keys to Firebase
 veltra/:1  Tracking Prevention blocked an XHR request to https://googleads.g.doubleclick.net/pagead/id.
 veltra/:1  Tracking Prevention blocked a Script resource from loading https://static.doubleclick.net/instream/ad_status.js.
-googleads.g.doubleclick.net/pagead/id:1   Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
-static.doubleclick.net/instream/ad_status.js:1   Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
 main.js:183 [Veltra Sync] Synced 2 keys to Firebase
-main.js:183 [Veltra Sync] Synced 1 keys to Firebase
-content-scripts.js:2 TSS: Caught suspicious full screen spamming
-content-scripts.js:2 TSS: Checking if repeated 10 times for interval 10000 against data:  Object
-content-scripts.js:2 TSS: Caught suspicious full screen spamming
-content-scripts.js:2 TSS: Checking if repeated 10 times for interval 10000 against data:  Object
-main.js:183 [Veltra Sync] Synced 1 keys to Firebase
-googleads.g.doubleclick.net/pagead/id:1   Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
-225 log entries are not shown.
+200 log entries are not shown.

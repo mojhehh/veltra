@@ -5706,6 +5706,12 @@ select:focus {
     padding: 16px 24px;
 }
 
+/* Remove padding when Shorts tab is active for full-screen experience */
+.youtube-content:has(#yt-shorts.active) {
+    padding: 0;
+    overflow: hidden;
+}
+
 .youtube-content::-webkit-scrollbar {
     width: 8px;
 }
@@ -5725,6 +5731,19 @@ select:focus {
 
 .youtube-tab-content.active {
     display: block;
+}
+
+/* Shorts tab needs full height with no overflow for immersive experience */
+#yt-shorts.active {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
+
+#yt-shorts .yt-shorts-container {
+    flex: 1;
+    min-height: 0;
 }
 
 /* YouTube Video Grid */
@@ -5944,6 +5963,28 @@ select:focus {
     padding: 12px 16px;
     background: #0f0f0f;
     border-bottom: 1px solid #272727;
+    gap: 12px;
+}
+
+.yt-back-btn {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 1.1rem;
+    cursor: pointer;
+    padding: 6px 10px;
+    border-radius: 50%;
+    transition: background 0.2s;
+    flex-shrink: 0;
+}
+
+.yt-back-btn:hover {
+    background: rgba(255,255,255,0.1);
+}
+
+.yt-player-info {
+    flex: 1;
+    min-width: 0;
 }
 
 .yt-player-info h3 {
@@ -5955,6 +5996,24 @@ select:focus {
 .yt-player-info span {
     color: #aaa;
     font-size: 0.85rem;
+}
+
+.yt-clickable-channel {
+    cursor: pointer !important;
+    transition: color 0.2s;
+}
+
+.yt-clickable-channel:hover {
+    color: #3ea6ff !important;
+    text-decoration: underline;
+}
+
+.yt-video-channel.yt-clickable-channel {
+    cursor: pointer;
+}
+
+.yt-video-channel.yt-clickable-channel:hover {
+    color: #3ea6ff;
 }
 
 .yt-player-btns {
@@ -6155,7 +6214,7 @@ select:focus {
     position: relative;
     width: 100%;
     height: 100%;
-    background: #000;
+    background: #0f0f0f;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -6202,11 +6261,10 @@ select:focus {
     position: relative;
     width: 100%;
     height: 100%;
-    max-width: 420px;
     display: flex;
-    align-items: center;
+    align-items: stretch;
     justify-content: center;
-    background: #000;
+    background: #0f0f0f;
 }
 
 .yt-short-iframe {
@@ -6214,6 +6272,7 @@ select:focus {
     height: 100%;
     border: none;
     border-radius: 0;
+    display: block;
 }
 
 .yt-short-overlay-top {
@@ -6228,6 +6287,11 @@ select:focus {
     align-items: center;
     z-index: 5;
     color: #fff;
+    pointer-events: none;
+}
+
+.yt-short-overlay-top > * {
+    pointer-events: auto;
 }
 
 .yt-short-counter {
@@ -6252,37 +6316,50 @@ select:focus {
     position: absolute;
     bottom: 0;
     left: 0;
-    right: 60px;
-    padding: 14px 16px;
+    right: 56px;
+    padding: 12px 14px;
     background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 70%, transparent 100%);
     z-index: 5;
     color: #fff;
+    max-height: 35%;
+    overflow: hidden;
 }
 
 .yt-short-channel-row {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 6px;
+    gap: 8px;
+    margin-bottom: 4px;
+    flex-wrap: wrap;
 }
 
 .yt-short-channel-name {
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     font-weight: 600;
     opacity: 0.9;
+    cursor: pointer;
+    transition: color 0.2s;
+    text-decoration: none;
+    color: #fff;
+}
+
+.yt-short-channel-name:hover {
+    color: #3ea6ff;
+    text-decoration: underline;
 }
 
 .yt-short-sub-btn {
-    padding: 4px 12px;
-    border-radius: 16px;
+    padding: 3px 10px;
+    border-radius: 14px;
     border: none;
     background: #ff4444;
     color: #fff;
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
     white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .yt-short-sub-btn.subscribed {
@@ -6317,7 +6394,7 @@ select:focus {
     bottom: 80px;
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 12px;
     z-index: 10;
 }
 
@@ -6325,15 +6402,16 @@ select:focus {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 3px;
+    gap: 2px;
     background: none;
     border: none;
     color: #fff;
     cursor: pointer;
-    font-size: 1.15rem;
+    font-size: 1.05rem;
     filter: drop-shadow(0 1px 3px rgba(0,0,0,0.6));
     transition: transform 0.15s, color 0.15s;
     padding: 0;
+    width: 40px;
 }
 
 .yt-short-action-btn:hover {
@@ -6345,8 +6423,9 @@ select:focus {
 }
 
 .yt-short-action-btn span {
-    font-size: 0.6rem;
+    font-size: 0.55rem;
     opacity: 0.85;
+    line-height: 1;
 }
 
 .yt-short-nav {
@@ -6355,15 +6434,13 @@ select:focus {
 }
 
 .yt-short-nav.left {
-    left: 50%;
-    top: 8px;
-    transform: translateX(220px);
+    right: 16px;
+    top: 50px;
 }
 
 .yt-short-nav.right {
-    left: 50%;
-    bottom: 40px;
-    transform: translateX(220px);
+    right: 16px;
+    bottom: 16px;
 }
 
 .yt-short-nav-btn {

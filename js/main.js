@@ -1917,6 +1917,9 @@ function playMusicPreview(index) {
   const song = musicSearchResults[index];
   if (!song) return;
   
+  // Stop any currently playing audio first
+  stopAllMelodifyPlayback();
+  
   // Extract video ID from URL
   let videoId = song.id;
   if (!videoId && song.url) {
@@ -2270,9 +2273,28 @@ async function searchMelodify(query) {
   }
 }
 
+function stopAllMelodifyPlayback() {
+  // Stop audio element
+  const audio = document.getElementById('melodifyAudio');
+  if (audio) {
+    audio.pause();
+    audio.src = '';
+    audio.load();
+  }
+  // Kill YouTube embed iframe
+  const ytEmbed = document.getElementById('melodifyYTEmbed');
+  if (ytEmbed) {
+    ytEmbed.src = '';
+  }
+  melodifyState.isPlaying = false;
+}
+
 function playMelodifyTrack(index) {
   const song = musicSearchResults[index];
   if (!song) return;
+  
+  // Stop any currently playing audio first
+  stopAllMelodifyPlayback();
   
   let videoId = song.id;
   if (!videoId && song.url) {
@@ -2593,6 +2615,9 @@ function playFromLibrary(index) {
   const song = melodifyState.library[index];
   if (!song) return;
   
+  // Stop any currently playing audio first
+  stopAllMelodifyPlayback();
+  
   let videoId = song.id || song.videoId;
   if (!videoId && song.url) {
     const match = song.url.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([^&?/]+)/);
@@ -2865,6 +2890,9 @@ function removeFromQueue(index) {
 function playFromQueue(index) {
   if (index < 0 || index >= melodifyState.queue.length) return;
   
+  // Stop any currently playing audio first
+  stopAllMelodifyPlayback();
+  
   melodifyState.currentQueueIndex = index;
   const track = melodifyState.queue[index];
   
@@ -3011,10 +3039,11 @@ const MELODIFY_RECOMMEND_QUERIES = [
 ];
 
 let melodifyRecommendCache = { trending: null, recommended: null, lastFetch: 0 };
+let melodifyForYouInterval = null;
 
 async function loadMelodifyRecommendations() {
   const now = Date.now();
-  const CACHE_TTL = 15 * 60 * 1000; // 15 min cache
+  const CACHE_TTL = 10 * 1000; // 10 second refresh
   
   if (melodifyRecommendCache.trending && now - melodifyRecommendCache.lastFetch < CACHE_TTL) {
     renderMelodifyRecommendations(melodifyRecommendCache.trending, 'melodifyTrending');
@@ -3422,7 +3451,7 @@ function renderYoutubeVideoGrid(videos, source) {
           <div class="yt-video-avatar"><i class="fas fa-user-circle"></i></div>
           <div class="yt-video-meta">
             <div class="yt-video-title">${safeTitle}</div>
-            <div class="yt-video-channel">${safeArtist}</div>
+            <div class="yt-video-channel yt-clickable-channel" onclick="event.stopPropagation(); searchYoutubeByChannel('${safeArtist}')">${safeArtist}</div>
             ${metaLine ? `<div class="yt-video-stats">${metaLine}</div>` : ''}
           </div>
         </div>
@@ -3514,6 +3543,17 @@ function closeYoutubePlayer() {
   youtubeState.currentVideo = null;
 }
 
+function searchYoutubeByChannel(channelName) {
+  if (!channelName || !channelName.trim()) return;
+  const clean = channelName.replace(/^@/, '').trim();
+  if (!clean) return;
+  // Close the player if open so user sees the search results
+  closeYoutubePlayer();
+  // Put query in search box and search
+  const input = document.getElementById('ytSearchInput');
+  if (input) input.value = clean;
+  searchYoutube(clean);
+}
 function toggleYoutubeTheater() {
   youtubeState.isTheater = !youtubeState.isTheater;
   const playerSection = document.getElementById('ytPlayerSection');
@@ -3522,10 +3562,10 @@ function toggleYoutubeTheater() {
 
 // ==================== YOUTUBE SHORTS ====================
 const YT_SHORTS_QUERIES = [
-  'shorts viral', 'youtube shorts trending', 'shorts funny',
-  'shorts satisfying', 'shorts gaming clips', 'shorts music',
-  'shorts comedy', 'tiktok compilation', 'shorts memes',
-  'shorts life hacks', 'shorts animals cute', 'shorts dance'
+  'youtube shorts viral today', 'youtube shorts trending now', 'youtube shorts funny moments',
+  'youtube shorts satisfying videos', 'youtube shorts gaming clips', 'youtube shorts music',
+  'youtube shorts comedy skit', 'youtube shorts memes compilation', 'youtube shorts animals cute',
+  'youtube shorts life hacks quick', 'youtube shorts dance challenge', 'youtube shorts asmr'
 ];
 
 let ytShortsState = {
@@ -3586,28 +3626,25 @@ async function loadYoutubeShorts() {
       for (const video of (data.results || [])) {
         const vid = video.id || '';
         if (!vid || seenIds.has(vid)) continue;
-        seenIds.add(vid);
         
-        // Filter for actual shorts: duration <= 60 seconds, or title/description hints
+        // STRICT filter: only accept videos with duration <= 60 seconds
+        // This ensures we only get actual short-form content
         const dur = video.duration || 0;
-        const title = (video.title || '').toLowerCase();
-        const isShort = dur > 0 && dur <= 65;
-        const looksLikeShort = title.includes('short') || title.includes('#shorts');
+        if (dur <= 0 || dur > 60) continue;
         
-        if (isShort || looksLikeShort) {
-          allVideos.push(video);
-        }
+        seenIds.add(vid);
+        allVideos.push(video);
       }
     }
     
-    // If not enough shorts found, also include very short videos
-    if (allVideos.length < 5) {
+    // If not enough found, slightly relax to 90 seconds max
+    if (allVideos.length < 4) {
       for (const data of results) {
         for (const video of (data.results || [])) {
           const vid = video.id || '';
           if (!vid || seenIds.has(vid)) continue;
           const dur = video.duration || 0;
-          if (dur > 0 && dur <= 120) {
+          if (dur > 0 && dur <= 90) {
             seenIds.add(vid);
             allVideos.push(video);
           }
@@ -3702,7 +3739,7 @@ function renderCurrentShort() {
       
       <div class="yt-short-info-overlay">
         <div class="yt-short-channel-row">
-          <span class="yt-short-channel-name">@${safeChannel}</span>
+          <span class="yt-short-channel-name" onclick="event.stopPropagation(); searchYoutubeByChannel('${safeChannel}')">@${safeChannel}</span>
           <button class="yt-short-sub-btn ${isSubbed ? 'subscribed' : ''}" onclick="toggleYoutubeSubscribe('${escapeHtml(rawChannel)}'); renderCurrentShort();">
             ${isSubbed ? '<i class="fas fa-check"></i> Subscribed' : '<i class="fas fa-plus"></i> Subscribe'}
           </button>
@@ -3891,7 +3928,7 @@ async function loadYoutubeTrending() {
   if (!container) return;
   
   const now = Date.now();
-  if (ytRecommendCache.trending && now - ytRecommendCache.lastFetch < 10 * 60 * 1000) {
+  if (ytRecommendCache.trending && now - ytRecommendCache.lastFetch < 10 * 1000) {
     container.innerHTML = renderYoutubeVideoGrid(ytRecommendCache.trending, 'trending');
     // Also render personalized section from cache
     const forYouContainer = document.getElementById('ytForYouGrid');
@@ -9305,7 +9342,17 @@ alt="favicon">
         </div>
       `,
       noPadding: true,
-      onOpen: function() { resetMelodifyAudio(); updateMelodifyLibraryUI(); loadMelodifyRecommendations(); },
+      onOpen: function() { resetMelodifyAudio(); updateMelodifyLibraryUI(); loadMelodifyRecommendations();
+        // Auto-refresh For You every 10 seconds
+        if (melodifyForYouInterval) clearInterval(melodifyForYouInterval);
+        melodifyForYouInterval = setInterval(() => {
+          melodifyRecommendCache.lastFetch = 0;
+          loadMelodifyRecommendations();
+        }, 10000);
+      },
+      onClose: function() {
+        if (melodifyForYouInterval) { clearInterval(melodifyForYouInterval); melodifyForYouInterval = null; }
+      },
       width: 1100,
       height: 700,
     },
@@ -9321,9 +9368,12 @@ alt="favicon">
                 <iframe id="ytPlayerIframe" src="" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen frameborder="0"></iframe>
               </div>
               <div class="yt-player-controls-bar">
+                <button class="yt-back-btn" onclick="closeYoutubePlayer()" title="Back">
+                  <i class="fas fa-arrow-left"></i>
+                </button>
                 <div class="yt-player-info">
                   <h3 id="ytPlayerTitle">Video Title</h3>
-                  <span id="ytPlayerChannel">Channel</span>
+                  <span id="ytPlayerChannel" class="yt-clickable-channel" onclick="searchYoutubeByChannel(this.textContent)">Channel</span>
                 </div>
                 <div class="yt-player-btns">
                   <button id="ytSubscribeBtn" class="yt-subscribe-btn" style="display:none;">
@@ -9492,8 +9542,17 @@ alt="favicon">
         </div>
       `,
       noPadding: true,
-      onOpen: function() { loadYoutubeTrending(); initYoutubeSocial(); startYoutubeNotifPolling(); },
-      onClose: function() { stopYoutubeNotifPolling(); },
+      onOpen: function() { loadYoutubeTrending(); initYoutubeSocial(); startYoutubeNotifPolling();
+        // Auto-refresh For You every 10 seconds
+        if (window._ytForYouInterval) clearInterval(window._ytForYouInterval);
+        window._ytForYouInterval = setInterval(() => {
+          ytRecommendCache.lastFetch = 0;
+          loadYoutubeTrending();
+        }, 10000);
+      },
+      onClose: function() { stopYoutubeNotifPolling();
+        if (window._ytForYouInterval) { clearInterval(window._ytForYouInterval); window._ytForYouInterval = null; }
+      },
       width: 1100,
       height: 750,
     },

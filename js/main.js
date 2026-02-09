@@ -15778,13 +15778,20 @@ async function setupComplete() {
   });
 
   localStorage.setItem("Veltra_username", username);
+  const hashedPw = isPasswordless ? "" : await hashPasswordAsync(password);
   if (isPasswordless) {
     localStorage.setItem("Veltra_password", "");
     localStorage.setItem("Veltra_isPasswordless", "true");
   } else {
-    localStorage.setItem("Veltra_password", await hashPasswordAsync(password));
+    localStorage.setItem("Veltra_password", hashedPw);
     localStorage.setItem("Veltra_isPasswordless", "false");
   }
+
+  // Write directly to Veltra_accounts so login() doesn't depend on migration
+  const newAccount = new UserAccount(username, hashedPw, "superuser", isPasswordless);
+  const existingAccounts = getAllAccounts().filter(a => a.username !== username);
+  existingAccounts.push(newAccount);
+  saveAllAccounts(existingAccounts);
   localStorage.setItem("Veltra_setupComplete", "true");
   localStorage.setItem("Veltra_bloatlessMode", isBloatless ? "true" : "false");
   localStorage.setItem(
@@ -15891,6 +15898,7 @@ async function forgotPassword() {
   localStorage.removeItem("Veltra_password");
   localStorage.removeItem("Veltra_isPasswordless");
   localStorage.removeItem("Veltra_setupComplete");
+  localStorage.removeItem("Veltra_accounts");
 
   const usernameInput = document.getElementById("username");
   if (usernameInput) usernameInput.value = "";

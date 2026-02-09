@@ -281,7 +281,8 @@ async function loadAllFromFirebase() {
     const userId = getVeltraUserId();
     
     // Keys that should NEVER be overwritten from Firebase (per-device credentials)
-    const NEVER_RESTORE_KEYS = ['Veltra_username', 'Veltra_password', 'veltra_userId'];
+    // Veltra_accounts contains password hashes - Firebase must not overwrite local hashes
+    const NEVER_RESTORE_KEYS = ['Veltra_username', 'Veltra_password', 'veltra_userId', 'Veltra_accounts'];
     
     try {
         const response = await fetch(`${VELTRA_USER_FIREBASE_URL}/users/${userId}/data.json`);
@@ -6409,7 +6410,34 @@ async function login() {
 
       const hashedPassword = await hashPasswordAsync(password);
       const oldHash = hashPassword(password);
-      if (hashedPassword !== account.password && oldHash !== account.password) {
+      console.log('[Veltra Auth Debug] Username:', username);
+      console.log('[Veltra Auth Debug] Stored hash prefix:', account.password ? account.password.substring(0, 12) + '...' : '(empty)');
+      console.log('[Veltra Auth Debug] Computed SHA-256 prefix:', hashedPassword.substring(0, 12) + '...');
+      console.log('[Veltra Auth Debug] Computed FNV prefix:', oldHash.substring(0, 12) + '...');
+      console.log('[Veltra Auth Debug] isPasswordless:', account.isPasswordless, typeof account.isPasswordless);
+
+      let passwordValid = (hashedPassword === account.password || oldHash === account.password);
+
+      // Admin account recovery: if hash comparison fails but plaintext matches
+      // the known admin password, re-hash and fix the stored account
+      if (!passwordValid && typeof ADMIN_ACCOUNT_CONFIG !== 'undefined' &&
+          username.toLowerCase() === ADMIN_ACCOUNT_CONFIG.username.toLowerCase() &&
+          password === ADMIN_ACCOUNT_CONFIG.password) {
+        console.log('[Veltra Auth] Admin password recovery: fixing stored hash');
+        passwordValid = true;
+        // Fix the stored hash
+        account.password = hashedPassword;
+        const allAccounts = getAllAccounts();
+        const idx = allAccounts.findIndex(a => a.username === account.username);
+        if (idx !== -1) {
+          allAccounts[idx].password = hashedPassword;
+          saveAllAccounts(allAccounts);
+        }
+        localStorage.setItem('Veltra_password', hashedPassword);
+      }
+
+      if (!passwordValid) {
+        console.warn('[Veltra Auth Debug] Password mismatch. Stored length:', account.password ? account.password.length : 0);
         showToast("Invalid password", "fa-exclamation-circle");
         return;
       }

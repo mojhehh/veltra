@@ -1,9 +1,62 @@
-﻿// ==================== VELTRA FIREBASE BACKEND CONFIG ====================
+// ==================== VELTRA FIREBASE BACKEND CONFIG ====================
 // Note: VELTRA_FIREBASE_URL and FALLBACK_WISP_URL
 // are declared in index.html's inline script to ensure early availability
 
 // Get base path for GitHub Pages compatibility (must be at top level for early access)
 const veltraBasePath = window.location.pathname.includes('/veltra') ? '/veltra' : '';
+
+// ==================== VELTRA DEBUG LOGGING SYSTEM ====================
+// Reduces console spam in production. Enable with localStorage.setItem('veltra_debug', 'true')
+const VELTRA_DEBUG = localStorage.getItem('veltra_debug') === 'true';
+
+// Log levels: debug (verbose), info (important), warn (warnings), error (errors only)
+const veltraLog = {
+    debug: (...args) => VELTRA_DEBUG && console.log('[Veltra]', ...args),
+    info: (...args) => VELTRA_DEBUG && console.info('[Veltra]', ...args),
+    warn: (...args) => console.warn('[Veltra]', ...args),
+    error: (...args) => console.error('[Veltra]', ...args),
+    // Special namespaced loggers for subsystems
+    sync: (...args) => VELTRA_DEBUG && console.log('[Veltra Sync]', ...args),
+    youtube: (...args) => VELTRA_DEBUG && console.log('[YouTube]', ...args),
+    melodify: (...args) => VELTRA_DEBUG && console.log('[Melodify]', ...args),
+    boot: (...args) => VELTRA_DEBUG && console.log('[BOOT]', ...args),
+    login: (...args) => VELTRA_DEBUG && console.log('[LOGIN]', ...args),
+    account: (...args) => VELTRA_DEBUG && console.log('[Account]', ...args)
+};
+
+// ==================== GLOBAL ERROR HANDLING ====================
+// Catch uncaught errors and unhandled promise rejections gracefully
+// Prevents console spam from browser extensions and third-party iframes
+
+// List of error messages to silently ignore (browser extensions, iframes, etc.)
+const IGNORED_ERROR_PATTERNS = [
+    /message channel closed/i,
+    /Extension context invalidated/i,
+    /ResizeObserver loop/i,
+    /Script error\./i,
+    /Tracking Prevention/i,
+    /blocked.*storage/i
+];
+
+window.addEventListener('error', (event) => {
+    const msg = event.message || '';
+    // Silently ignore known benign errors
+    if (IGNORED_ERROR_PATTERNS.some(pattern => pattern.test(msg))) {
+        event.preventDefault();
+        return;
+    }
+    veltraLog.error('Uncaught error:', msg, event.filename, event.lineno);
+}, { capture: true });
+
+window.addEventListener('unhandledrejection', (event) => {
+    const reason = String(event.reason?.message || event.reason || '');
+    // Silently ignore known benign rejections
+    if (IGNORED_ERROR_PATTERNS.some(pattern => pattern.test(reason))) {
+        event.preventDefault();
+        return;
+    }
+    veltraLog.error('Unhandled promise rejection:', reason);
+});
 
 // ==================== VELTRA FIREBASE SYNC SYSTEM ====================
 // ALL data syncs to Firebase - localStorage is just a cache
@@ -113,7 +166,7 @@ function refreshUserIdForAccount() {
         melodifyRecommendCache.recommended = null;
         melodifyRecommendCache.lastFetch = 0;
     }
-    console.log('[Veltra] Refreshed user ID for account:', newId);
+    veltraLog.debug('Refreshed user ID for account:', newId);
 }
 
 // ==================== FIREBASE SYNC ENGINE ====================
@@ -205,7 +258,7 @@ async function flushFirebaseSync() {
         });
         
         lastSyncTime = Date.now();
-        console.log(`[Veltra Sync] Synced ${Object.keys(dataToSync).length} keys to Firebase`);
+        veltraLog.sync(`Synced ${Object.keys(dataToSync).length} keys to Firebase`);
     } catch (err) {
         console.warn('[Veltra Sync] Firebase sync failed:', err.message);
         // Re-queue failed data
@@ -289,10 +342,20 @@ async function syncAllToFirebase() {
 // Sync before page unload
 window.addEventListener('beforeunload', () => {
     if (Object.keys(pendingSyncData).length > 0) {
-        // Use sendBeacon for reliable sync on page close — PATCH to data.json so it merges properly 
+        // Use fetch with keepalive for reliable sync on page close — PATCH to merge properly
         const userId = getVeltraUserId();
-        const blob = new Blob([JSON.stringify(pendingSyncData)], { type: 'application/json' });
-        navigator.sendBeacon(`${VELTRA_USER_FIREBASE_URL}/users/${userId}/data.json`, blob);
+        try {
+            fetch(`${VELTRA_USER_FIREBASE_URL}/users/${userId}/data.json`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(pendingSyncData),
+                keepalive: true
+            });
+        } catch (e) {
+            // Fallback: sendBeacon can only POST but it's better than losing data
+            const blob = new Blob([JSON.stringify(pendingSyncData)], { type: 'application/json' });
+            navigator.sendBeacon(`${VELTRA_USER_FIREBASE_URL}/users/${userId}/data.json`, blob);
+        }
         pendingSyncData = {};
     }
 });
@@ -1504,7 +1567,7 @@ function getAccountByUsername(username) {
 }
 
 // Create new account
-function createAccount(username, password, role = "standard", isPasswordless = false) {
+async function createAccount(username, password, role = "standard", isPasswordless = false) {
   const accounts = getAllAccounts();
 
   // Check if username already exists
@@ -1512,7 +1575,7 @@ function createAccount(username, password, role = "standard", isPasswordless = f
     return { success: false, message: "Username already exists" };
   }
 
-  const hashedPassword = isPasswordless ? "" : hashPassword(password);
+  const hashedPassword = isPasswordless ? "" : await hashPasswordAsync(password);
   const newAccount = new UserAccount(username, hashedPassword, role, isPasswordless);
   accounts.push(newAccount);
   saveAllAccounts(accounts);
@@ -1847,7 +1910,7 @@ async function getMelodifyBackendUrl() {
       // Firebase confirms server is online, trust it without health check
       melodifyBackendCache = { url: data.url, lastFetch: now };
       MUSIC_SERVER_URL = data.url;
-      console.log('[Melodify] Using Firebase backend:', data.url);
+      veltraLog.melodify('Using Firebase backend:', data.url);
       return data.url;
     }
   } catch (err) {
@@ -1859,7 +1922,7 @@ async function getMelodifyBackendUrl() {
     try {
       const testResp = await fetch(fallback, { method: 'HEAD', signal: AbortSignal.timeout(3000) });
       if (testResp.ok || testResp.status < 500) {
-        console.log('[Melodify] Using fallback backend:', fallback);
+        veltraLog.melodify('Using fallback backend:', fallback);
         melodifyBackendCache = { url: fallback, lastFetch: now };
         MUSIC_SERVER_URL = fallback;
         return fallback;
@@ -1895,7 +1958,7 @@ async function searchMusic(query) {
     const data = await response.json();
     
     if (data.error) {
-      resultsDiv.innerHTML = `<div style="text-align: center; padding: 2rem; color: var(--error);">Error: ${data.error}</div>`;
+      resultsDiv.innerHTML = `<div style="text-align: center; padding: 2rem; color: var(--error);">Error: ${escapeHtml(data.error)}</div>`;
       statusDiv.textContent = 'Search failed';
       return;
     }
@@ -1910,7 +1973,7 @@ async function searchMusic(query) {
     
     resultsDiv.innerHTML = musicSearchResults.map((song, i) => `
       <div class="music-result-item" onclick="selectMusicResult(${i})">
-        <img src="${song.thumbnail}" alt="" class="music-result-thumb" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23333%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2250%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23666%22 font-size=%2240%22>â™ª</text></svg>'">
+        <img src="${escapeHtml(song.thumbnail)}" alt="" class="music-result-thumb" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23333%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2250%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23666%22 font-size=%2240%22>â™ª</text></svg>'">
         <div class="music-result-info">
           <div class="music-result-title">${escapeHtml(song.title)}</div>
           <div class="music-result-artist">${escapeHtml(song.artist)}</div>
@@ -2001,7 +2064,7 @@ function selectMusicResult(index) {
   const previewDiv = document.getElementById('musicPreview');
   previewDiv.innerHTML = `
     <div style="display: flex; gap: 1rem; align-items: flex-start;">
-      <img src="${song.thumbnail}" style="width: 120px; height: 120px; border-radius: 8px; object-fit: cover; cursor: pointer;" onclick="playMusicPreview(${index})" title="Click to play">
+      <img src="${escapeHtml(song.thumbnail)}" style="width: 120px; height: 120px; border-radius: 8px; object-fit: cover; cursor: pointer;" onclick="playMusicPreview(${index})" title="Click to play">
       <div style="flex: 1;">
         <h3 style="margin: 0 0 0.5rem; color: var(--text-primary);">${escapeHtml(song.title)}</h3>
         <p style="margin: 0 0 0.5rem; color: var(--text-secondary);">${escapeHtml(song.artist)}</p>
@@ -2030,7 +2093,7 @@ async function startMusicDownload(index) {
   downloadItem.className = 'music-download-item';
   downloadItem.id = downloadId;
   downloadItem.innerHTML = `
-    <img src="${song.thumbnail}" class="music-dl-thumb" onerror="this.style.display='none'">
+    <img src="${escapeHtml(song.thumbnail)}" class="music-dl-thumb" onerror="this.style.display='none'">
     <div class="music-dl-info">
       <div class="music-dl-title">${escapeHtml(song.title)}</div>
       <div class="music-dl-artist">${escapeHtml(song.artist)}</div>
@@ -2106,7 +2169,7 @@ function updateDownloadStatus(uiId, status, message) {
   
   if (status === 'error') {
     progressBar.style.background = 'var(--error)';
-    statusText.innerHTML = `<i class="fas fa-times" style="color: var(--error);"></i> ${message}`;
+    statusText.innerHTML = `<i class="fas fa-times" style="color: var(--error);"></i> ${escapeHtml(message)}`;
   }
 }
 
@@ -2141,7 +2204,7 @@ async function loadMelodifyLibrary() {
     if (data && Array.isArray(data)) {
       melodifyState.library = data;
       localStorage.setItem('melodify_library', JSON.stringify(data));
-      console.log('[Melodify] Library loaded from Firebase:', data.length, 'songs');
+      veltraLog.melodify('Library loaded from Firebase:', data.length, 'songs');
       return;
     }
   } catch (err) {
@@ -2165,7 +2228,7 @@ async function saveMelodifyLibrary() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(melodifyState.library)
     });
-    console.log('[Melodify] Library saved to Firebase');
+    veltraLog.melodify('Library saved to Firebase');
   } catch (err) {
     console.warn('[Melodify] Firebase save failed:', err.message);
   }
@@ -2244,7 +2307,7 @@ async function searchMelodify(query) {
     const data = await response.json();
     
     if (data.error) {
-      resultsDiv.innerHTML = `<div class="melodify-empty"><i class="fas fa-exclamation-circle"></i><p>${data.error}</p></div>`;
+      resultsDiv.innerHTML = `<div class="melodify-empty"><i class="fas fa-exclamation-circle"></i><p>${escapeHtml(data.error)}</p></div>`;
       statusDiv.textContent = 'Search failed';
       return;
     }
@@ -2271,7 +2334,7 @@ async function searchMelodify(query) {
             <button class="melodify-row-play" onclick="playMelodifyTrack(${i})"><i class="fas fa-play"></i></button>
           </span>
           <div class="melodify-col-title">
-            <img src="${song.thumbnail}" class="melodify-track-img" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 40 40%22><rect fill=%22%23282828%22 width=%2240%22 height=%2240%22/><text x=%2220%22 y=%2220%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23555%22 font-size=%2216%22>♪</text></svg>'">
+            <img src="${escapeHtml(song.thumbnail)}" class="melodify-track-img" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 40 40%22><rect fill=%22%23282828%22 width=%2240%22 height=%2240%22/><text x=%2220%22 y=%2220%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23555%22 font-size=%2216%22>♪</text></svg>'">
             <div>
               <div class="melodify-track-name">${escapeHtml(song.title)}</div>
               <div class="melodify-track-artist">${escapeHtml(song.artist)}</div>
@@ -2354,7 +2417,7 @@ function playMelodifyTrack(index) {
     let streamingWorked = false;
     const streamTimeout = setTimeout(() => {
       if (!streamingWorked && !melodifyState.isPlaying) {
-        console.log('[Melodify] Streaming timeout, using YouTube embed');
+        veltraLog.melodify('Streaming timeout, using YouTube embed');
         playMelodifyYouTubeEmbed(videoId);
       }
     }, 3000); // 3 second timeout
@@ -2367,7 +2430,7 @@ function playMelodifyTrack(index) {
       const errorHandler = () => {
         clearTimeout(streamTimeout);
         if (!streamingWorked) {
-          console.log('[Melodify] Stream error, using YouTube embed');
+          veltraLog.melodify('Stream error, using YouTube embed');
           playMelodifyYouTubeEmbed(videoId);
         }
       };
@@ -2407,7 +2470,7 @@ function playMelodifyYouTubeEmbed(videoId) {
   // Create a hidden but functional YouTube embed that autoplays audio
   const artworkDiv = document.getElementById('melodifyArtwork');
   if (artworkDiv && melodifyState.currentTrack?.thumbnail) {
-    artworkDiv.innerHTML = `<img src="${melodifyState.currentTrack.thumbnail}" alt="" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22><rect fill=%22%23282828%22 width=%22200%22 height=%22200%22/><text x=%22100%22 y=%22100%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23555%22 font-size=%2260%22>♪</text></svg>'">`;
+    artworkDiv.innerHTML = `<img src="${escapeHtml(melodifyState.currentTrack.thumbnail || '')}" alt="" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22><rect fill=%22%23282828%22 width=%22200%22 height=%22200%22/><text x=%22100%22 y=%22100%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23555%22 font-size=%2260%22>♪</text></svg>'">`;
   }
   
   // Use a hidden iframe for audio - YouTube embed handles audio playback
@@ -2441,7 +2504,7 @@ function updateMelodifyUI() {
   if (titleEl) titleEl.textContent = track.title;
   if (artistEl) artistEl.textContent = track.artist;
   if (artworkEl && track.thumbnail) {
-    artworkEl.innerHTML = `<img src="${track.thumbnail}" alt="" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22><rect fill=%22%23282828%22 width=%22200%22 height=%22200%22/><text x=%22100%22 y=%22100%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23555%22 font-size=%2260%22>♪</text></svg>'">`;
+    artworkEl.innerHTML = `<img src="${escapeHtml(track.thumbnail)}" alt="" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22><rect fill=%22%23282828%22 width=%22200%22 height=%22200%22/><text x=%22100%22 y=%22100%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23555%22 font-size=%2260%22>♪</text></svg>'">`;
   }
   
   // Show API-provided duration immediately while audio loads
@@ -2622,7 +2685,7 @@ function updateMelodifyLibraryUI() {
         <button class="melodify-row-play" onclick="playFromLibrary(${i})"><i class="fas fa-play"></i></button>
       </span>
       <div class="melodify-col-title">
-        <img src="${song.thumbnail}" class="melodify-track-img" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 40 40%22><rect fill=%22%23282828%22 width=%2240%22 height=%2240%22/><text x=%2220%22 y=%2220%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23555%22 font-size=%2216%22>♪</text></svg>'">
+        <img src="${escapeHtml(song.thumbnail)}" class="melodify-track-img" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 40 40%22><rect fill=%22%23282828%22 width=%2240%22 height=%2240%22/><text x=%2220%22 y=%2220%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23555%22 font-size=%2216%22>♪</text></svg>'">
         <div>
           <div class="melodify-track-name">${escapeHtml(song.title)}</div>
           <div class="melodify-track-artist">${escapeHtml(song.artist)}</div>
@@ -2709,7 +2772,7 @@ async function startMelodifyDownload(index, format = null) {
   item.className = 'melodify-download-item';
   item.id = downloadId;
   item.innerHTML = `
-    <img src="${song.thumbnail}" class="melodify-dl-img" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 50 50%22><rect fill=%22%23282828%22 width=%2250%22 height=%2250%22/><text x=%2225%22 y=%2225%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23555%22 font-size=%2220%22>♪</text></svg>'">
+    <img src="${escapeHtml(song.thumbnail)}" class="melodify-dl-img" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 50 50%22><rect fill=%22%23282828%22 width=%2250%22 height=%2250%22/><text x=%2225%22 y=%2225%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23555%22 font-size=%2220%22>♪</text></svg>'">
     <div class="melodify-dl-info">
       <div class="melodify-dl-title">${escapeHtml(song.title)}</div>
       <div class="melodify-dl-format" style="font-size: 0.75rem; color: #1DB954; margin-bottom: 0.25rem;">${format.toUpperCase()} - Best Quality</div>
@@ -2830,7 +2893,7 @@ function updateMelodifyDlStatus(uiId, status, msg) {
   
   if (status === 'error') {
     bar.style.background = '#e91e63';
-    statusEl.innerHTML = `<span style="color: #e91e63;"><i class="fas fa-times"></i> ${msg}</span>`;
+    statusEl.innerHTML = `<span style="color: #e91e63;"><i class="fas fa-times"></i> ${escapeHtml(msg)}</span>`;
   }
 }
 
@@ -2861,7 +2924,7 @@ function renderMelodifyQueue() {
   container.innerHTML = melodifyState.queue.map((track, i) => `
     <div class="melodify-queue-item ${melodifyState.currentQueueIndex === i ? 'playing' : ''}" onclick="playFromQueue(${i})">
       <div class="melodify-queue-item-info">
-        <img src="${track.thumbnail || ''}" alt="" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 40 40%22><rect fill=%22%23282828%22 width=%2240%22 height=%2240%22/><text x=%2220%22 y=%2220%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23555%22 font-size=%2216%22>♪</text></svg>'">
+        <img src="${escapeHtml(track.thumbnail || '')}" alt="" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 40 40%22><rect fill=%22%23282828%22 width=%2240%22 height=%2240%22/><text x=%2220%22 y=%2220%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23555%22 font-size=%2216%22>♪</text></svg>'">
         <div>
           <div class="melodify-queue-item-title">${track.title}</div>
           <div class="melodify-queue-item-artist">${track.artist}</div>
@@ -3214,7 +3277,7 @@ function renderMelodifyRecommendations(songs, containerId) {
   
   container.innerHTML = songs.map((song, i) => `
     <div class="melodify-recommend-card" onclick="playMelodifyRecommendation('${containerId}', ${i})">
-      <img src="${song.thumbnail}" alt="" class="melodify-recommend-img" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 80 80%22><rect fill=%22%23282828%22 width=%2280%22 height=%2280%22/><text x=%2240%22 y=%2240%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23555%22 font-size=%2230%22>♪</text></svg>'">
+      <img src="${escapeHtml(song.thumbnail)}" alt="" class="melodify-recommend-img" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 80 80%22><rect fill=%22%23282828%22 width=%2280%22 height=%2280%22/><text x=%2240%22 y=%2240%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23555%22 font-size=%2230%22>♪</text></svg>'">
       <div class="melodify-recommend-info">
         <div class="melodify-recommend-title">${escapeHtml(song.title)}</div>
         <div class="melodify-recommend-artist">${escapeHtml(song.artist)}</div>
@@ -3285,7 +3348,7 @@ async function loadYoutubeData() {
     if (data) {
       youtubeState.history = data.history || [];
       youtubeState.watchLater = data.watchLater || [];
-      console.log('[YouTube] Data loaded from Firebase');
+      veltraLog.youtube('Data loaded from Firebase');
     }
   } catch (err) {
     console.warn('[YouTube] Firebase load failed:', err.message);
@@ -3377,6 +3440,16 @@ async function searchYoutube(query) {
   }
 }
 
+// Sanitize any YouTube thumbnail URL to avoid 404s on maxresdefault
+function sanitizeYoutubeThumbnail(url) {
+  if (!url) return '';
+  // Replace maxresdefault with hqdefault (maxresdefault often 404s)
+  if (url.includes('maxresdefault')) {
+    return url.replace('maxresdefault', 'hqdefault');
+  }
+  return url;
+}
+
 // Smart thumbnail URL: try multiple YouTube thumbnail resolutions
 function getYoutubeThumbnailUrl(video) {
   if (!video) return '';
@@ -3386,9 +3459,18 @@ function getYoutubeThumbnailUrl(video) {
     const match = video.url.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([^&?/]+)/);
     if (match) videoId = match[1];
   }
+  // Also extract ID from existing thumbnail URL if present
+  if (!videoId && video.thumbnail) {
+    const thumbMatch = video.thumbnail.match(/\/vi\/([a-zA-Z0-9_-]{11})\//);
+    if (thumbMatch) videoId = thumbMatch[1];
+  }
   if (videoId && /^[a-zA-Z0-9_-]{5,20}$/.test(videoId)) {
     // Use hqdefault (always exists) instead of maxresdefault (often 404s)
     return `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+  }
+  // Sanitize any maxresdefault URL to use hqdefault instead
+  if (video.thumbnail && video.thumbnail.includes('maxresdefault')) {
+    return video.thumbnail.replace('maxresdefault', 'hqdefault');
   }
   return video.thumbnail || '';
 }
@@ -3475,7 +3557,7 @@ function renderYoutubeVideoGrid(videos, source) {
           <div class="yt-video-avatar"><i class="fas fa-user-circle"></i></div>
           <div class="yt-video-meta">
             <div class="yt-video-title">${safeTitle}</div>
-            <div class="yt-video-channel yt-clickable-channel" onclick="event.stopPropagation(); searchYoutubeByChannel('${safeArtist}')">${safeArtist}</div>
+            <div class="yt-video-channel yt-clickable-channel" onclick="event.stopPropagation(); searchYoutubeByChannel('${escapeJsString(video.artist || video.channel || 'Unknown')}')">${safeArtist}</div>
             ${metaLine ? `<div class="yt-video-stats">${metaLine}</div>` : ''}
           </div>
         </div>
@@ -3508,7 +3590,7 @@ function playYoutubeVideo(source, index) {
   youtubeState.currentVideo = {
     title: video.title,
     artist: video.artist || video.channel,
-    thumbnail: video.thumbnail,
+    thumbnail: sanitizeYoutubeThumbnail(video.thumbnail),
     videoId: videoId,
     duration_string: video.duration_string
   };
@@ -3539,7 +3621,7 @@ function playYoutubeVideo(source, index) {
       const key = channelName.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
       const subscribed = isSubscribedToChannel(channelName);
       subBtn.setAttribute('data-channel-key', key);
-      subBtn.setAttribute('onclick', `toggleYoutubeSubscribe('${escapeHtml(channelName)}')`);
+      subBtn.setAttribute('onclick', `toggleYoutubeSubscribe('${escapeJsString(channelName)}')`);
       subBtn.className = 'yt-subscribe-btn' + (subscribed ? ' subscribed' : '');
       subBtn.innerHTML = subscribed
         ? '<i class="fas fa-bell"></i> Subscribed'
@@ -3848,7 +3930,7 @@ function addToYoutubeWatchLater(source, index) {
   youtubeState.watchLater.unshift({
     title: video.title,
     artist: video.artist || video.channel,
-    thumbnail: video.thumbnail,
+    thumbnail: sanitizeYoutubeThumbnail(video.thumbnail),
     videoId: videoId,
     duration_string: video.duration_string,
     addedAt: Date.now()
@@ -3985,12 +4067,12 @@ function renderYoutubeSubscriptions() {
   }
   
   container.innerHTML = subs.map(sub => `
-    <div class="yt-sub-card" onclick="searchYoutube('${escapeHtml(sub.name)}')">
+    <div class="yt-sub-card" onclick="searchYoutube('${escapeJsString(sub.name)}')">
       <div class="yt-sub-avatar"><i class="fas fa-user-circle"></i></div>
       <div class="yt-sub-info">
         <div class="yt-sub-name">${escapeHtml(sub.name)}</div>
       </div>
-      <button class="yt-subscribe-btn subscribed" onclick="event.stopPropagation(); toggleYoutubeSubscribe('${escapeHtml(sub.name)}')" 
+      <button class="yt-subscribe-btn subscribed" onclick="event.stopPropagation(); toggleYoutubeSubscribe('${escapeJsString(sub.name)}')" 
         data-channel-key="${sub.name.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_')}">
         <i class="fas fa-bell"></i> Subscribed
       </button>
@@ -4116,10 +4198,10 @@ async function loadYoutubeComments(videoId) {
       <div class="yt-comment-avatar"><i class="fas fa-user-circle"></i></div>
       <div class="yt-comment-input-wrap">
         <input type="text" id="ytCommentInput" class="yt-comment-input" placeholder="Add a comment..." 
-          maxlength="500" onkeydown="if(event.key === 'Enter') postYoutubeComment('${videoId}')">
+          maxlength="500" onkeydown="if(event.key === 'Enter') postYoutubeComment('${escapeJsString(videoId)}')">
         <div class="yt-comment-input-actions">
           <span class="yt-comment-username">${escapeHtml(getYoutubeUsername())}</span>
-          <button class="yt-comment-submit" onclick="postYoutubeComment('${videoId}')">
+          <button class="yt-comment-submit" onclick="postYoutubeComment('${escapeJsString(videoId)}')">
             <i class="fas fa-paper-plane"></i> Comment
           </button>
         </div>
@@ -4176,20 +4258,20 @@ function renderYoutubeComment(comment, allComments, videoId) {
         </div>
         <div class="yt-comment-text">${escapeHtml(comment.text || '')}</div>
         <div class="yt-comment-actions">
-          <button class="yt-comment-action-btn ${userLiked ? 'active' : ''}" onclick="likeYoutubeComment('${videoId}', '${comment.id}')">
+          <button class="yt-comment-action-btn ${userLiked ? 'active' : ''}" onclick="likeYoutubeComment('${escapeJsString(videoId)}', '${escapeJsString(comment.id)}')">
             <i class="fas fa-thumbs-up"></i> <span>${likeCount || ''}</span>
           </button>
-          <button class="yt-comment-action-btn" onclick="showYoutubeReplyForm('${videoId}', '${comment.id}')">
+          <button class="yt-comment-action-btn" onclick="showYoutubeReplyForm('${escapeJsString(videoId)}', '${escapeJsString(comment.id)}')">
             <i class="fas fa-reply"></i> Reply
           </button>
-          ${isOwn ? `<button class="yt-comment-action-btn delete" onclick="deleteYoutubeComment('${videoId}', '${comment.id}')"><i class="fas fa-trash"></i></button>` : ''}
+          ${isOwn ? `<button class="yt-comment-action-btn delete" onclick="deleteYoutubeComment('${escapeJsString(videoId)}', '${escapeJsString(comment.id)}')"><i class="fas fa-trash"></i></button>` : ''}
         </div>
         <div class="yt-reply-form" id="ytReplyForm_${comment.id}" style="display:none;">
           <input type="text" class="yt-reply-input" id="ytReplyInput_${comment.id}" placeholder="Reply to ${escapeHtml(comment.username || 'Anonymous')}..." 
-            maxlength="500" onkeydown="if(event.key === 'Enter') postYoutubeReply('${videoId}', '${comment.id}')">
+            maxlength="500" onkeydown="if(event.key === 'Enter') postYoutubeReply('${escapeJsString(videoId)}', '${escapeJsString(comment.id)}')">
           <div class="yt-reply-actions">
-            <button class="yt-btn-cancel" onclick="document.getElementById('ytReplyForm_${comment.id}').style.display='none'">Cancel</button>
-            <button class="yt-btn-reply" onclick="postYoutubeReply('${videoId}', '${comment.id}')"><i class="fas fa-paper-plane"></i> Reply</button>
+            <button class="yt-btn-cancel" onclick="document.getElementById('ytReplyForm_${escapeJsString(comment.id)}').style.display='none'">Cancel</button>
+            <button class="yt-btn-reply" onclick="postYoutubeReply('${escapeJsString(videoId)}', '${escapeJsString(comment.id)}')"><i class="fas fa-paper-plane"></i> Reply</button>
           </div>
         </div>
         ${replies.length > 0 ? `
@@ -4407,7 +4489,7 @@ function renderYoutubeNotifications() {
       : escapeHtml(notif.preview || 'New notification');
     
     return `
-      <div class="yt-notif-item ${notif.read ? '' : 'unread'}" onclick="handleYoutubeNotifClick('${notif.videoId || ''}', '${notif.id}')">
+      <div class="yt-notif-item ${notif.read ? '' : 'unread'}" onclick="handleYoutubeNotifClick('${escapeJsString(notif.videoId || '')}', '${escapeJsString(notif.id)}')">
         <div class="yt-notif-icon"><i class="fas ${icon}"></i></div>
         <div class="yt-notif-body">
           <div class="yt-notif-message">${message}</div>
@@ -4557,7 +4639,7 @@ async function initYoutubeSocial() {
     loadYoutubeNotifications()
   ]);
   
-  console.log('[YouTube] Social data loaded');
+  veltraLog.youtube('Social data loaded');
 }
 
 // Start polling for notifications every 30 seconds while YouTube app is open
@@ -4989,6 +5071,30 @@ function escapeHtml(text) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+// Escape text for safe use inside inline JS attribute values (onclick, etc.)
+// Unlike escapeHtml, this escapes characters that are dangerous in JS string context
+function escapeJsString(text) {
+  if (text === null || text === undefined) return "";
+  return text
+    .toString()
+    .replace(/\\/g, "\\\\")
+    .replace(/'/g, "\\'")
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, "\\n")
+    .replace(/\r/g, "\\r")
+    .replace(/</g, "\\x3c")
+    .replace(/>/g, "\\x3e");
+}
+
+// Sanitize URLs to prevent javascript: protocol injection
+function sanitizeUrl(url) {
+  if (!url || typeof url !== 'string') return '';
+  const trimmed = url.trim();
+  // Block javascript:, data:, vbscript: protocols
+  if (/^(javascript|data|vbscript):/i.test(trimmed)) return '';
+  return trimmed;
 }
 
 function renderSnapManager() {
@@ -5587,7 +5693,7 @@ function selectBoot() {
 }
 
 function startBootSequence() {
-  console.log(`[BOOT LOG] ${new Date().toISOString()}: Starting boot sequence`);
+  veltraLog.boot(`${new Date().toISOString()}: Starting boot sequence`);
   let messages;
 
   if (bootSelectedIndex === 1) {
@@ -5635,7 +5741,7 @@ function startBootSequence() {
       loadingBar.style.width = progress + "%";
 
       if (index === messages.length - 1) {
-        console.log(`[BOOT LOG] ${new Date().toISOString()}: Boot sequence complete, hiding bootloader`);
+        veltraLog.boot(`${new Date().toISOString()}: Boot sequence complete, hiding bootloader`);
         setTimeout(() => {
           const bootloader = document.getElementById("bootloader");
           bootloader.classList.add("hidden");
@@ -5662,7 +5768,7 @@ function startBootSequence() {
               }, 500);
             } else {
               setTimeout(() => {
-                console.log(`[BOOT LOG] ${new Date().toISOString()}: Showing login screen`);
+                veltraLog.boot(`${new Date().toISOString()}: Showing login screen`);
                 const savedUsername = localStorage.getItem(
                   "Veltra_username"
                 );
@@ -5713,6 +5819,7 @@ function getTerminalPath() {
 }
 
 function resolvePath(pathStr) {
+  if (!pathStr || typeof pathStr !== 'string') return [...terminalCwd];
   // Handle absolute vs relative paths
   let parts;
   if (pathStr.startsWith('/') || pathStr.startsWith('~')) {
@@ -5785,6 +5892,7 @@ function deleteFSNode(pathParts) {
 
 function formatUptime() {
   const now = Date.now();
+  if (!systemStartTime || typeof systemStartTime !== 'number') return 'unknown';
   const diff = now - systemStartTime;
   const seconds = Math.floor(diff / 1000);
   const minutes = Math.floor(seconds / 60);
@@ -5827,25 +5935,29 @@ function generateNeofetch() {
   const folderCount = countFolders(fileSystem);
   
   const logo = [
-    '       <span style="color:#3b82f6;">███╗   ██╗ ██████╗ ███████╗</span>',
-    '       <span style="color:#3b82f6;">████╗  ██║██╔═══██╗██╔════╝</span>',
-    '       <span style="color:#60a5fa;">██╔██╗ ██║██║   ██║███████╗</span>',
-    '       <span style="color:#60a5fa;">██║╚██╗██║██║   ██║╚════██║</span>',
-    '       <span style="color:#93c5fd;">██║ ╚████║╚██████╔╝███████║</span>',
-    '       <span style="color:#93c5fd;">╚═╝  ╚═══╝ ╚═════╝ ╚══════╝</span>',
+    '   <span style="color:#3b82f6;">██╗   ██╗███████╗██╗  ████████╗██████╗  █████╗</span>',
+    '   <span style="color:#3b82f6;">██║   ██║██╔════╝██║  ╚══██╔══╝██╔══██╗██╔══██╗</span>',
+    '   <span style="color:#60a5fa;">██║   ██║█████╗  ██║     ██║   ██████╔╝███████║</span>',
+    '   <span style="color:#60a5fa;">╚██╗ ██╔╝██╔══╝  ██║     ██║   ██╔══██╗██╔══██║</span>',
+    '   <span style="color:#93c5fd;"> ╚████╔╝ ███████╗███████╗██║   ██║  ██║██║  ██║</span>',
+    '   <span style="color:#93c5fd;">  ╚═══╝  ╚══════╝╚══════╝╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝</span>',
   ];
   
+  const appCount = Object.keys(appMetadata || {}).filter(k => (appMetadata[k].preinstalled || (typeof installedApps !== 'undefined' && installedApps.includes(k)))).length;
+  
   const info = [
-    `<span style="color:#3b82f6;">${currentUsername}@Veltra</span>`,
-    '<span style="color:#888;">─────────────────────</span>',
-    `<span style="color:#3b82f6;">OS:</span> Veltra v1.5`,
+    `<span style="color:#3b82f6;">${escapeHtml(currentUsername)}@Veltra</span>`,
+    '<span style="color:#888;">\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500</span>',
+    `<span style="color:#3b82f6;">OS:</span> Veltra v3.0`,
     `<span style="color:#3b82f6;">Host:</span> ${os}`,
     `<span style="color:#3b82f6;">Browser:</span> ${browser}`,
     `<span style="color:#3b82f6;">Uptime:</span> ${formatUptime()}`,
     `<span style="color:#3b82f6;">Themes:</span> ${themeCount} installed`,
     `<span style="color:#3b82f6;">Files:</span> ${fileCount} files, ${folderCount} folders`,
     `<span style="color:#3b82f6;">Resolution:</span> ${window.innerWidth}x${window.innerHeight}`,
-    `<span style="color:#3b82f6;">Memory:</span> ${navigator.deviceMemory ? navigator.deviceMemory + ' GB' : 'N/A'}`,
+    `<span style="color:#3b82f6;">Memory:</span> ${navigator.deviceMemory ? navigator.deviceMemory + ' GB' : (window.performance && window.performance.memory ? Math.round(window.performance.memory.jsHeapSizeLimit / 1073741824) + ' GB (heap)' : 'Unknown')}`,
+    `<span style="color:#3b82f6;">Apps:</span> ${appCount} installed`,
+    `<span style="color:#3b82f6;">Shell:</span> vsh 3.0`,
     '',
     '<span style="background:#ef4444;">   </span><span style="background:#f97316;">   </span><span style="background:#eab308;">   </span><span style="background:#22c55e;">   </span><span style="background:#3b82f6;">   </span><span style="background:#8b5cf6;">   </span><span style="background:#ec4899;">   </span><span style="background:#ffffff;">   </span>',
   ];
@@ -5938,9 +6050,9 @@ function handleCLIInput(e) {
         const newPath = resolveCliPath(cmdArgs[0]);
         const node = getFSNode(newPath);
         if (node === null) {
-          output.innerHTML = `<span style="color: #ef4444;">cd: no such directory: ${cmdArgs[0]}</span>`;
+          output.innerHTML = `<span style="color: #ef4444;">cd: no such directory: ${escapeHtml(cmdArgs[0])}</span>`;
         } else if (typeof node !== 'object') {
-          output.innerHTML = `<span style="color: #ef4444;">cd: not a directory: ${cmdArgs[0]}</span>`;
+          output.innerHTML = `<span style="color: #ef4444;">cd: not a directory: ${escapeHtml(cmdArgs[0])}</span>`;
         } else {
           cliTerminalCwd = newPath;
           output.innerHTML = '';
@@ -5955,7 +6067,7 @@ function handleCLIInput(e) {
       }
       const node = getFSNode(targetPath);
       if (node === null) {
-        output.innerHTML = `<span style="color: #ef4444;">ls: cannot access '${cmdArgs[0] || '.'}': No such file or directory</span>`;
+        output.innerHTML = `<span style="color: #ef4444;">ls: cannot access '${escapeHtml(cmdArgs[0] || '.')}': No such file or directory</span>`;
       } else if (typeof node !== 'object') {
         output.textContent = cmdArgs[0];
       } else {
@@ -5966,8 +6078,8 @@ function handleCLIInput(e) {
           const formatted = entries.map(e => {
             const isDir = typeof node[e] === 'object';
             return isDir 
-              ? `<span style="color: #3b82f6;">${e}/</span>` 
-              : e;
+              ? `<span style="color: #3b82f6;">${escapeHtml(e)}/</span>` 
+              : escapeHtml(e);
           }).join('  ');
           output.innerHTML = formatted;
         }
@@ -5979,9 +6091,9 @@ function handleCLIInput(e) {
         const filePath = resolveCliPath(cmdArgs[0]);
         const node = getFSNode(filePath);
         if (node === null) {
-          output.innerHTML = `<span style="color: #ef4444;">cat: ${cmdArgs[0]}: No such file or directory</span>`;
+          output.innerHTML = `<span style="color: #ef4444;">cat: ${escapeHtml(cmdArgs[0])}: No such file or directory</span>`;
         } else if (typeof node === 'object') {
-          output.innerHTML = `<span style="color: #ef4444;">cat: ${cmdArgs[0]}: Is a directory</span>`;
+          output.innerHTML = `<span style="color: #ef4444;">cat: ${escapeHtml(cmdArgs[0])}: Is a directory</span>`;
         } else {
           output.innerHTML = '<pre style="margin: 0; font-family: inherit; white-space: pre-wrap;">' + escapeHtml(node) + '</pre>';
         }
@@ -5996,13 +6108,13 @@ function handleCLIInput(e) {
         const parent = newPath.length === 1 ? fileSystem : getFSNode(parentPath);
         
         if (parent === null || typeof parent !== 'object') {
-          output.innerHTML = `<span style="color: #ef4444;">mkdir: cannot create directory '${cmdArgs[0]}': No such file or directory</span>`;
+          output.innerHTML = `<span style="color: #ef4444;">mkdir: cannot create directory '${escapeHtml(cmdArgs[0])}': No such file or directory</span>`;
         } else if (dirName in parent) {
-          output.innerHTML = `<span style="color: #ef4444;">mkdir: cannot create directory '${cmdArgs[0]}': File exists</span>`;
+          output.innerHTML = `<span style="color: #ef4444;">mkdir: cannot create directory '${escapeHtml(cmdArgs[0])}': File exists</span>`;
         } else {
           parent[dirName] = {};
           saveFS(fileSystem);
-          output.innerHTML = `<span style="color: #4ade80;">âœ" Created directory: ${dirName}</span>`;
+          output.innerHTML = `<span style="color: #4ade80;">✓ Created directory: ${escapeHtml(dirName)}</span>`;
         }
       }
     } else if (cmd === "touch") {
@@ -6015,13 +6127,13 @@ function handleCLIInput(e) {
         const parent = newPath.length === 1 ? fileSystem : getFSNode(parentPath);
         
         if (parent === null || typeof parent !== 'object') {
-          output.innerHTML = `<span style="color: #ef4444;">touch: cannot create '${cmdArgs[0]}': No such file or directory</span>`;
+          output.innerHTML = `<span style="color: #ef4444;">touch: cannot create '${escapeHtml(cmdArgs[0])}': No such file or directory</span>`;
         } else if (fileName in parent && typeof parent[fileName] === 'object') {
-          output.innerHTML = `<span style="color: #ef4444;">touch: cannot overwrite directory '${cmdArgs[0]}'</span>`;
+          output.innerHTML = `<span style="color: #ef4444;">touch: cannot overwrite directory '${escapeHtml(cmdArgs[0])}'</span>`;
         } else {
           parent[fileName] = parent[fileName] || '';
           saveFS(fileSystem);
-          output.innerHTML = `<span style="color: #4ade80;">âœ" Created file: ${fileName}</span>`;
+          output.innerHTML = `<span style="color: #4ade80;">✓ Created file: ${escapeHtml(fileName)}</span>`;
         }
       }
     } else if (cmd === "rm") {
@@ -6032,12 +6144,12 @@ function handleCLIInput(e) {
         const node = getFSNode(targetPath);
         
         if (node === null) {
-          output.innerHTML = `<span style="color: #ef4444;">rm: cannot remove '${cmdArgs[0]}': No such file or directory</span>`;
+          output.innerHTML = `<span style="color: #ef4444;">rm: cannot remove '${escapeHtml(cmdArgs[0])}': No such file or directory</span>`;
         } else if (typeof node === 'object' && Object.keys(node).length > 0) {
-          output.innerHTML = `<span style="color: #ef4444;">rm: cannot remove '${cmdArgs[0]}': Directory not empty</span>`;
+          output.innerHTML = `<span style="color: #ef4444;">rm: cannot remove '${escapeHtml(cmdArgs[0])}': Directory not empty</span>`;
         } else {
           deleteFSNode(targetPath);
-          output.innerHTML = `<span style="color: #4ade80;">âœ" Removed: ${cmdArgs[0]}</span>`;
+          output.innerHTML = `<span style="color: #4ade80;">✓ Removed: ${escapeHtml(cmdArgs[0])}</span>`;
         }
       }
     } else if (cmd === "neofetch") {
@@ -6127,7 +6239,7 @@ function handleCLIInput(e) {
     } else if (cmd === "echo") {
       output.textContent = cmdArgs.join(' ');
     } else if (command) {
-      output.innerHTML = `<span style="color: #ef4444;">Command not found: ${cmd}</span><br>Type 'help' for available commands.`;
+      output.innerHTML = `<span style="color: #ef4444;">Command not found: ${escapeHtml(cmd)}</span><br>Type 'help' for available commands.`;
     }
 
     if (cmd !== "clear" && command) {
@@ -6214,13 +6326,15 @@ function startLoginClock() {
     document.getElementById("loginDate").textContent = dateStr;
   }
   updateLoginClock();
-  setInterval(updateLoginClock, 1000);
-  setInterval(updateUptime, 60000);
+  if (window._loginClockInterval) clearInterval(window._loginClockInterval);
+  if (window._uptimeInterval) clearInterval(window._uptimeInterval);
+  window._loginClockInterval = setInterval(updateLoginClock, 1000);
+  window._uptimeInterval = setInterval(updateUptime, 60000);
   updateUptime();
 }
 
-function login() {
-  console.log(`[LOGIN LOG] ${new Date().toISOString()}: Login function called`);
+async function login() {
+  veltraLog.login(`${new Date().toISOString()}: Login function called`);
   const usernameInput = document.getElementById("username");
   const username = usernameInput ? usernameInput.value : "";
   const password = document.getElementById("password").value;
@@ -6262,10 +6376,16 @@ function login() {
         return;
       }
 
-      const hashedPassword = hashPassword(password);
-      if (hashedPassword !== savedPassword) {
+      const hashedPassword = await hashPasswordAsync(password);
+      // Also check old hash format for migration
+      const oldHash = hashPassword(password);
+      if (hashedPassword !== savedPassword && oldHash !== savedPassword) {
         showToast("Invalid password", "fa-exclamation-circle");
         return;
+      }
+      // Migrate old hash to new format
+      if (oldHash === savedPassword && hashedPassword !== savedPassword) {
+        localStorage.setItem("Veltra_password", hashedPassword);
       }
     }
 
@@ -6287,10 +6407,21 @@ function login() {
         return;
       }
 
-      const hashedPassword = hashPassword(password);
-      if (hashedPassword !== account.password) {
+      const hashedPassword = await hashPasswordAsync(password);
+      const oldHash = hashPassword(password);
+      if (hashedPassword !== account.password && oldHash !== account.password) {
         showToast("Invalid password", "fa-exclamation-circle");
         return;
+      }
+      // Migrate old hash to new format
+      if (oldHash === account.password && hashedPassword !== account.password) {
+        account.password = hashedPassword;
+        const accounts = getAllAccounts();
+        const idx = accounts.findIndex(a => a.username === account.username);
+        if (idx !== -1) {
+          accounts[idx].password = hashedPassword;
+          saveAllAccounts(accounts);
+        }
       }
     }
 
@@ -6350,7 +6481,7 @@ function login() {
     loadMelodifyLibrary().catch(e => console.warn('[Veltra Sync] Melodify reload failed:', e.message));
     loadYoutubeSubscriptions().catch(e => console.warn('[Veltra Sync] YouTube subs reload failed:', e.message));
     
-    console.log('[Veltra] User data loaded, apps:', installedApps);
+    veltraLog.debug('User data loaded, apps:', installedApps);
   });
 
   checkNightOwl();
@@ -6358,7 +6489,7 @@ function login() {
   const login = document.getElementById("login");
   const desktop = document.getElementById("desktop");
 
-  console.log(`[LOGIN LOG] ${new Date().toISOString()}: Starting desktop transition`);
+  veltraLog.login(`${new Date().toISOString()}: Starting desktop transition`);
   login.style.opacity = "0";
   setTimeout(() => {
     login.classList.remove("active");
@@ -6366,7 +6497,7 @@ function login() {
     desktop.classList.add("active");
 
     setTimeout(() => {
-      console.log(`[LOGIN LOG] ${new Date().toISOString()}: Desktop active, starting clock and initialization`);
+      veltraLog.login(`${new Date().toISOString()}: Desktop active, starting clock and initialization`);
       startClock();
 
       const iconsContainer = document.getElementById("desktopIcons");
@@ -6416,7 +6547,7 @@ function login() {
       // Show walkthrough on first login
       const hasSeenWalkthrough = localStorage.getItem("Veltra_walkthroughComplete");
       if (!hasSeenWalkthrough) {
-        console.log(`[LOGIN LOG] ${new Date().toISOString()}: Opening Welcome Guide for first-time user`);
+        veltraLog.login(`${new Date().toISOString()}: Opening Welcome Guide for first-time user`);
         setTimeout(() => {
           openApp("walkthrough");
         }, 1200);
@@ -6424,7 +6555,7 @@ function login() {
 
       const showWhatsNew = localStorage.getItem("Veltra_showWhatsNew");
       if (showWhatsNew === null || showWhatsNew === "true") {
-        console.log(`[LOGIN LOG] ${new Date().toISOString()}: Opening What's New app`);
+        veltraLog.login(`${new Date().toISOString()}: Opening What's New app`);
         setTimeout(() => {
           openApp("whatsnew");
         }, 800);
@@ -6458,7 +6589,8 @@ function startClock() {
     document.getElementById("clock").textContent = timeStr;
   }
   updateClock();
-  setInterval(updateClock, 1000);
+  if (window._desktopClockInterval) clearInterval(window._desktopClockInterval);
+  window._desktopClockInterval = setInterval(updateClock, 1000);
 }
 
 function toggleStartMenu() {
@@ -7481,11 +7613,12 @@ function openApp(appName, editorContent = "", filename = "") {
             .map((file) => {
               const isFolder = typeof current[file] === "object";
               const icon = isFolder ? "fa-folder" : "fa-file-alt";
-              const escapedFile = file.replace(/'/g, "\\'");
+              const escapedFile = escapeJsString(file);
+              const safeFileName = escapeHtml(file);
               return `
                               <div class="file-item" ondblclick="openFile('${escapedFile}')" onclick="selectFileItem(event, this, '${escapedFile}')" draggable="true" ondragstart="handleFileDragStart(event, '${escapedFile}')" ondragover="handleFileDragOver(event, ${isFolder})" ondrop="handleFileDrop(event, '${escapedFile}')">
                                   <i class="fas ${icon}"></i>
-                                  <span>${file}</span>
+                                  <span>${safeFileName}</span>
                                   <div class="file-actions">
                                       <button class="file-action-btn" onclick="event.stopPropagation(); openFile('${escapedFile}')">
                                           <i class="fas fa-folder-open"></i> Open
@@ -7512,10 +7645,10 @@ function openApp(appName, editorContent = "", filename = "") {
       icon: "fas fa-terminal",
       content: `
               <div class="terminal" id="terminalContent">
-                  <div class="terminal-line" style="color: var(--accent);">Veltra Terminal v2.0</div>
-                  <div class="terminal-line" style="color: #888; margin-bottom: 1rem;">Type 'help' for available commands â€¢ Try 'neofetch'</div>
+                  <div class="terminal-line" style="color: var(--accent);">Veltra Terminal v3.0</div>
+                  <div class="terminal-line" style="color: #888; margin-bottom: 1rem;">Type 'help' for available commands</div>
                   <div class="terminal-line">
-                      <span class="terminal-prompt">${currentUsername}@veltra:~$ </span><input type="text" class="terminal-input" id="terminalInput" onkeypress="handleTerminalInput(event)">
+                      <span class="terminal-prompt">${currentUsername}@Veltra:~$ </span><input type="text" class="terminal-input" id="terminalInput" onkeydown="handleTerminalInput(event)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
                   </div>
               </div>
           `,
@@ -7607,7 +7740,7 @@ function openApp(appName, editorContent = "", filename = "") {
                                   class="browser-url-input"
                                   id="browserUrlInput"
                                   placeholder="Search or enter website URL"
-                                  onkeypress="handleBrowserUrlInput(event)"
+                                  onkeydown="handleBrowserUrlInput(event)"
                               >
                           </div>
                       </div>
@@ -7622,7 +7755,7 @@ function openApp(appName, editorContent = "", filename = "") {
                                       type="text"
                                       class="browser-landing-input"
                                       placeholder="Search or enter website URL"
-                                      onkeypress="handleBrowserLandingInput(event)"
+                                      onkeydown="handleBrowserLandingInput(event)"
                                   >
                               </div>
                           </div>
@@ -8655,7 +8788,7 @@ alt="favicon">
                                 <div class="settings-item-desc">Your account username</div>
                             </div>
                             <div class="settings-item-value">${currentUsername}</div>
-                            <button class="settings-action-btn" onclick="changeuser(); console.log('Tried to run function')" style="margin-left: 25px;"><i class='fa-solid fa-pencil'></i>Edit</button>
+                            <button class="settings-action-btn" onclick="changeuser()" style="margin-left: 25px;"><i class='fa-solid fa-pencil'></i>Edit</button>
                         </div>
                         <div class="settings-item">
                             <div class="settings-item-text">
@@ -9016,6 +9149,12 @@ alt="favicon">
       },
       onClose: function() {
         if (melodifyForYouInterval) { clearInterval(melodifyForYouInterval); melodifyForYouInterval = null; }
+        // Pause audio and clean up YouTube embed to stop background playback
+        const audio = document.getElementById('melodifyAudio');
+        if (audio) { audio.pause(); audio.src = ''; }
+        const ytEmbed = document.getElementById('melodifyYTEmbed');
+        if (ytEmbed) { ytEmbed.src = ''; ytEmbed.remove(); }
+        melodifyState.isPlaying = false;
       },
       width: 1100,
       height: 700,
@@ -9229,15 +9368,19 @@ alt="favicon">
                   <div class="photos-grid" id="photosGrid">
                       ${photoList
             .map(
-              (name) => `
-                          <div class="photo-item" onclick="viewPhoto('${name}')">
-                              <img src="${photos[name]}" alt="${name}" class="photo-thumbnail">
-                              <div class="photo-name">${name}</div>
-                              <button class="photo-delete-btn" onclick="event.stopPropagation(); deletePhoto('${name}')">
+              (name) => {
+                const safeName = escapeHtml(name).replace(/'/g, '&#39;');
+                const safeUrl = escapeHtml(photos[name]);
+                return `
+                          <div class="photo-item" onclick="viewPhoto('${safeName}')">
+                              <img src="${safeUrl}" alt="${safeName}" class="photo-thumbnail" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22><rect fill=%22%23282828%22 width=%22200%22 height=%22200%22/><text x=%22100%22 y=%22100%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23555%22 font-size=%2260%22>?</text></svg>'">
+                              <div class="photo-name">${safeName}</div>
+                              <button class="photo-delete-btn" onclick="event.stopPropagation(); deletePhoto('${safeName}')">
                                   <i class="fas fa-trash"></i>
                               </button>
                           </div>
-                      `
+                      `;
+              }
             )
             .join("")}
                   </div>
@@ -10070,7 +10213,7 @@ alt="favicon">
                   <div class="calculator-buttons">
                       <button class="calculator-btn clear" onclick="calcClear()">C</button>
                       <button class="calculator-btn operator" onclick="calcInput('/')">/</button>
-                      <button class="calculator-btn operator" onclick="calcInput('*')">Ã—</button>
+                      <button class="calculator-btn operator" onclick="calcInput('*')">×</button>
       <button class="calculator-btn operator" onclick="calcBackspace()"><i class="fas fa-backspace"></i></button>
 
                       <button class="calculator-btn" onclick="calcInput('7')">7</button>
@@ -10997,290 +11140,1144 @@ print(f'Sum: {sum(numbers)}')
   }
 }
 
-function handleTerminalInput(e) {
-  if (e.key === "Enter") {
-    const input = e.target;
-    const command = input.value.trim();
-    const terminal = document.getElementById("terminalContent");
-    const prompt = `${currentUsername}@Veltra:${getTerminalPath()}$`;
+// ==================== ADVANCED TERMINAL SYSTEM ====================
+// Terminal state
+let terminalHistoryIndex = -1;
+let terminalTempInput = '';
+let terminalAliases = {};
+let terminalEnvVars = {};
+let terminalTabCompletionIndex = -1;
+let terminalTabCompletionMatches = [];
+let terminalTabCompletionBase = '';
 
+// Load terminal aliases and env vars from localStorage
+(function loadTerminalState() {
+  try {
+    terminalAliases = JSON.parse(localStorage.getItem('Veltra_terminalAliases') || '{}');
+    terminalEnvVars = JSON.parse(localStorage.getItem('Veltra_terminalEnvVars') || '{}');
+  } catch(e) { terminalAliases = {}; terminalEnvVars = {}; }
+  // Default env vars
+  if (!terminalEnvVars.HOME) terminalEnvVars.HOME = '~';
+  if (!terminalEnvVars.SHELL) terminalEnvVars.SHELL = '/bin/vsh';
+  if (!terminalEnvVars.USER) terminalEnvVars.USER = currentUsername || 'User';
+  if (!terminalEnvVars.TERM) terminalEnvVars.TERM = 'veltra-256color';
+})();
+
+function saveTerminalAliases() {
+  try { localStorage.setItem('Veltra_terminalAliases', JSON.stringify(terminalAliases)); } catch(e) {}
+}
+function saveTerminalEnvVars() {
+  try { localStorage.setItem('Veltra_terminalEnvVars', JSON.stringify(terminalEnvVars)); } catch(e) {}
+}
+
+// Expand environment variables $VAR and ${VAR} in text
+function expandEnvVars(text) {
+  if (!text || typeof text !== 'string') return text || '';
+  return text.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)/g, (match, g1, g2) => {
+    const varName = g1 || g2;
+    if (varName === 'PWD') return '/' + terminalCwd.join('/') || '/';
+    if (varName === 'USER') return currentUsername;
+    if (varName === 'HOSTNAME') return 'Veltra';
+    if (varName === 'RANDOM') return String(Math.floor(Math.random() * 32768));
+    return terminalEnvVars[varName] !== undefined ? terminalEnvVars[varName] : '';
+  });
+}
+
+// Deep copy a file system node (for cp)
+function deepCopyFSNode(node) {
+  if (typeof node !== 'object' || node === null) return node;
+  const copy = {};
+  for (const key in node) {
+    copy[key] = deepCopyFSNode(node[key]);
+  }
+  return copy;
+}
+
+// Get file size estimate
+function getFileSizeEstimate(node) {
+  if (typeof node === 'string') return new Blob([node]).size;
+  if (typeof node === 'object' && node !== null) {
+    let total = 0;
+    for (const key in node) total += getFileSizeEstimate(node[key]);
+    return total;
+  }
+  return 0;
+}
+
+// Format bytes human-readable
+function formatBytes(bytes) {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+// Recursive search for find command
+function findInFS(node, currentPath, name, type) {
+  const results = [];
+  if (typeof node !== 'object' || node === null) return results;
+  for (const key in node) {
+    const fullPath = currentPath ? currentPath + '/' + key : key;
+    const isDir = typeof node[key] === 'object';
+    const matchesName = !name || matchGlob(key, name);
+    const matchesType = !type || (type === 'd' && isDir) || (type === 'f' && !isDir);
+    if (matchesName && matchesType) results.push(fullPath);
+    if (isDir) results.push(...findInFS(node[key], fullPath, name, type));
+  }
+  return results;
+}
+
+// Simple glob matching (supports * and ?)
+function matchGlob(str, pattern) {
+  const regex = new RegExp('^' + pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.') + '$', 'i');
+  return regex.test(str);
+}
+
+// Grep text in file content
+function grepInFS(node, currentPath, pattern, flags) {
+  const results = [];
+  if (typeof node === 'string') {
+    const lines = node.split('\n');
+    const regex = new RegExp(pattern, flags.includes('i') ? 'i' : '');
+    lines.forEach((line, i) => {
+      if (regex.test(line)) {
+        results.push({ path: currentPath, line: i + 1, text: line });
+      }
+    });
+  } else if (typeof node === 'object' && node !== null) {
+    for (const key in node) {
+      const fullPath = currentPath ? currentPath + '/' + key : key;
+      results.push(...grepInFS(node[key], fullPath, pattern, flags));
+    }
+  }
+  return results;
+}
+
+// Parse flags from args (returns { flags: Set, args: string[] })
+function parseTerminalFlags(cmdArgs) {
+  const flags = new Set();
+  const args = [];
+  for (const arg of cmdArgs) {
+    if (arg.startsWith('-') && arg.length > 1 && !arg.startsWith('--')) {
+      for (let i = 1; i < arg.length; i++) flags.add(arg[i]);
+    } else if (arg.startsWith('--')) {
+      flags.add(arg.slice(2));
+    } else {
+      args.push(arg);
+    }
+  }
+  return { flags, args };
+}
+
+// Terminal input handler with advanced features: history, tab-completion, pipes, redirects
+function handleTerminalInput(e) {
+  const input = e.target;
+  const terminal = document.getElementById("terminalContent");
+
+  // Tab completion
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    handleTerminalTabCompletion(input);
+    return;
+  }
+
+  // Arrow Up/Down for history navigation
+  if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+    e.preventDefault();
+    const history = JSON.parse(localStorage.getItem('Veltra_terminalHistory') || '[]');
+    if (history.length === 0) return;
+    if (e.key === 'ArrowUp') {
+      if (terminalHistoryIndex === -1) {
+        terminalTempInput = input.value;
+        terminalHistoryIndex = history.length - 1;
+      } else if (terminalHistoryIndex > 0) {
+        terminalHistoryIndex--;
+      }
+      input.value = history[terminalHistoryIndex] || '';
+    } else {
+      if (terminalHistoryIndex === -1) return;
+      terminalHistoryIndex++;
+      if (terminalHistoryIndex >= history.length) {
+        terminalHistoryIndex = -1;
+        input.value = terminalTempInput;
+      } else {
+        input.value = history[terminalHistoryIndex] || '';
+      }
+    }
+    setTimeout(() => { input.selectionStart = input.selectionEnd = input.value.length; }, 0);
+    terminalTabCompletionIndex = -1;
+    return;
+  }
+
+  // Ctrl+C to cancel
+  if (e.key === 'c' && e.ctrlKey) {
+    e.preventDefault();
+    const prompt = `${currentUsername}@Veltra:${getTerminalPath()}$`;
     const cmdLine = document.createElement("div");
     cmdLine.className = "terminal-line";
-    cmdLine.innerHTML = `<span class="terminal-prompt">${prompt} </span>${escapeHtml(command)}`;
+    cmdLine.innerHTML = `<span class="terminal-prompt">${prompt} </span>${escapeHtml(input.value)}^C`;
     terminal.insertBefore(cmdLine, terminal.lastElementChild);
+    input.value = '';
+    terminalHistoryIndex = -1;
+    terminal.scrollTop = terminal.scrollHeight;
+    return;
+  }
 
-    const output = document.createElement("div");
-    output.className = "terminal-line";
+  // Ctrl+L to clear
+  if (e.key === 'l' && e.ctrlKey) {
+    e.preventDefault();
+    terminal.innerHTML = '';
+    const inputLine = document.createElement("div");
+    inputLine.className = "terminal-line";
+    const prompt = `${currentUsername}@Veltra:${getTerminalPath()}$`;
+    inputLine.innerHTML = `<span class="terminal-prompt">${prompt} </span><input type="text" class="terminal-input" id="terminalInput" onkeydown="handleTerminalInput(event)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">`;
+    terminal.appendChild(inputLine);
+    document.getElementById("terminalInput")?.focus();
+    return;
+  }
 
-    // Parse command and arguments
-    const args = command.match(/(?:[^\s"]+|"[^"]*")+/g) || [];
+  // Reset tab completion on any other key
+  if (e.key !== 'Tab') {
+    terminalTabCompletionIndex = -1;
+    terminalTabCompletionMatches = [];
+  }
+
+  if (e.key !== "Enter") return;
+
+  let command = input.value.trim();
+  const prompt = `${currentUsername}@Veltra:${getTerminalPath()}$`;
+
+  const cmdLine = document.createElement("div");
+  cmdLine.className = "terminal-line";
+  cmdLine.innerHTML = `<span class="terminal-prompt">${prompt} </span>${escapeHtml(command)}`;
+  terminal.insertBefore(cmdLine, terminal.lastElementChild);
+
+  terminalHistoryIndex = -1;
+  terminalTempInput = '';
+
+  if (!command) {
+    recreateTerminalPrompt(terminal);
+    return;
+  }
+
+  // Expand aliases (first word only)
+  const firstWord = command.split(/\s+/)[0];
+  if (terminalAliases[firstWord]) {
+    command = command.replace(firstWord, terminalAliases[firstWord]);
+  }
+
+  // Expand environment variables
+  command = expandEnvVars(command);
+
+  // Handle output redirection (> and >>)
+  let redirectTarget = null;
+  let redirectAppend = false;
+  const redirectMatch = command.match(/^(.+?)\s*(>>|>)\s*(.+)$/);
+  if (redirectMatch) {
+    command = redirectMatch[1].trim();
+    redirectAppend = redirectMatch[2] === '>>';
+    redirectTarget = redirectMatch[3].trim();
+  }
+
+  // Handle pipe chains
+  const pipeSegments = command.split(/\s*\|\s*/);
+  let pipeInput = null;
+
+  const output = document.createElement("div");
+  output.className = "terminal-line";
+
+  for (let pipeIdx = 0; pipeIdx < pipeSegments.length; pipeIdx++) {
+    const segment = pipeSegments[pipeIdx].trim();
+    if (!segment) continue;
+
+    const args = segment.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
     const cmd = args[0]?.toLowerCase();
-    const cmdArgs = args.slice(1).map(a => a.replace(/^"|"$/g, ''));
+    const cmdArgs = args.slice(1).map(a => a.replace(/^["']|["']$/g, ''));
+
+    const isLastPipe = pipeIdx === pipeSegments.length - 1;
+    let cmdOutput = '';
 
     if (cmd === "help") {
-      output.innerHTML =
-        '<span style="color: var(--accent);">Veltra Terminal - Available Commands:</span><br><br>' +
+      cmdOutput =
+        '<span style="color: var(--accent);">Veltra Terminal v3.0 \u2014 Advanced Shell</span><br><br>' +
         '<span style="color: #60a5fa;">Navigation:</span><br>' +
-        '  cd [dir]      - Change directory<br>' +
-        '  pwd           - Print working directory<br>' +
-        '  ls [dir]      - List directory contents<br><br>' +
+        '  cd [dir]          \u2014 Change directory<br>' +
+        '  pwd               \u2014 Print working directory<br>' +
+        '  ls [-l] [-a] [dir]\u2014 List directory contents<br>' +
+        '  tree [dir]        \u2014 Show directory tree<br><br>' +
         '<span style="color: #60a5fa;">File Operations:</span><br>' +
-        '  cat [file]    - Display file contents<br>' +
-        '  mkdir [name]  - Create directory<br>' +
-        '  touch [name]  - Create empty file<br>' +
-        '  rm [name]     - Remove file or empty folder<br><br>' +
-        '<span style="color: #60a5fa;">System Info:</span><br>' +
-        '  neofetch      - Display system information<br>' +
-        '  whoami        - Display current username<br>' +
-        '  hostname      - Display hostname<br>' +
-        '  uptime        - Show system uptime<br>' +
-        '  date          - Show current date and time<br><br>' +
+        '  cat [file...]     \u2014 Display file contents<br>' +
+        '  head [-n N] file  \u2014 Show first N lines (default 10)<br>' +
+        '  tail [-n N] file  \u2014 Show last N lines (default 10)<br>' +
+        '  wc [file]         \u2014 Word/line/char count<br>' +
+        '  mkdir [-p] name   \u2014 Create directory (-p: parents)<br>' +
+        '  touch name        \u2014 Create empty file<br>' +
+        '  rm [-r] [-f] name \u2014 Remove file/directory<br>' +
+        '  cp src dest       \u2014 Copy file or directory<br>' +
+        '  mv src dest       \u2014 Move/rename file or directory<br>' +
+        '  write file text   \u2014 Write text to file<br><br>' +
+        '<span style="color: #60a5fa;">Search & Filter:</span><br>' +
+        '  grep [-i] [-r] pattern [file] \u2014 Search text in files<br>' +
+        '  find [dir] -name pattern      \u2014 Find files by name<br>' +
+        '  sort [file]       \u2014 Sort lines alphabetically<br>' +
+        '  uniq [file]       \u2014 Remove duplicate lines<br><br>' +
+        '<span style="color: #60a5fa;">I/O & Piping:</span><br>' +
+        '  echo [text]       \u2014 Display text (supports $VAR)<br>' +
+        '  cmd1 | cmd2       \u2014 Pipe output between commands<br>' +
+        '  cmd > file        \u2014 Redirect output to file<br>' +
+        '  cmd >> file       \u2014 Append output to file<br><br>' +
+        '<span style="color: #60a5fa;">System & Environment:</span><br>' +
+        '  neofetch          \u2014 Display system information<br>' +
+        '  whoami            \u2014 Current username<br>' +
+        '  hostname          \u2014 Display hostname<br>' +
+        '  uptime            \u2014 Show system uptime<br>' +
+        '  date [-u]         \u2014 Show current date/time<br>' +
+        '  uname [-a]        \u2014 System information<br>' +
+        '  df                \u2014 Disk usage statistics<br>' +
+        '  du [dir]          \u2014 Directory size estimate<br>' +
+        '  env               \u2014 Show environment variables<br>' +
+        '  export VAR=val    \u2014 Set environment variable<br>' +
+        '  unset VAR         \u2014 Remove environment variable<br>' +
+        '  alias name=cmd    \u2014 Create command alias<br>' +
+        '  unalias name      \u2014 Remove alias<br>' +
+        '  type cmd          \u2014 Show command type<br>' +
+        '  which cmd         \u2014 Show if command exists<br><br>' +
         '<span style="color: #60a5fa;">Applications:</span><br>' +
-        '  apps          - List installed applications<br>' +
-        '  themes        - List installed themes<br>' +
-        '  open [app]    - Open an application<br><br>' +
-        '<span style="color: #60a5fa;">Other:</span><br>' +
-        '  echo [text]   - Display text<br>' +
-        '  clear         - Clear terminal<br>' +
-        '  reset-boot    - Reset bootloader preferences<br>' +
-        '  refresh-cache - Purge jsDelivr cache<br>' +
-        '  history       - Show command history<br>' +
-        '  exit          - Close terminal';
+        '  apps              \u2014 List installed applications<br>' +
+        '  themes            \u2014 List installed themes<br>' +
+        '  open [app]        \u2014 Open an application<br>' +
+        '  screenshot        \u2014 Take a screenshot<br><br>' +
+        '<span style="color: #60a5fa;">Utilities:</span><br>' +
+        '  clear / Ctrl+L    \u2014 Clear terminal<br>' +
+        '  history [-c]      \u2014 Show/clear command history<br>' +
+        '  reset-boot        \u2014 Reset bootloader preferences<br>' +
+        '  refresh-cache     \u2014 Purge jsDelivr cache<br>' +
+        '  base64 [-d] text  \u2014 Encode/decode base64<br>' +
+        '  calc expr         \u2014 Evaluate math expression<br>' +
+        '  sleep N           \u2014 Wait N seconds<br>' +
+        '  yes [text]        \u2014 Repeat text (5 lines)<br>' +
+        '  rev [text]        \u2014 Reverse text<br>' +
+        '  exit              \u2014 Close terminal<br><br>' +
+        '<span style="color: #60a5fa;">Keyboard Shortcuts:</span><br>' +
+        '  \u2191/\u2193               \u2014 Navigate command history<br>' +
+        '  Tab               \u2014 Auto-complete files/commands<br>' +
+        '  Ctrl+C            \u2014 Cancel current input<br>' +
+        '  Ctrl+L            \u2014 Clear screen';
     } else if (cmd === "cd") {
-      if (!cmdArgs[0] || cmdArgs[0] === '~') {
+      if (!cmdArgs[0] || cmdArgs[0] === '~' || cmdArgs[0] === '-') {
         terminalCwd = [];
-        output.innerHTML = '';
+        cmdOutput = '';
       } else {
         const newPath = resolvePath(cmdArgs[0]);
         const node = getFSNode(newPath);
         if (node === null) {
-          output.innerHTML = `<span style="color: #ef4444;">cd: no such directory: ${cmdArgs[0]}</span>`;
+          cmdOutput = `<span style="color: #ef4444;">cd: no such directory: ${escapeHtml(cmdArgs[0])}</span>`;
         } else if (typeof node !== 'object') {
-          output.innerHTML = `<span style="color: #ef4444;">cd: not a directory: ${cmdArgs[0]}</span>`;
+          cmdOutput = `<span style="color: #ef4444;">cd: not a directory: ${escapeHtml(cmdArgs[0])}</span>`;
         } else {
           terminalCwd = newPath;
-          output.innerHTML = '';
+          cmdOutput = '';
         }
       }
     } else if (cmd === "pwd") {
-      output.textContent = '/' + terminalCwd.join('/') || '/';
+      cmdOutput = '/' + (terminalCwd.length > 0 ? terminalCwd.join('/') : '');
     } else if (cmd === "ls") {
+      const { flags, args: lsArgs } = parseTerminalFlags(cmdArgs);
       let targetPath = terminalCwd;
-      if (cmdArgs[0]) {
-        targetPath = resolvePath(cmdArgs[0]);
-      }
+      if (lsArgs[0]) targetPath = resolvePath(lsArgs[0]);
       const node = getFSNode(targetPath);
       if (node === null) {
-        output.innerHTML = `<span style="color: #ef4444;">ls: cannot access '${cmdArgs[0] || '.'}': No such file or directory</span>`;
+        cmdOutput = `<span style="color: #ef4444;">ls: cannot access '${escapeHtml(lsArgs[0] || '.')}': No such file or directory</span>`;
       } else if (typeof node !== 'object') {
-        output.textContent = cmdArgs[0];
+        cmdOutput = escapeHtml(String(lsArgs[0]));
       } else {
-        const entries = Object.keys(node);
+        let entries = Object.keys(node).sort();
+        if (!flags.has('a')) entries = entries.filter(e => !e.startsWith('.'));
         if (entries.length === 0) {
-          output.innerHTML = '<span style="color: #888;">(empty directory)</span>';
-        } else {
-          const formatted = entries.map(e => {
+          cmdOutput = '<span style="color: #888;">(empty directory)</span>';
+        } else if (flags.has('l')) {
+          const lines = entries.map(e => {
             const isDir = typeof node[e] === 'object';
-            return isDir 
-              ? `<span style="color: #3b82f6;"><i class="fas fa-folder"></i> ${e}/</span>` 
-              : `<i class="fas fa-file-alt"></i> ${e}`;
+            const size = getFileSizeEstimate(node[e]);
+            const type = isDir ? '<span style="color: #3b82f6;">d</span>' : '-';
+            const perms = isDir ? 'rwxr-xr-x' : 'rw-r--r--';
+            const color = isDir ? 'color: #3b82f6;' : '';
+            return `${type}${perms}  ${escapeHtml(currentUsername).padEnd(10)} ${formatBytes(size).padStart(8)}  <span style="${color}">${escapeHtml(e)}${isDir ? '/' : ''}</span>`;
+          });
+          cmdOutput = lines.join('<br>');
+        } else {
+          cmdOutput = entries.map(e => {
+            const isDir = typeof node[e] === 'object';
+            return isDir
+              ? `<span style="color: #3b82f6;">${escapeHtml(e)}/</span>`
+              : escapeHtml(e);
           }).join('  ');
-          output.innerHTML = formatted;
         }
       }
-    } else if (cmd === "cat") {
-      if (!cmdArgs[0]) {
-        output.innerHTML = '<span style="color: #ef4444;">cat: missing file operand</span>';
+    } else if (cmd === "tree") {
+      const treePath = cmdArgs[0] ? resolvePath(cmdArgs[0]) : terminalCwd;
+      const treeNode = getFSNode(treePath);
+      if (treeNode === null || typeof treeNode !== 'object') {
+        cmdOutput = `<span style="color: #ef4444;">tree: '${escapeHtml(cmdArgs[0] || '.')}': Not a directory</span>`;
       } else {
-        const filePath = resolvePath(cmdArgs[0]);
-        const node = getFSNode(filePath);
-        if (node === null) {
-          output.innerHTML = `<span style="color: #ef4444;">cat: ${cmdArgs[0]}: No such file or directory</span>`;
-        } else if (typeof node === 'object') {
-          output.innerHTML = `<span style="color: #ef4444;">cat: ${cmdArgs[0]}: Is a directory</span>`;
+        let dirs = 0, files = 0;
+        function buildTree(node, prefix) {
+          const entries = Object.keys(node).sort();
+          let result = '';
+          entries.forEach((e, i) => {
+            const isLast = i === entries.length - 1;
+            const connector = isLast ? '\u2514\u2500\u2500 ' : '\u251C\u2500\u2500 ';
+            const extension = isLast ? '    ' : '\u2502   ';
+            const isDir = typeof node[e] === 'object';
+            if (isDir) { dirs++; } else { files++; }
+            const nameSpan = isDir ? `<span style="color: #3b82f6;">${escapeHtml(e)}/</span>` : escapeHtml(e);
+            result += prefix + connector + nameSpan + '\n';
+            if (isDir) result += buildTree(node[e], prefix + extension);
+          });
+          return result;
+        }
+        const rootName = cmdArgs[0] || '.';
+        cmdOutput = `<pre style="margin:0;font-family:inherit;line-height:1.5;"><span style="color:#3b82f6;">${escapeHtml(rootName)}</span>\n${buildTree(treeNode, '')}\n${dirs} directories, ${files} files</pre>`;
+      }
+    } else if (cmd === "cat") {
+      if (!cmdArgs[0] && pipeInput === null) {
+        cmdOutput = '<span style="color: #ef4444;">cat: missing file operand</span>';
+      } else if (pipeInput !== null && !cmdArgs[0]) {
+        cmdOutput = '<pre style="margin: 0; font-family: inherit; white-space: pre-wrap;">' + escapeHtml(pipeInput) + '</pre>';
+      } else {
+        const contents = [];
+        let catError = false;
+        for (const f of cmdArgs) {
+          const filePath = resolvePath(f);
+          const node = getFSNode(filePath);
+          if (node === null) {
+            cmdOutput = `<span style="color: #ef4444;">cat: ${escapeHtml(f)}: No such file or directory</span>`;
+            catError = true; break;
+          } else if (typeof node === 'object') {
+            cmdOutput = `<span style="color: #ef4444;">cat: ${escapeHtml(f)}: Is a directory</span>`;
+            catError = true; break;
+          } else {
+            contents.push(node);
+          }
+        }
+        if (!catError) {
+          const combined = contents.join('\n');
+          cmdOutput = '<pre style="margin: 0; font-family: inherit; white-space: pre-wrap;">' + escapeHtml(combined) + '</pre>';
+          pipeInput = combined;
+          if (!isLastPipe) continue;
+        }
+      }
+    } else if (cmd === "head") {
+      const { flags, args: headArgs } = parseTerminalFlags(cmdArgs);
+      const nIdx = cmdArgs.indexOf('-n');
+      const n = nIdx !== -1 && cmdArgs[nIdx + 1] ? parseInt(cmdArgs[nIdx + 1]) || 10 : 10;
+      const fileArg = headArgs.find(a => a !== String(n));
+      const text = pipeInput !== null && !fileArg ? pipeInput : (() => {
+        if (!fileArg) return null;
+        const node = getFSNode(resolvePath(fileArg));
+        return typeof node === 'string' ? node : null;
+      })();
+      if (text === null) {
+        cmdOutput = '<span style="color: #ef4444;">head: missing file operand</span>';
+      } else {
+        const lines = text.split('\n').slice(0, n).join('\n');
+        cmdOutput = '<pre style="margin: 0; font-family: inherit; white-space: pre-wrap;">' + escapeHtml(lines) + '</pre>';
+        pipeInput = lines;
+        if (!isLastPipe) continue;
+      }
+    } else if (cmd === "tail") {
+      const { flags, args: tailArgs } = parseTerminalFlags(cmdArgs);
+      const nIdx = cmdArgs.indexOf('-n');
+      const n = nIdx !== -1 && cmdArgs[nIdx + 1] ? parseInt(cmdArgs[nIdx + 1]) || 10 : 10;
+      const fileArg = tailArgs.find(a => a !== String(n));
+      const text = pipeInput !== null && !fileArg ? pipeInput : (() => {
+        if (!fileArg) return null;
+        const node = getFSNode(resolvePath(fileArg));
+        return typeof node === 'string' ? node : null;
+      })();
+      if (text === null) {
+        cmdOutput = '<span style="color: #ef4444;">tail: missing file operand</span>';
+      } else {
+        const allLines = text.split('\n');
+        const lines = allLines.slice(Math.max(0, allLines.length - n)).join('\n');
+        cmdOutput = '<pre style="margin: 0; font-family: inherit; white-space: pre-wrap;">' + escapeHtml(lines) + '</pre>';
+        pipeInput = lines;
+        if (!isLastPipe) continue;
+      }
+    } else if (cmd === "wc") {
+      const fileArg = cmdArgs[0];
+      const text = pipeInput !== null && !fileArg ? pipeInput : (() => {
+        if (!fileArg) return null;
+        const node = getFSNode(resolvePath(fileArg));
+        return typeof node === 'string' ? node : null;
+      })();
+      if (text === null) {
+        cmdOutput = '<span style="color: #ef4444;">wc: missing file operand</span>';
+      } else {
+        const lineCount = text.split('\n').length;
+        const words = text.split(/\s+/).filter(w => w).length;
+        const chars = text.length;
+        const result = `  ${lineCount} lines, ${words} words, ${chars} chars` + (fileArg ? `  ${escapeHtml(fileArg)}` : '');
+        cmdOutput = result;
+        pipeInput = result;
+        if (!isLastPipe) continue;
+      }
+    } else if (cmd === "sort") {
+      const fileArg = cmdArgs[0];
+      const text = pipeInput !== null && !fileArg ? pipeInput : (() => {
+        if (!fileArg) return null;
+        const node = getFSNode(resolvePath(fileArg));
+        return typeof node === 'string' ? node : null;
+      })();
+      if (text === null) {
+        cmdOutput = '<span style="color: #ef4444;">sort: missing file operand</span>';
+      } else {
+        const sorted = text.split('\n').sort().join('\n');
+        cmdOutput = '<pre style="margin: 0; font-family: inherit; white-space: pre-wrap;">' + escapeHtml(sorted) + '</pre>';
+        pipeInput = sorted;
+        if (!isLastPipe) continue;
+      }
+    } else if (cmd === "uniq") {
+      const fileArg = cmdArgs[0];
+      const text = pipeInput !== null && !fileArg ? pipeInput : (() => {
+        if (!fileArg) return null;
+        const node = getFSNode(resolvePath(fileArg));
+        return typeof node === 'string' ? node : null;
+      })();
+      if (text === null) {
+        cmdOutput = '<span style="color: #ef4444;">uniq: missing file operand</span>';
+      } else {
+        const unique = text.split('\n').filter((line, i, arr) => i === 0 || line !== arr[i - 1]).join('\n');
+        cmdOutput = '<pre style="margin: 0; font-family: inherit; white-space: pre-wrap;">' + escapeHtml(unique) + '</pre>';
+        pipeInput = unique;
+        if (!isLastPipe) continue;
+      }
+    } else if (cmd === "grep") {
+      const { flags, args: grepArgs } = parseTerminalFlags(cmdArgs);
+      const pattern = grepArgs[0];
+      if (!pattern) {
+        cmdOutput = '<span style="color: #ef4444;">grep: missing pattern</span>';
+      } else {
+        let text, searchPath;
+        if (pipeInput !== null && !grepArgs[1]) {
+          text = pipeInput;
         } else {
-          output.innerHTML = '<pre style="margin: 0; font-family: inherit; white-space: pre-wrap;">' + escapeHtml(node) + '</pre>';
+          searchPath = grepArgs[1] ? resolvePath(grepArgs[1]) : terminalCwd;
+        }
+        if (text !== undefined) {
+          try {
+            const regex = new RegExp(pattern, flags.has('i') ? 'gi' : 'g');
+            const lines = text.split('\n').filter(l => regex.test(l));
+            if (lines.length === 0) {
+              cmdOutput = '<span style="color: #888;">(no matches)</span>';
+            } else {
+              const highlighted = lines.map(l => {
+                return escapeHtml(l).replace(new RegExp(escapeHtml(pattern), flags.has('i') ? 'gi' : 'g'),
+                  m => `<span style="color:#ef4444;font-weight:bold;">${m}</span>`);
+              }).join('<br>');
+              cmdOutput = highlighted;
+              pipeInput = lines.join('\n');
+              if (!isLastPipe) continue;
+            }
+          } catch(regexErr) {
+            cmdOutput = `<span style="color: #ef4444;">grep: invalid regex: ${escapeHtml(pattern)}</span>`;
+          }
+        } else {
+          const node = getFSNode(searchPath);
+          if (node === null) {
+            cmdOutput = `<span style="color: #ef4444;">grep: ${escapeHtml(grepArgs[1] || '.')}: No such file or directory</span>`;
+          } else {
+            const flagStr = flags.has('i') ? 'i' : '';
+            const results = typeof node === 'string'
+              ? grepInFS(node, grepArgs[1] || '.', pattern, flagStr)
+              : (flags.has('r') ? grepInFS(node, grepArgs[1] || '.', pattern, flagStr) : []);
+            if (results.length === 0) {
+              cmdOutput = '<span style="color: #888;">(no matches)</span>';
+            } else {
+              cmdOutput = results.slice(0, 100).map(r => {
+                return `<span style="color:#8b5cf6;">${escapeHtml(r.path)}</span>:<span style="color:#888;">${r.line}</span>: ${escapeHtml(r.text)}`;
+              }).join('<br>');
+              if (results.length > 100) cmdOutput += `<br><span style="color:#888;">... and ${results.length - 100} more matches</span>`;
+            }
+          }
+        }
+      }
+    } else if (cmd === "find") {
+      let searchDir = cmdArgs[0] || '.';
+      let namePattern = null;
+      let typeFilter = null;
+      for (let i = 0; i < cmdArgs.length; i++) {
+        if (cmdArgs[i] === '-name' && cmdArgs[i + 1]) namePattern = cmdArgs[++i];
+        if (cmdArgs[i] === '-type' && cmdArgs[i + 1]) typeFilter = cmdArgs[++i];
+      }
+      const searchPath = resolvePath(searchDir);
+      const searchNode = getFSNode(searchPath);
+      if (searchNode === null || typeof searchNode !== 'object') {
+        cmdOutput = `<span style="color: #ef4444;">find: '${escapeHtml(searchDir)}': No such directory</span>`;
+      } else {
+        const results = findInFS(searchNode, searchDir === '.' ? '' : searchDir, namePattern, typeFilter);
+        if (results.length === 0) {
+          cmdOutput = '<span style="color: #888;">(no matches)</span>';
+        } else {
+          cmdOutput = results.map(r => escapeHtml(searchDir === '.' ? './' + r : r)).join('<br>');
         }
       }
     } else if (cmd === "mkdir") {
-      if (!cmdArgs[0]) {
-        output.innerHTML = '<span style="color: #ef4444;">mkdir: missing operand</span>';
+      const { flags, args: mkdirArgs } = parseTerminalFlags(cmdArgs);
+      if (!mkdirArgs[0]) {
+        cmdOutput = '<span style="color: #ef4444;">mkdir: missing operand</span>';
+      } else if (flags.has('p')) {
+        const pathParts = mkdirArgs[0].startsWith('/') || mkdirArgs[0].startsWith('~')
+          ? mkdirArgs[0].replace(/^[~\/]+/, '').split('/').filter(p => p)
+          : [...terminalCwd, ...mkdirArgs[0].split('/').filter(p => p)];
+        let current = fileSystem;
+        let created = false;
+        for (const part of pathParts) {
+          if (!(part in current)) {
+            current[part] = {};
+            created = true;
+          } else if (typeof current[part] !== 'object') {
+            cmdOutput = `<span style="color: #ef4444;">mkdir: '${escapeHtml(part)}' exists and is not a directory</span>`;
+            break;
+          }
+          current = current[part];
+        }
+        if (!cmdOutput) {
+          saveFS(fileSystem);
+          cmdOutput = created ? `<span style="color: #4ade80;">\u2713 Created directory path: ${escapeHtml(mkdirArgs[0])}</span>` : '';
+        }
       } else {
-        const newPath = resolvePath(cmdArgs[0]);
+        const newPath = resolvePath(mkdirArgs[0]);
         const parentPath = newPath.slice(0, -1);
         const dirName = newPath[newPath.length - 1];
         const parent = newPath.length === 1 ? fileSystem : getFSNode(parentPath);
-        
         if (parent === null || typeof parent !== 'object') {
-          output.innerHTML = `<span style="color: #ef4444;">mkdir: cannot create directory '${cmdArgs[0]}': No such file or directory</span>`;
+          cmdOutput = `<span style="color: #ef4444;">mkdir: cannot create directory '${escapeHtml(mkdirArgs[0])}': No such file or directory</span>`;
         } else if (dirName in parent) {
-          output.innerHTML = `<span style="color: #ef4444;">mkdir: cannot create directory '${cmdArgs[0]}': File exists</span>`;
+          cmdOutput = `<span style="color: #ef4444;">mkdir: cannot create directory '${escapeHtml(mkdirArgs[0])}': File exists</span>`;
         } else {
           parent[dirName] = {};
           saveFS(fileSystem);
-          output.innerHTML = `<span style="color: #4ade80;">âœ" Created directory: ${dirName}</span>`;
+          cmdOutput = `<span style="color: #4ade80;">\u2713 Created directory: ${escapeHtml(dirName)}</span>`;
         }
       }
     } else if (cmd === "touch") {
       if (!cmdArgs[0]) {
-        output.innerHTML = '<span style="color: #ef4444;">touch: missing file operand</span>';
+        cmdOutput = '<span style="color: #ef4444;">touch: missing file operand</span>';
       } else {
-        const newPath = resolvePath(cmdArgs[0]);
-        const parentPath = newPath.slice(0, -1);
-        const fileName = newPath[newPath.length - 1];
-        const parent = newPath.length === 1 ? fileSystem : getFSNode(parentPath);
-        
-        if (parent === null || typeof parent !== 'object') {
-          output.innerHTML = `<span style="color: #ef4444;">touch: cannot create '${cmdArgs[0]}': No such file or directory</span>`;
-        } else if (fileName in parent && typeof parent[fileName] === 'object') {
-          output.innerHTML = `<span style="color: #ef4444;">touch: cannot overwrite directory '${cmdArgs[0]}'</span>`;
-        } else {
-          parent[fileName] = parent[fileName] || '';
+        let touchError = false;
+        for (const f of cmdArgs) {
+          const newPath = resolvePath(f);
+          const parentPath = newPath.slice(0, -1);
+          const fileName = newPath[newPath.length - 1];
+          const parent = newPath.length === 1 ? fileSystem : getFSNode(parentPath);
+          if (parent === null || typeof parent !== 'object') {
+            cmdOutput = `<span style="color: #ef4444;">touch: cannot create '${escapeHtml(f)}': No such directory</span>`;
+            touchError = true; break;
+          } else if (fileName in parent && typeof parent[fileName] === 'object') {
+            cmdOutput = `<span style="color: #ef4444;">touch: cannot overwrite directory '${escapeHtml(f)}'</span>`;
+            touchError = true; break;
+          } else {
+            parent[fileName] = parent[fileName] || '';
+          }
+        }
+        if (!touchError) {
           saveFS(fileSystem);
-          output.innerHTML = `<span style="color: #4ade80;">âœ" Created file: ${fileName}</span>`;
+          cmdOutput = `<span style="color: #4ade80;">\u2713 Created ${cmdArgs.length} file${cmdArgs.length > 1 ? 's' : ''}</span>`;
         }
       }
     } else if (cmd === "rm") {
-      if (!cmdArgs[0]) {
-        output.innerHTML = '<span style="color: #ef4444;">rm: missing operand</span>';
+      const { flags, args: rmArgs } = parseTerminalFlags(cmdArgs);
+      if (!rmArgs[0]) {
+        cmdOutput = '<span style="color: #ef4444;">rm: missing operand</span>';
       } else {
-        const targetPath = resolvePath(cmdArgs[0]);
+        const targetPath = resolvePath(rmArgs[0]);
         const node = getFSNode(targetPath);
-        
         if (node === null) {
-          output.innerHTML = `<span style="color: #ef4444;">rm: cannot remove '${cmdArgs[0]}': No such file or directory</span>`;
-        } else if (typeof node === 'object' && Object.keys(node).length > 0) {
-          output.innerHTML = `<span style="color: #ef4444;">rm: cannot remove '${cmdArgs[0]}': Directory not empty (use rm -r)</span>`;
+          if (!flags.has('f')) {
+            cmdOutput = `<span style="color: #ef4444;">rm: cannot remove '${escapeHtml(rmArgs[0])}': No such file or directory</span>`;
+          }
+        } else if (typeof node === 'object' && Object.keys(node).length > 0 && !flags.has('r')) {
+          cmdOutput = `<span style="color: #ef4444;">rm: cannot remove '${escapeHtml(rmArgs[0])}': Directory not empty (use rm -r)</span>`;
         } else {
           deleteFSNode(targetPath);
-          output.innerHTML = `<span style="color: #4ade80;">âœ" Removed: ${cmdArgs[0]}</span>`;
+          saveFS(fileSystem);
+          cmdOutput = `<span style="color: #4ade80;">\u2713 Removed: ${escapeHtml(rmArgs[0])}</span>`;
+        }
+      }
+    } else if (cmd === "cp") {
+      if (cmdArgs.length < 2) {
+        cmdOutput = '<span style="color: #ef4444;">cp: missing destination operand</span>';
+      } else {
+        const srcPath = resolvePath(cmdArgs[0]);
+        const destPath = resolvePath(cmdArgs[1]);
+        const srcNode = getFSNode(srcPath);
+        if (srcNode === null) {
+          cmdOutput = `<span style="color: #ef4444;">cp: cannot stat '${escapeHtml(cmdArgs[0])}': No such file or directory</span>`;
+        } else {
+          const destParentPath = destPath.slice(0, -1);
+          const destName = destPath[destPath.length - 1];
+          const destParent = destPath.length === 1 ? fileSystem : getFSNode(destParentPath);
+          if (!destParent || typeof destParent !== 'object') {
+            cmdOutput = `<span style="color: #ef4444;">cp: cannot copy to '${escapeHtml(cmdArgs[1])}': No such directory</span>`;
+          } else {
+            destParent[destName] = deepCopyFSNode(srcNode);
+            saveFS(fileSystem);
+            cmdOutput = `<span style="color: #4ade80;">\u2713 Copied: ${escapeHtml(cmdArgs[0])} \u2192 ${escapeHtml(cmdArgs[1])}</span>`;
+          }
+        }
+      }
+    } else if (cmd === "mv") {
+      if (cmdArgs.length < 2) {
+        cmdOutput = '<span style="color: #ef4444;">mv: missing destination operand</span>';
+      } else {
+        const srcPath = resolvePath(cmdArgs[0]);
+        const destPath = resolvePath(cmdArgs[1]);
+        const srcNode = getFSNode(srcPath);
+        if (srcNode === null) {
+          cmdOutput = `<span style="color: #ef4444;">mv: cannot stat '${escapeHtml(cmdArgs[0])}': No such file or directory</span>`;
+        } else {
+          const destParentPath = destPath.slice(0, -1);
+          const destName = destPath[destPath.length - 1];
+          const destParent = destPath.length === 1 ? fileSystem : getFSNode(destParentPath);
+          if (!destParent || typeof destParent !== 'object') {
+            cmdOutput = `<span style="color: #ef4444;">mv: cannot move to '${escapeHtml(cmdArgs[1])}': No such directory</span>`;
+          } else {
+            destParent[destName] = deepCopyFSNode(srcNode);
+            deleteFSNode(srcPath);
+            saveFS(fileSystem);
+            cmdOutput = `<span style="color: #4ade80;">\u2713 Moved: ${escapeHtml(cmdArgs[0])} \u2192 ${escapeHtml(cmdArgs[1])}</span>`;
+          }
+        }
+      }
+    } else if (cmd === "write") {
+      if (!cmdArgs[0]) {
+        cmdOutput = '<span style="color: #ef4444;">write: missing file operand</span>';
+      } else {
+        const content = cmdArgs.slice(1).join(' ');
+        const targetPath = resolvePath(cmdArgs[0]);
+        const parentPath = targetPath.slice(0, -1);
+        const parent = targetPath.length === 1 ? fileSystem : getFSNode(parentPath);
+        if (parent && typeof parent === 'object') {
+          parent[targetPath[targetPath.length - 1]] = content;
+          saveFS(fileSystem);
+          cmdOutput = `<span style="color: #4ade80;">\u2713 Written ${content.length} chars to ${escapeHtml(cmdArgs[0])}</span>`;
+        } else {
+          cmdOutput = `<span style="color: #ef4444;">write: cannot write to '${escapeHtml(cmdArgs[0])}': Parent directory not found</span>`;
         }
       }
     } else if (cmd === "neofetch") {
-      output.innerHTML = '<pre style="margin: 0; font-family: monospace; line-height: 1.4;">' + generateNeofetch() + '</pre>';
+      cmdOutput = '<pre style="margin: 0; font-family: monospace; line-height: 1.4;">' + generateNeofetch() + '</pre>';
     } else if (cmd === "hostname") {
-      output.textContent = 'Veltra';
+      cmdOutput = 'Veltra';
     } else if (cmd === "uptime") {
-      output.innerHTML = `<span style="color: var(--accent);">System uptime:</span> ${formatUptime()}`;
+      cmdOutput = `<span style="color: var(--accent);">System uptime:</span> ${formatUptime()}`;
+    } else if (cmd === "uname") {
+      const { flags } = parseTerminalFlags(cmdArgs);
+      if (flags.has('a')) {
+        cmdOutput = `Veltra v2.0 ${navigator.platform || 'Web'} ${navigator.userAgent.split(' ').pop() || 'Unknown'} vsh`;
+      } else {
+        cmdOutput = 'Veltra';
+      }
+    } else if (cmd === "df") {
+      const totalSize = getFileSizeEstimate(fileSystem);
+      const maxStorage = 50 * 1024 * 1024;
+      const usedPct = Math.min(100, (totalSize / maxStorage * 100)).toFixed(1);
+      cmdOutput =
+        'Filesystem      Size    Used    Avail   Use%  Mounted on<br>' +
+        `<span style="color:#60a5fa;">veltra-fs</span>    ${formatBytes(maxStorage).padStart(7)}  ${formatBytes(totalSize).padStart(7)}  ${formatBytes(maxStorage - totalSize).padStart(7)}   ${usedPct.padStart(4)}%  /`;
+    } else if (cmd === "du") {
+      const targetPath = cmdArgs[0] ? resolvePath(cmdArgs[0]) : terminalCwd;
+      const node = getFSNode(targetPath);
+      if (node === null) {
+        cmdOutput = `<span style="color: #ef4444;">du: '${escapeHtml(cmdArgs[0] || '.')}': No such file or directory</span>`;
+      } else {
+        cmdOutput = `${formatBytes(getFileSizeEstimate(node)).padStart(8)}\t${escapeHtml(cmdArgs[0] || '.')}`;
+      }
+    } else if (cmd === "env") {
+      const envLines = Object.entries(terminalEnvVars).map(([k, v]) => `${escapeHtml(k)}=${escapeHtml(v)}`);
+      envLines.push(`PWD=/${terminalCwd.join('/')}`);
+      envLines.push(`USER=${escapeHtml(currentUsername)}`);
+      envLines.push(`HOSTNAME=Veltra`);
+      cmdOutput = envLines.join('<br>');
+    } else if (cmd === "export") {
+      const exportStr = cmdArgs.join(' ');
+      const eqIdx = exportStr.indexOf('=');
+      if (eqIdx === -1) {
+        cmdOutput = '<span style="color: #ef4444;">export: usage: export VAR=value</span>';
+      } else {
+        const varName = exportStr.slice(0, eqIdx).trim();
+        const varValue = exportStr.slice(eqIdx + 1).trim().replace(/^["']|["']$/g, '');
+        if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(varName)) {
+          cmdOutput = `<span style="color: #ef4444;">export: '${escapeHtml(varName)}': not a valid identifier</span>`;
+        } else {
+          terminalEnvVars[varName] = varValue;
+          saveTerminalEnvVars();
+          cmdOutput = '';
+        }
+      }
+    } else if (cmd === "unset") {
+      if (!cmdArgs[0]) {
+        cmdOutput = '<span style="color: #ef4444;">unset: missing variable name</span>';
+      } else {
+        delete terminalEnvVars[cmdArgs[0]];
+        saveTerminalEnvVars();
+        cmdOutput = '';
+      }
+    } else if (cmd === "alias") {
+      if (!cmdArgs[0]) {
+        const lines = Object.entries(terminalAliases).map(([k, v]) => `alias ${escapeHtml(k)}='${escapeHtml(v)}'`);
+        cmdOutput = lines.length > 0 ? lines.join('<br>') : '<span style="color: #888;">No aliases defined</span>';
+      } else {
+        const aliasStr = cmdArgs.join(' ');
+        const eqIdx = aliasStr.indexOf('=');
+        if (eqIdx === -1) {
+          cmdOutput = terminalAliases[cmdArgs[0]]
+            ? `alias ${escapeHtml(cmdArgs[0])}='${escapeHtml(terminalAliases[cmdArgs[0]])}'`
+            : `<span style="color: #ef4444;">alias: ${escapeHtml(cmdArgs[0])}: not found</span>`;
+        } else {
+          const name = aliasStr.slice(0, eqIdx).trim();
+          const val = aliasStr.slice(eqIdx + 1).trim().replace(/^["']|["']$/g, '');
+          terminalAliases[name] = val;
+          saveTerminalAliases();
+          cmdOutput = '';
+        }
+      }
+    } else if (cmd === "unalias") {
+      if (!cmdArgs[0]) {
+        cmdOutput = '<span style="color: #ef4444;">unalias: missing alias name</span>';
+      } else {
+        delete terminalAliases[cmdArgs[0]];
+        saveTerminalAliases();
+        cmdOutput = '';
+      }
+    } else if (cmd === "type" || cmd === "which") {
+      if (!cmdArgs[0]) {
+        cmdOutput = `<span style="color: #ef4444;">${escapeHtml(cmd)}: missing argument</span>`;
+      } else {
+        const target = cmdArgs[0].toLowerCase();
+        const builtins = ['help','cd','pwd','ls','tree','cat','head','tail','wc','sort','uniq','grep','find',
+          'mkdir','touch','rm','cp','mv','write','neofetch','hostname','uptime','uname','df','du','env',
+          'export','unset','alias','unalias','type','which','apps','open','themes','whoami','reset-boot',
+          'refresh-cache','clear','date','echo','history','exit','base64','calc','sleep','yes','rev',
+          'screenshot','hexdump','chmod','id','printenv'];
+        if (terminalAliases[target]) {
+          cmdOutput = `${escapeHtml(target)} is aliased to '${escapeHtml(terminalAliases[target])}'`;
+        } else if (builtins.includes(target)) {
+          cmdOutput = `${escapeHtml(target)} is a shell builtin`;
+        } else {
+          cmdOutput = `<span style="color: #ef4444;">${escapeHtml(cmd)}: ${escapeHtml(target)}: not found</span>`;
+        }
+      }
     } else if (cmd === "apps") {
-      const appList = [
-        "files       - File manager and explorer",
-        "terminal    - Command line interface",
-        "browser     - Web browser",
-        "settings    - System settings",
-        "texteditor  - Edit text files",
-        "music       - Music player",
-        "photos      - Photo viewer",
-        "help        - System help and documentation",
-        "whatsnew    - View latest features",
-        "appstore    - Browse and install apps/themes",
-        "snake       - Classic snake game",
-        "2048        - 2048 puzzle game",
-        "tictactoe   - Tic Tac Toe game",
-        "ai-snake    - AI Snake Learning",
-      ];
-      output.innerHTML =
+      const appList = Object.entries(appMetadata)
+        .filter(([key, meta]) => meta.preinstalled || installedApps.includes(key))
+        .map(([key, meta]) => ({name: key, label: meta.name}));
+      cmdOutput =
         '<span style="color: var(--accent);">Installed Applications:</span><br>' +
         '<span style="color: #888;">Use "open [appname]" to launch</span><br><br>' +
-        appList.map((app) => `  <span style="color: #60a5fa;">${app.split(' - ')[0].padEnd(12)}</span>${app.split(' - ')[1]}`).join("<br>");
+        appList.map(app => `  <span style="color: #60a5fa;">${escapeHtml(app.name).padEnd(16)}</span>${escapeHtml(app.label)}`).join("<br>");
     } else if (cmd === "open") {
       if (!cmdArgs[0]) {
-        output.innerHTML = '<span style="color: #ef4444;">open: missing application name</span>';
+        cmdOutput = '<span style="color: #ef4444;">open: missing application name</span>';
       } else {
         const appName = cmdArgs[0].toLowerCase().replace(/\s+/g, '');
         const appMap = {
           'files': 'files', 'terminal': 'terminal', 'browser': 'browser',
-          'settings': 'settings', 'texteditor': 'texteditor', 'music': 'music',
-          'photos': 'photos', 'help': 'help', 'whatsnew': 'whatsnew',
-          'appstore': 'appstore', 'snake': 'snake', '2048': '2048',
-          'tictactoe': 'tictactoe', 'ai-snake': 'ai-snake', 'aisnake': 'ai-snake',
-          'calculator': 'calculator', 'veltra-ai': 'veltra-ai', 'veltraAI': 'veltra-ai',
+          'settings': 'settings', 'texteditor': 'editor', 'editor': 'editor',
+          'music': 'melodify', 'melodify': 'melodify', 'photos': 'photos',
+          'help': 'help', 'whatsnew': 'whatsnew', 'appstore': 'appstore',
+          'snake': 'snake', '2048': '2048', 'tictactoe': 'tictactoe',
+          'ai-snake': 'ai-snake', 'aisnake': 'ai-snake', 'calculator': 'calculator',
+          'veltra-ai': 'veltra-ai', 'veltraai': 'veltra-ai', 'youtube': 'youtube',
+          'python': 'python', 'support': 'support', 'cloaking': 'cloaking',
+          'achievements': 'achievements', 'about': 'about', 'v86': 'v86-emulator',
         };
         if (appMap[appName]) {
           openApp(appMap[appName]);
-          output.innerHTML = `<span style="color: #4ade80;">âœ" Opening ${appName}...</span>`;
+          cmdOutput = `<span style="color: #4ade80;">\u2713 Opening ${escapeHtml(appName)}...</span>`;
         } else {
-          output.innerHTML = `<span style="color: #ef4444;">open: application '${cmdArgs[0]}' not found</span>`;
+          cmdOutput = `<span style="color: #ef4444;">open: application '${escapeHtml(cmdArgs[0])}' not found</span><br><span style="color: #888;">Type 'apps' to list available applications</span>`;
         }
       }
     } else if (cmd === "themes") {
       const themeList = ["dark (default)"];
       if (installedThemes.length > 0) {
-        installedThemes.forEach((theme) => {
-          themeList.push(theme);
-        });
+        installedThemes.forEach((theme) => themeList.push(theme));
       }
-      output.innerHTML =
+      cmdOutput =
         '<span style="color: var(--accent);">Installed Themes:</span><br>' +
-        themeList.map((theme) => `  â€¢ ${theme}`).join("<br>");
+        themeList.map((theme) => `  \u2022 ${escapeHtml(theme)}`).join("<br>");
     } else if (cmd === "whoami") {
-      output.textContent = currentUsername;
+      cmdOutput = escapeHtml(currentUsername);
+    } else if (cmd === "id") {
+      const account = getAccountByUsername(currentUsername);
+      const role = account ? account.role : 'standard';
+      cmdOutput = `uid=1000(${escapeHtml(currentUsername)}) gid=1000(${escapeHtml(currentUsername)}) groups=1000(${escapeHtml(currentUsername)})${role === 'superuser' ? ',0(root)' : ''}`;
+    } else if (cmd === "printenv") {
+      if (cmdArgs[0]) {
+        cmdOutput = escapeHtml(terminalEnvVars[cmdArgs[0]] || '');
+      } else {
+        cmdOutput = Object.entries(terminalEnvVars).map(([k,v]) => `${escapeHtml(k)}=${escapeHtml(v)}`).join('<br>');
+      }
     } else if (cmd === "reset-boot") {
       localStorage.removeItem("Veltra_bootChoice");
-      output.innerHTML =
-        '<span style="color: #4ade80;">âœ" Bootloader preferences reset successfully</span><br>' +
+      cmdOutput =
+        '<span style="color: #4ade80;">\u2714 Bootloader preferences reset successfully</span><br>' +
         "The bootloader menu will appear on next page reload.";
     } else if (cmd === "refresh-cache") {
-      output.innerHTML = "Submitting purge request to jsDelivr...<br>";
-      fetch('https://purge.jsdelivr.net/gh/nautilus-os/community@main/files/info.json').catch(e => { });
-      fetch('https://purge.jsdelivr.net/gh/nautilus-os/community@main/apps').catch(e => { });
-      output.innerHTML += '<span style="color: #4ade80;">âœ" Purge request sent.</span><br>' +
-        "Please wait a few moments and try reloading the store.";
+      fetch('https://purge.jsdelivr.net/gh/nautilus-os/community@main/files/info.json').catch(() => {});
+      fetch('https://purge.jsdelivr.net/gh/nautilus-os/community@main/apps').catch(() => {});
+      cmdOutput = '<span style="color: #4ade80;">\u2714 Purge request sent.</span><br>Please wait a few moments and try reloading the store.';
     } else if (cmd === "clear") {
       terminal.innerHTML = `
-                      <div class="terminal-line" style="color: var(--accent);">Veltra Terminal v2.0</div>
+                      <div class="terminal-line" style="color: var(--accent);">Veltra Terminal v3.0</div>
                       <div class="terminal-line" style="color: #888; margin-bottom: 1rem;">Type 'help' for available commands</div>
                   `;
-      terminalCwd = []; // Reset to home
-    } else if (cmd === "date") {
-      output.textContent = new Date().toString();
-    } else if (cmd === "echo") {
-      output.textContent = cmdArgs.join(' ');
-    } else if (cmd === "history") {
-      const history = JSON.parse(localStorage.getItem('Veltra_terminalHistory') || '[]');
-      if (history.length === 0) {
-        output.innerHTML = '<span style="color: #888;">No command history</span>';
-      } else {
-        output.innerHTML = history.slice(-20).map((h, i) => `  ${(i + 1).toString().padStart(3)}  ${h}`).join('<br>');
+      terminalCwd = [];
+      if (command) {
+        const history = JSON.parse(localStorage.getItem('Veltra_terminalHistory') || '[]');
+        history.push(command);
+        if (history.length > 500) history.splice(0, history.length - 500);
+        localStorage.setItem('Veltra_terminalHistory', JSON.stringify(history));
       }
-    } else if (cmd === "exit") {
-      const terminalWindow = terminal.closest('.window');
-      if (terminalWindow) {
-        closeWindow(terminalWindow);
-      }
+      recreateTerminalPrompt(terminal);
       return;
-    } else if (command) {
-      output.innerHTML = `<span style="color: #ef4444;">Command not found: ${cmd}</span><br>Type 'help' for available commands.`;
-    }
-
-    // Save command to history
-    if (command) {
+    } else if (cmd === "date") {
+      const { flags } = parseTerminalFlags(cmdArgs);
+      cmdOutput = flags.has('u') ? new Date().toUTCString() : new Date().toString();
+    } else if (cmd === "echo") {
+      const text = cmdArgs.join(' ');
+      cmdOutput = escapeHtml(text);
+      pipeInput = text;
+      if (!isLastPipe) continue;
+    } else if (cmd === "history") {
+      const { flags } = parseTerminalFlags(cmdArgs);
       const history = JSON.parse(localStorage.getItem('Veltra_terminalHistory') || '[]');
+      if (flags.has('c')) {
+        localStorage.setItem('Veltra_terminalHistory', '[]');
+        cmdOutput = '<span style="color: #4ade80;">\u2713 History cleared</span>';
+      } else {
+        if (history.length === 0) {
+          cmdOutput = '<span style="color: #888;">No command history</span>';
+        } else {
+          const count = parseInt(cmdArgs[0]) || 50;
+          cmdOutput = history.slice(-count).map((h, i) =>
+            `<span style="color:#888;">${String(history.length - count + i + 1).padStart(4)}</span>  ${escapeHtml(h)}`
+          ).join('<br>');
+        }
+      }
+    } else if (cmd === "base64") {
+      const { flags, args: b64Args } = parseTerminalFlags(cmdArgs);
+      const text = b64Args.join(' ') || (pipeInput || '');
+      if (!text) {
+        cmdOutput = '<span style="color: #ef4444;">base64: missing input</span>';
+      } else {
+        try {
+          cmdOutput = escapeHtml(flags.has('d') || flags.has('decode') ? atob(text) : btoa(text));
+          pipeInput = cmdOutput;
+          if (!isLastPipe) continue;
+        } catch(err) {
+          cmdOutput = '<span style="color: #ef4444;">base64: invalid input</span>';
+        }
+      }
+    } else if (cmd === "calc") {
+      const expr = cmdArgs.join(' ');
+      if (!expr) {
+        cmdOutput = '<span style="color: #ef4444;">calc: missing expression</span>';
+      } else {
+        try {
+          // Safe math evaluation - only numbers, operators, parens
+          const sanitized = expr.replace(/\s+/g, '');
+          if (!/^[0-9+\-*/().%^]+$/.test(sanitized)) {
+            cmdOutput = '<span style="color: #ef4444;">calc: invalid expression (only numbers and +-*/^% allowed)</span>';
+          } else {
+            const result = Function('"use strict"; return (' + sanitized.replace(/\^/g, '**') + ')')();
+            cmdOutput = `<span style="color: #4ade80;">${escapeHtml(String(result))}</span>`;
+          }
+        } catch(err) {
+          cmdOutput = '<span style="color: #ef4444;">calc: error evaluating expression</span>';
+        }
+      }
+    } else if (cmd === "sleep") {
+      const secs = parseFloat(cmdArgs[0]);
+      if (isNaN(secs) || secs < 0 || secs > 30) {
+        cmdOutput = '<span style="color: #ef4444;">sleep: invalid time (0-30 seconds)</span>';
+      } else {
+        cmdOutput = `<span style="color: #888;">Sleeping ${secs}s...</span>`;
+      }
+    } else if (cmd === "yes") {
+      const text = cmdArgs.length > 0 ? cmdArgs.join(' ') : 'y';
+      cmdOutput = Array(5).fill(escapeHtml(text)).join('<br>');
+    } else if (cmd === "rev") {
+      const text = cmdArgs.join(' ') || (pipeInput || '');
+      if (!text) {
+        cmdOutput = '<span style="color: #ef4444;">rev: missing input</span>';
+      } else {
+        const reversed = [...text].reverse().join('');
+        cmdOutput = escapeHtml(reversed);
+        pipeInput = reversed;
+        if (!isLastPipe) continue;
+      }
+    } else if (cmd === "hexdump") {
+      const fileArg = cmdArgs[0];
+      const text = pipeInput !== null && !fileArg ? pipeInput : (() => {
+        if (!fileArg) return null;
+        const node = getFSNode(resolvePath(fileArg));
+        return typeof node === 'string' ? node : null;
+      })();
+      if (text === null) {
+        cmdOutput = '<span style="color: #ef4444;">hexdump: missing file operand</span>';
+      } else {
+        const lines = [];
+        const bytes = new TextEncoder().encode(text);
+        for (let i = 0; i < Math.min(bytes.length, 256); i += 16) {
+          const hex = Array.from(bytes.slice(i, i + 16)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+          const ascii = Array.from(bytes.slice(i, i + 16)).map(b => b >= 32 && b < 127 ? String.fromCharCode(b) : '.').join('');
+          lines.push(`<span style="color:#888;">${i.toString(16).padStart(8, '0')}</span>  ${hex.padEnd(48)}  |${escapeHtml(ascii)}|`);
+        }
+        if (bytes.length > 256) lines.push(`<span style="color:#888;">... ${bytes.length - 256} more bytes</span>`);
+        cmdOutput = '<pre style="margin:0;font-family:inherit;">' + lines.join('\n') + '</pre>';
+      }
+    } else if (cmd === "chmod" || cmd === "chown" || cmd === "chgrp") {
+      if (!cmdArgs[0]) {
+        cmdOutput = `<span style="color: #ef4444;">${escapeHtml(cmd)}: missing operand</span>`;
+      } else {
+        cmdOutput = `<span style="color: #888;">${escapeHtml(cmd)}: operation simulated (virtual filesystem)</span>`;
+      }
+    } else if (cmd === "screenshot") {
+      takeScreenshot();
+      cmdOutput = '<span style="color: #4ade80;">\u2713 Taking screenshot...</span>';
+    } else if (cmd === "exit") {
+      closeWindowByAppName('terminal');
+      return;
+    } else if (segment) {
+      cmdOutput = `<span style="color: #ef4444;">Command not found: ${escapeHtml(cmd)}</span><br><span style="color: #888;">Type 'help' for available commands.</span>`;
+    }
+
+    // Pass output text to next pipe segment
+    if (!isLastPipe && cmdOutput) {
+      const tmp = document.createElement('div');
+      tmp.innerHTML = cmdOutput;
+      pipeInput = tmp.textContent || tmp.innerText || '';
+    }
+    if (isLastPipe && cmdOutput) {
+      output.innerHTML = cmdOutput;
+    }
+  }
+
+  // Handle output redirection
+  if (redirectTarget && output.innerHTML) {
+    const redirectPath = resolvePath(redirectTarget);
+    const tmp = document.createElement('div');
+    tmp.innerHTML = output.innerHTML;
+    const plainText = tmp.textContent || tmp.innerText || '';
+    const existingNode = getFSNode(redirectPath);
+    if (redirectAppend && typeof existingNode === 'string') {
+      setFSNode(redirectPath, existingNode + '\n' + plainText);
+    } else {
+      const parentPath = redirectPath.slice(0, -1);
+      const parent = redirectPath.length === 1 ? fileSystem : getFSNode(parentPath);
+      if (parent && typeof parent === 'object') {
+        parent[redirectPath[redirectPath.length - 1]] = plainText;
+        saveFS(fileSystem);
+      }
+    }
+    output.innerHTML = '';
+  }
+
+  // Save to history (deduplicate consecutive)
+  if (command) {
+    const history = JSON.parse(localStorage.getItem('Veltra_terminalHistory') || '[]');
+    if (history.length === 0 || history[history.length - 1] !== command) {
       history.push(command);
-      if (history.length > 100) history.shift();
-      localStorage.setItem('Veltra_terminalHistory', JSON.stringify(history));
     }
+    if (history.length > 500) history.splice(0, history.length - 500);
+    localStorage.setItem('Veltra_terminalHistory', JSON.stringify(history));
+  }
 
-    if (cmd !== "clear" && command) {
-      terminal.insertBefore(output, terminal.lastElementChild);
+  if (output.innerHTML) {
+    terminal.insertBefore(output, terminal.lastElementChild);
+  }
+
+  recreateTerminalPrompt(terminal);
+}
+
+// Tab completion for file/directory names and commands
+function handleTerminalTabCompletion(input) {
+  const value = input.value;
+  const parts = value.split(/\s+/);
+  const isFirstWord = parts.length <= 1;
+  const currentWord = parts[parts.length - 1] || '';
+
+  if (terminalTabCompletionIndex === -1 || terminalTabCompletionBase !== currentWord) {
+    terminalTabCompletionBase = currentWord;
+    terminalTabCompletionMatches = [];
+
+    if (isFirstWord) {
+      const commands = ['help','cd','pwd','ls','tree','cat','head','tail','wc','sort','uniq','grep','find',
+        'mkdir','touch','rm','cp','mv','write','neofetch','hostname','uptime','uname','df','du','env',
+        'export','unset','alias','unalias','type','which','apps','open','themes','whoami','reset-boot',
+        'refresh-cache','clear','date','echo','history','exit','base64','calc','sleep','yes','rev',
+        'screenshot','hexdump','id','printenv'];
+      commands.push(...Object.keys(terminalAliases));
+      terminalTabCompletionMatches = commands.filter(c => c.startsWith(currentWord.toLowerCase())).sort();
+    } else {
+      const pathParts = currentWord.split('/');
+      const partial = pathParts.pop() || '';
+      const basePath = pathParts.length > 0
+        ? resolvePath(pathParts.join('/'))
+        : terminalCwd;
+      const node = getFSNode(basePath);
+      if (node && typeof node === 'object') {
+        const prefix = pathParts.length > 0 ? pathParts.join('/') + '/' : '';
+        terminalTabCompletionMatches = Object.keys(node)
+          .filter(f => f.toLowerCase().startsWith(partial.toLowerCase()))
+          .map(f => {
+            const isDir = typeof node[f] === 'object';
+            return prefix + f + (isDir ? '/' : '');
+          }).sort();
+      }
     }
+    terminalTabCompletionIndex = 0;
+  } else {
+    terminalTabCompletionIndex = (terminalTabCompletionIndex + 1) % terminalTabCompletionMatches.length;
+  }
 
-    const newPrompt = `${currentUsername}@Veltra:${getTerminalPath()}$`;
-    const newInputLine = document.createElement("div");
-    newInputLine.className = "terminal-line";
-    newInputLine.innerHTML =
-      `<span class="terminal-prompt">${newPrompt} </span><input type="text" class="terminal-input" id="terminalInput" onkeypress="handleTerminalInput(event)">`;
-
-    terminal.removeChild(terminal.lastElementChild);
-    terminal.appendChild(newInputLine);
-
-    const newInput = document.getElementById("terminalInput");
-    if (newInput) newInput.focus();
-
-    input.value = "";
-    terminal.scrollTop = terminal.scrollHeight;
+  if (terminalTabCompletionMatches.length > 0) {
+    const completion = terminalTabCompletionMatches[terminalTabCompletionIndex];
+    parts[parts.length - 1] = completion;
+    input.value = parts.join(' ');
+    if (terminalTabCompletionMatches.length > 1 && terminalTabCompletionIndex === 0) {
+      const terminal = document.getElementById("terminalContent");
+      const matchLine = document.createElement("div");
+      matchLine.className = "terminal-line";
+      matchLine.style.color = '#60a5fa';
+      matchLine.innerHTML = terminalTabCompletionMatches.map(m => escapeHtml(m)).join('  ');
+      terminal.insertBefore(matchLine, terminal.lastElementChild);
+      terminal.scrollTop = terminal.scrollHeight;
+    }
   }
 }
+
+// Recreate the terminal prompt after a command
+function recreateTerminalPrompt(terminal) {
+  const newPrompt = `${currentUsername}@Veltra:${getTerminalPath()}$`;
+  const newInputLine = document.createElement("div");
+  newInputLine.className = "terminal-line";
+  newInputLine.innerHTML =
+    `<span class="terminal-prompt">${newPrompt} </span><input type="text" class="terminal-input" id="terminalInput" onkeydown="handleTerminalInput(event)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">`;
+
+  if (terminal.lastElementChild) terminal.removeChild(terminal.lastElementChild);
+  terminal.appendChild(newInputLine);
+
+  const newInput = document.getElementById("terminalInput");
+  if (newInput) newInput.focus();
+
+  terminal.scrollTop = terminal.scrollHeight;
+}
+
 
 function toggleSetting(setting) {
   if (setting === "showWhatsNew") {
@@ -11721,11 +12718,12 @@ function updateFileExplorer() {
         const icon = isFolder
           ? "fa-folder"
           : "fa-file-alt";
-        const escapedFile = file.replace(/'/g, "\\'");
+        const escapedFile = escapeJsString(file);
+        const safeFileName = escapeHtml(file);
         return `
                                       <div class="file-item" ondblclick="openFile('${escapedFile}')" onclick="selectFileItem(event, this, '${escapedFile}')" draggable="true" ondragstart="handleFileDragStart(event, '${escapedFile}')" ondragover="handleFileDragOver(event, ${isFolder})" ondrop="handleFileDrop(event, '${escapedFile}')">
                                           <i class="fas ${icon}"></i>
-                                          <span>${file}</span>
+                                          <span>${safeFileName}</span>
                                           <div class="file-actions">
                                               <button class="file-action-btn" onclick="event.stopPropagation(); openFile('${escapedFile}')">
                                                   <i class="fas fa-folder-open"></i> Open
@@ -13268,7 +14266,7 @@ function openGemtraGame(gameUrl) {
         "fas fa-gamepad",
         `<div style="width: 100%; height: 100%; overflow: hidden; background: #1a1a2e; position: relative;">
           <iframe id="${iframeId}" src="${uvPageUrl}" style="width: 100%; height: 100%; border: none;" allowfullscreen allow="accelerometer; gyroscope; autoplay; fullscreen"></iframe>
-          <button onclick="window.open('${gameUrl}', '_blank'); this.parentElement.querySelector('iframe').remove(); this.remove();" 
+          <button onclick="window.open('${escapeJsString(gameUrl)}', '_blank', 'noopener,noreferrer'); this.parentElement.querySelector('iframe').remove(); this.remove();" 
             style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; border: 1px solid rgba(255,255,255,0.3); padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; z-index: 1000; display: flex; align-items: center; gap: 6px;"
             title="If game doesn't load, click to open in new tab">
             <i class="fas fa-external-link-alt"></i> Open in New Tab
@@ -13291,7 +14289,7 @@ function openGemtraGame(gameUrl) {
       "fas fa-gamepad",
       `<div style="width: 100%; height: 100%; overflow: hidden; background: #1a1a2e; position: relative;">
         <iframe id="${iframeId}" src="${encodedUrl}" style="width: 100%; height: 100%; border: none;" allowfullscreen allow="accelerometer; gyroscope; autoplay; fullscreen" sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-pointer-lock allow-modals"></iframe>
-        <button onclick="window.open('${gameUrl}', '_blank'); this.parentElement.querySelector('iframe').remove(); this.remove();" 
+        <button onclick="window.open('${escapeJsString(gameUrl)}', '_blank', 'noopener,noreferrer'); this.parentElement.querySelector('iframe').remove(); this.remove();" 
           style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; border: 1px solid rgba(255,255,255,0.3); padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; z-index: 1000; display: flex; align-items: center; gap: 6px;"
           title="If game doesn't load, click to open in new tab">
           <i class="fas fa-external-link-alt"></i> Open in New Tab
@@ -13368,7 +14366,6 @@ function applyTheme(themeName) {
   const theme = themeDefinitions[themeName];
   const themeLink = document.getElementById("themeLink")
   if (!theme) { console.warn("Theme not found:", themeName); return; }
-  console.log(themeLink)
   themeLink.href = theme.url
   localStorage.setItem("Veltra_currentTheme", themeName);
   appliedThemeName = themeName;
@@ -13629,7 +14626,7 @@ function createBrowserTab() {
                           type="text"
                           class="browser-landing-input"
                           placeholder="Search or enter website URL"
-                          onkeypress="handleBrowserLandingInput(event)"
+                          onkeydown="handleBrowserLandingInput(event)"
                       >
                   </div>
               </div>
@@ -13789,20 +14786,13 @@ async function loadBrowserPage(url) {
       baseEl.setAttribute("href", baseHref);
       doc.head.prepend(baseEl);
     }
-    viewEl.innerHTML = doc.documentElement.innerHTML;
-    const links = viewEl.querySelectorAll("a[target]");
-    links.forEach((link) => link.removeAttribute("target"));
-    const forms = viewEl.querySelectorAll("form[target]");
-    forms.forEach((form) => form.removeAttribute("target"));
-    const scripts = Array.from(viewEl.querySelectorAll("script"));
-    for (const script of scripts) {
-      const replacement = document.createElement("script");
-      for (const attr of script.attributes) {
-        replacement.setAttribute(attr.name, attr.value);
-      }
-      replacement.textContent = script.textContent;
-      script.replaceWith(replacement);
-    }
+    // Render proxied content in a sandboxed iframe to prevent script execution in main context
+    viewEl.innerHTML = '';
+    const sandboxFrame = document.createElement('iframe');
+    sandboxFrame.setAttribute('sandbox', 'allow-same-origin allow-forms allow-popups');
+    sandboxFrame.style.cssText = 'width:100%;height:100%;border:none;';
+    sandboxFrame.srcdoc = doc.documentElement.innerHTML;
+    viewEl.appendChild(sandboxFrame);
     const title = new URL(url).hostname;
     currentTab.title = title;
     const tabEl = document.querySelector(
@@ -13814,64 +14804,54 @@ async function loadBrowserPage(url) {
     }
     viewEl.scrollTop = 0;
     
-    // Handle link clicks - use both click and touchend for iPad/Safari compatibility
-    const handleLinkNavigation = (event) => {
-      const link = event.target.closest("a[href]");
-      if (!link) return;
-      const href = link.getAttribute("href");
-      if (!href || href.startsWith("javascript:")) return;
-      event.preventDefault();
-      event.stopPropagation();
-      let targetUrl;
+    // Handle link clicks inside sandboxed iframe
+    sandboxFrame.addEventListener('load', () => {
       try {
-        targetUrl = new URL(href, url).toString();
-      } catch (_) {
-        return;
-      }
-      navigateBrowser(targetUrl);
-    };
-    
-    // Use both click and touchend for better touch device support
-    viewEl.onclick = handleLinkNavigation;
-    viewEl.addEventListener('touchend', (event) => {
-      // Small delay to let Safari process the touch
-      setTimeout(() => handleLinkNavigation(event), 50);
-    }, { passive: false });
-    
-    viewEl.addEventListener(
-      "submit",
-      (event) => {
-        const form = event.target;
-        if (!(form instanceof HTMLFormElement)) {
-          return;
-        }
-        const method = (form.getAttribute("method") || "GET").toUpperCase();
-        if (method !== "GET") {
-          return;
-        }
-        event.preventDefault();
-        let action = form.getAttribute("action") || url;
-        let targetUrl;
-        try {
-          targetUrl = new URL(action, url);
-        } catch (_) {
-          return;
-        }
-        const formData = new FormData(form);
-        const params = new URLSearchParams();
-        for (const [key, value] of formData.entries()) {
-          if (typeof value === "string") {
-            params.append(key, value);
+        const iframeDoc = sandboxFrame.contentDocument || sandboxFrame.contentWindow.document;
+        if (!iframeDoc) return;
+        
+        const handleLinkNavigation = (event) => {
+          const link = event.target.closest("a[href]");
+          if (!link) return;
+          const href = link.getAttribute("href");
+          if (!href || href.startsWith("javascript:")) return;
+          event.preventDefault();
+          event.stopPropagation();
+          let targetUrl;
+          try {
+            targetUrl = new URL(href, url).toString();
+          } catch (_) {
+            return;
           }
-        }
-        const queryString = params.toString();
-        if (queryString) {
-          targetUrl.search = queryString;
-        }
-        navigateBrowser(targetUrl.toString());
-      },
-      true
-    );
+          navigateBrowser(targetUrl);
+        };
+        
+        iframeDoc.addEventListener('click', handleLinkNavigation);
+        iframeDoc.addEventListener('touchend', (event) => {
+          setTimeout(() => handleLinkNavigation(event), 50);
+        }, { passive: false });
+        
+        iframeDoc.addEventListener('submit', (event) => {
+          const form = event.target;
+          if (!(form instanceof HTMLFormElement)) return;
+          const method = (form.getAttribute("method") || "GET").toUpperCase();
+          if (method !== "GET") return;
+          event.preventDefault();
+          const formData = new FormData(form);
+          const params = new URLSearchParams(formData).toString();
+          const action = form.getAttribute("action") || url;
+          let formUrl;
+          try {
+            formUrl = new URL(action, url).toString();
+          } catch (_) {
+            return;
+          }
+          navigateBrowser(formUrl + "?" + params);
+        });
+      } catch (e) {
+        // Cross-origin restriction - expected for sandboxed content
+      }
+    });
     updateBrowserNavButtons();
 
     setTimeout(() => {
@@ -13918,8 +14898,8 @@ async function loadBrowserPage(url) {
                       <h2 class="browser-error-title">${errorTitle}</h2>
                       <p class="browser-error-message">${errorMsg}</p>
                       <div style="display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center;">
-                        <button class="browser-error-btn" onclick="navigateBrowser('${url}')">Try Again</button>
-                        <button class="browser-error-btn" onclick="window.open('${url}', '_blank')">Open in New Tab</button>
+                        <button class="browser-error-btn" onclick="navigateBrowser('${escapeJsString(url)}')">Try Again</button>
+                        <button class="browser-error-btn" onclick="window.open('${escapeJsString(url)}', '_blank', 'noopener,noreferrer')">Open in New Tab</button>
                       </div>
                   </div>
               `;
@@ -14002,7 +14982,7 @@ function calcInput(value) {
     calcCurrentValue = "";
 
     if (history) {
-      const opSymbol = value === "*" ? "Ã—" : value === "/" ? "Ã·" : value;
+      const opSymbol = value === "*" ? "×" : value === "/" ? "÷" : value;
       history.textContent = `${calcPreviousValue} ${opSymbol}`;
     }
 
@@ -14022,7 +15002,7 @@ function calcInput(value) {
 
   if (history && calcOperation && calcPreviousValue) {
     const opSymbol =
-      calcOperation === "*" ? "Ã—" : calcOperation === "/" ? "Ã·" : calcOperation;
+      calcOperation === "*" ? "×" : calcOperation === "/" ? "÷" : calcOperation;
     history.textContent = `${calcPreviousValue} ${opSymbol} ${calcCurrentValue}`;
   }
 }
@@ -14070,7 +15050,7 @@ function calcEquals() {
 
   if (history) {
     const opSymbol =
-      calcOperation === "*" ? "Ã—" : calcOperation === "/" ? "Ã·" : calcOperation;
+      calcOperation === "*" ? "×" : calcOperation === "/" ? "÷" : calcOperation;
     history.textContent = `${calcPreviousValue} ${opSymbol} ${calcCurrentValue} =`;
   }
 
@@ -14424,15 +15404,19 @@ function updatePhotosApp() {
               <div class="photos-grid" id="photosGrid">
                   ${photoList
       .map(
-        (name) => `
-                      <div class="photo-item" onclick="viewPhoto('${name}')">
-                          <img src="${photos[name]}" alt="${name}" class="photo-thumbnail">
-                          <div class="photo-name">${name}</div>
-                          <button class="photo-delete-btn" onclick="event.stopPropagation(); deletePhoto('${name}')">
+        (name) => {
+          const safeName = escapeHtml(name).replace(/'/g, '&#39;');
+          const safeUrl = escapeHtml(photos[name]);
+          return `
+                      <div class="photo-item" onclick="viewPhoto('${safeName}')">
+                          <img src="${safeUrl}" alt="${safeName}" class="photo-thumbnail" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22><rect fill=%22%23282828%22 width=%22200%22 height=%22200%22/><text x=%22100%22 y=%22100%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23555%22 font-size=%2260%22>?</text></svg>'">
+                          <div class="photo-name">${safeName}</div>
+                          <button class="photo-delete-btn" onclick="event.stopPropagation(); deletePhoto('${safeName}')">
                               <i class="fas fa-trash"></i>
                           </button>
                       </div>
-                  `
+                  `;
+        }
       )
       .join("")}
               </div>
@@ -14456,7 +15440,7 @@ function viewPhoto(name) {
     `;
 
   modal.innerHTML = `
-        <img src="${url}" style="max-width: 90%; max-height: 90%; object-fit: contain; border-radius: 8px;">
+        <img src="" id="photoViewerImg" style="max-width: 90%; max-height: 90%; object-fit: contain; border-radius: 8px;" onerror="this.alt='Failed to load image'">
         <button onclick="this.parentElement.remove()" style="
             position: absolute;
             top: 2rem;
@@ -14482,6 +15466,10 @@ function viewPhoto(name) {
     if (e.target === modal) modal.remove();
   };
 
+  // Set src safely via DOM property to avoid XSS
+  const photoImg = modal.querySelector('#photoViewerImg');
+  if (photoImg) photoImg.src = url;
+
   document.body.appendChild(modal);
 }
 
@@ -14501,58 +15489,163 @@ async function takeScreenshot() {
   showToast("Taking screenshot...", "fa-camera");
 
   try {
-    const stream = await navigator.mediaDevices.getDisplayMedia({
-      video: { mediaSource: "screen" },
-    });
+    let canvas;
 
-    const video = document.createElement("video");
-    video.srcObject = stream;
-    video.play();
+    // Try getDisplayMedia first (desktop browsers)
+    if (typeof navigator.mediaDevices !== 'undefined' && typeof navigator.mediaDevices.getDisplayMedia === 'function') {
+      try {
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+          video: { mediaSource: "screen" },
+        });
 
-    await new Promise((resolve) => {
-      video.onloadedmetadata = resolve;
-    });
+        const video = document.createElement("video");
+        video.srcObject = stream;
+        await video.play();
 
-    const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(video, 0, 0);
+        await new Promise((resolve) => {
+          video.onloadedmetadata = resolve;
+        });
 
-    stream.getTracks().forEach((track) => track.stop());
+        canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(video, 0, 0);
 
-    canvas.toBlob((blob) => {
-      const now = new Date();
-      const month = String(now.getMonth() + 1).padStart(2, "0");
-      const day = String(now.getDate()).padStart(2, "0");
-      const year = now.getFullYear();
-      const hours = String(now.getHours()).padStart(2, "0");
-      const minutes = String(now.getMinutes()).padStart(2, "0");
-      const seconds = String(now.getSeconds()).padStart(2, "0");
-
-      const filename = `${month}-${day}-${year} ${hours}-${minutes}-${seconds}.png`;
-
-      const url = URL.createObjectURL(blob);
-
-      if (!fileSystem["Photos"]) {
-        fileSystem["Photos"] = {};
+        stream.getTracks().forEach((track) => track.stop());
+      } catch (displayErr) {
+        if (displayErr.name === "NotAllowedError") {
+          showToast("Screenshot cancelled", "fa-info-circle");
+          return;
+        }
+        // Fall through to DOM capture fallback
+        canvas = null;
       }
-      fileSystem["Photos"][filename] = url;
-
-      showToast(`Screenshot saved: ${filename}`, "fa-check-circle");
-      unlockAchievement("screenshot");
-      if (!windows["photos"]) {
-        openApp("photos");
-      } else {
-        updatePhotosApp();
-      }
-    }, "image/png");
-  } catch (error) {
-    if (error.name === "NotAllowedError") {
-      showToast("Screenshot cancelled", "fa-info-circle");
-    } else {
-      showToast("Screenshot failed: " + error.message, "fa-exclamation-circle");
     }
+
+    // Fallback: DOM-based capture (for iPad/iOS Safari and other browsers without getDisplayMedia)
+    if (!canvas) {
+      canvas = await captureDesktopDOM();
+    }
+
+    if (!canvas) {
+      showToast("Screenshot failed: unable to capture screen", "fa-exclamation-circle");
+      return;
+    }
+
+    // Convert canvas to data URL (survives page reload unlike blob URLs)
+    const dataUrl = canvas.toDataURL("image/png");
+
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    const year = now.getFullYear();
+    const hours = String(now.getHours()).padStart(2, "0");
+    const minutes = String(now.getMinutes()).padStart(2, "0");
+    const seconds = String(now.getSeconds()).padStart(2, "0");
+
+    const filename = `${month}-${day}-${year} ${hours}-${minutes}-${seconds}.png`;
+
+    if (!fileSystem["Photos"]) {
+      fileSystem["Photos"] = {};
+    }
+    fileSystem["Photos"][filename] = dataUrl;
+    saveFS(fileSystem);
+
+    showToast(`Screenshot saved: ${filename}`, "fa-check-circle");
+    unlockAchievement("screenshot");
+    if (!windows["photos"]) {
+      openApp("photos");
+    } else {
+      updatePhotosApp();
+    }
+  } catch (error) {
+    showToast("Screenshot failed: " + (error.message || "Unknown error"), "fa-exclamation-circle");
+  }
+}
+
+// DOM-based screenshot capture fallback (works on iPad/iOS Safari)
+async function captureDesktopDOM() {
+  const desktop = document.getElementById('desktop');
+  if (!desktop) return null;
+
+  const width = desktop.offsetWidth || window.innerWidth;
+  const height = desktop.offsetHeight || window.innerHeight;
+
+  const canvas = document.createElement('canvas');
+  const dpr = Math.min(window.devicePixelRatio || 1, 2); // Cap at 2x for performance
+  canvas.width = width * dpr;
+  canvas.height = height * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  // Collect all computed styles needed for rendering
+  const cssText = Array.from(document.styleSheets).map(sheet => {
+    try {
+      return Array.from(sheet.cssRules || []).map(rule => rule.cssText).join('\n');
+    } catch (e) {
+      // Cross-origin stylesheets can't be read
+      return '';
+    }
+  }).join('\n');
+
+  // Clone the desktop DOM
+  const clone = desktop.cloneNode(true);
+
+  // Remove inputs and replace with styled spans to avoid foreignObject issues
+  clone.querySelectorAll('input, textarea, select').forEach(el => {
+    const span = document.createElement('span');
+    span.textContent = el.value || el.placeholder || '';
+    span.style.cssText = window.getComputedStyle(el).cssText;
+    if (el.parentNode) el.parentNode.replaceChild(span, el);
+  });
+
+  // Build SVG foreignObject
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const xhtmlNS = 'http://www.w3.org/1999/xhtml';
+  const svgMarkup = `
+    <svg xmlns="${svgNS}" width="${width}" height="${height}">
+      <defs>
+        <style type="text/css">
+          <![CDATA[${cssText}]]>
+        </style>
+      </defs>
+      <foreignObject width="100%" height="100%">
+        <div xmlns="${xhtmlNS}" style="width:${width}px;height:${height}px;overflow:hidden;">
+          ${clone.outerHTML}
+        </div>
+      </foreignObject>
+    </svg>
+  `;
+
+  const svgBlob = new Blob([svgMarkup], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(svgBlob);
+
+  try {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = () => reject(new Error('SVG rendering failed'));
+      img.src = url;
+    });
+
+    ctx.drawImage(img, 0, 0, width, height);
+    return canvas;
+  } catch (svgErr) {
+    // Final fallback: capture just the background color and visible text
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg') || '#1a1a2e';
+    ctx.fillRect(0, 0, width, height);
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text') || '#ffffff';
+    ctx.font = '24px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Veltra OS Screenshot', width / 2, height / 2 - 20);
+    ctx.font = '14px sans-serif';
+    ctx.fillText(new Date().toLocaleString(), width / 2, height / 2 + 20);
+    return canvas;
+  } finally {
+    URL.revokeObjectURL(url);
   }
 }
 function closeAllWindows() {
@@ -14654,7 +15747,7 @@ function togglePasswordless() {
   }
 }
 
-function setupComplete() {
+async function setupComplete() {
   const username = document.getElementById("setupUsername").value.trim();
   const isPasswordless = window.setupIsPasswordless || false;
   const isBloatless = window.setupIsBloatless || false;
@@ -14689,7 +15782,7 @@ function setupComplete() {
     localStorage.setItem("Veltra_password", "");
     localStorage.setItem("Veltra_isPasswordless", "true");
   } else {
-    localStorage.setItem("Veltra_password", hashPassword(password));
+    localStorage.setItem("Veltra_password", await hashPasswordAsync(password));
     localStorage.setItem("Veltra_isPasswordless", "false");
   }
   localStorage.setItem("Veltra_setupComplete", "true");
@@ -15047,7 +16140,6 @@ async function resetAllData() {
 }
 
 async function changeuser() {
-  console.log("Changing user....");
   const newUsername = await prompt("Enter a new username:");
   if (!newUsername) {
     showToast("Username change cancelled", "fa-info-circle");
@@ -15166,16 +16258,54 @@ let startupApps = [];
 let installedGames = [];
 let bloatlessMode = false;
 
-function hashPassword(password) {
-  const salt = "Veltra_Salt_2024"; // Simple salt for demo
-  let hash = 0;
-  const combined = password + salt;
-  for (let i = 0; i < combined.length; i++) {
-    const char = combined.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash = hash & hash; // Convert to 32-bit integer
+// Password hashing using SHA-256 via Web Crypto API
+// Falls back to improved client-side hash if SubtleCrypto unavailable
+async function hashPasswordAsync(password) {
+  const salt = "Veltra_Salt_2024_v2";
+  const combined = salt + password + salt;
+  
+  if (window.crypto && window.crypto.subtle) {
+    try {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(combined);
+      // Run multiple rounds for added strength
+      let hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      for (let i = 0; i < 1000; i++) {
+        hashBuffer = await crypto.subtle.digest('SHA-256', hashBuffer);
+      }
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    } catch (e) {
+      // Fall through to sync fallback
+    }
   }
-  return hash.toString(16);
+  
+  // Synchronous fallback (still better than DJB2)
+  return hashPassword(password);
+}
+
+// Synchronous fallback hash - improved from original 32-bit to 128-bit output
+function hashPassword(password) {
+  const salt = "Veltra_Salt_2024_v2";
+  const combined = salt + password + salt;
+  // Use 4 different seeds to produce 128-bit output
+  const seeds = [0x811c9dc5, 0x27d4eb2f, 0xc2b2ae35, 0x165667b1];
+  const parts = seeds.map(seed => {
+    let hash = seed;
+    for (let i = 0; i < combined.length; i++) {
+      hash ^= combined.charCodeAt(i);
+      hash = Math.imul(hash, 0x01000193);
+      hash = hash & hash;
+    }
+    // Extra mixing rounds
+    for (let i = 0; i < 100; i++) {
+      hash ^= (hash >>> 16);
+      hash = Math.imul(hash, 0x45d9f3b);
+      hash = hash & hash;
+    }
+    return (hash >>> 0).toString(16).padStart(8, '0');
+  });
+  return parts.join('');
 }
 
 function loadInstalledApps() {
@@ -15605,10 +16735,22 @@ async function initializeAISnakeApp() {
   
   if (typeof tf === 'undefined') {
     updateAITrainingStatus('Loading TensorFlow.js...');
-    // Wait longer for TensorFlow to load
-    for (let i = 0; i < 10; i++) {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      if (typeof tf !== 'undefined') break;
+    // Dynamically load TensorFlow.js
+    try {
+      await new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js';
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+      });
+      // Wait for tf to be defined
+      for (let i = 0; i < 20; i++) {
+        await new Promise(resolve => setTimeout(resolve, 250));
+        if (typeof tf !== 'undefined') break;
+      }
+    } catch (e) {
+      // ignore, check below
     }
     if (typeof tf === 'undefined') {
       updateAITrainingStatus('Error: TensorFlow.js failed to load. Please refresh the page.');
@@ -17151,7 +18293,7 @@ function openCreateAccountDialog() {
     confirm: true,
     confirmText: "Create Account",
     cancelText: "Cancel"
-  }).then(result => {
+  }).then(async (result) => {
     if (result) {
       const username = document.getElementById("newAccountUsername").value;
       const password = document.getElementById("newAccountPassword").value;
@@ -17170,10 +18312,10 @@ function openCreateAccountDialog() {
 
       // Check if trying to create admin account
       if (username.toLowerCase() === ADMIN_ACCOUNT_CONFIG.username.toLowerCase()) {
-        showAdminVerificationModal((verified) => {
+        showAdminVerificationModal(async (verified) => {
           if (verified) {
             // Admin account is always superuser
-            const createResult = createAccount(username, password, "superuser", isPasswordless);
+            const createResult = await createAccount(username, password, "superuser", isPasswordless);
             if (createResult.success) {
               showToast(createResult.message, "fa-check-circle");
               openAccountManager();
@@ -17183,7 +18325,7 @@ function openCreateAccountDialog() {
           }
         });
       } else {
-        const createResult = createAccount(username, password, isSuperUser ? "superuser" : "standard", isPasswordless);
+        const createResult = await createAccount(username, password, isSuperUser ? "superuser" : "standard", isPasswordless);
 
         if (createResult.success) {
           showToast(createResult.message, "fa-check-circle");
@@ -18237,6 +19379,13 @@ window.addEventListener('blur', () => {
 window.addEventListener('focus', () => {
   if (cloakingConfig.cloakOnClickoff) {
     resetCloaking(false);
+  }
+});
+
+// Listen for postMessage from walkthrough iframe as a fallback close method
+window.addEventListener('message', function(e) {
+  if (e.data && e.data.type === 'veltra-close-walkthrough') {
+    closeWindowByAppName('walkthrough');
   }
 });
 
@@ -19408,14 +20557,14 @@ function createAccountFromLogin() {
 }
 
 // Finalize account creation after verification
-function finalizeAccountCreation(username, password, isPasswordless) {
+async function finalizeAccountCreation(username, password, isPasswordless) {
   // Check if any accounts exist - first account should be superuser
   const accounts = getAllAccounts();
   // Admin account is always superuser
   const isAdminAccount = username.toLowerCase() === ADMIN_ACCOUNT_CONFIG.username.toLowerCase();
   const role = (accounts.length === 0 || isAdminAccount) ? "superuser" : "standard";
 
-  const createResult = createAccount(username, password, role, isPasswordless);
+  const createResult = await createAccount(username, password, role, isPasswordless);
 
   if (createResult.success) {
     showToast(`Account "${username}" created! ${role === "superuser" ? "(Super User)" : ""}`, "fa-check-circle");
@@ -20314,18 +21463,12 @@ function togglePanicOverlay() {
     // Ensure the image fills the screen
     overlay.style.width = "100%";
     overlay.style.height = "100%";
-
-    // Log for debugging (will be visible in devtools)
-    console.log('[DEBUG] Overlay triggered with image:', cloakingConfig.panicImage.substring(0, 50) + '...');
-  } else {
-    console.warn('[WARNING] No panic image set!');
   }
 
   document.body.appendChild(overlay);
 }
 
 function changeSearchEngine(value) {
-  console.log('[DEBUG] changeSearchEngine called with value:', value);
   localStorage.setItem('veltra_searchEngine', value);
   showToast('Search engine updated!', 'fa-check-circle');
 }
@@ -20442,7 +21585,7 @@ function openChangeUsernameDialog() {
   placeholder="New username" 
   value="${currentUsername}"
   style="margin-bottom: 1rem; width: 100%;"
-  onkeypress="if(event.key === 'Enter') changeUsername()"
+  onkeydown="if(event.key === 'Enter') changeUsername()"
   >
   `;
 
@@ -23239,7 +24382,7 @@ function executeTool_RunTerminalCommand(params) {
       // Add command to terminal display
       const cmdLine = document.createElement('div');
       cmdLine.className = 'terminal-line';
-      cmdLine.innerHTML = `<span class="terminal-prompt">${currentUsername}@veltra:~$ </span>${command}`;
+      cmdLine.innerHTML = `<span class="terminal-prompt">${escapeHtml(currentUsername)}@veltra:~$ </span>${escapeHtml(command)}`;
       terminal.insertBefore(cmdLine, terminal.lastElementChild);
 
       // Execute the command logic (simplified version)
@@ -24097,7 +25240,7 @@ function openCustomWebAppWindow(app) {
 
   const content = `
     <div style="width: 100%; height: 100%; display: flex; flex-direction: column; background: #fff;">
-      <iframe src="${proxyUrl}" style="flex: 1; width: 100%; height: 100%; border: none;" allowfullscreen></iframe>
+      <iframe src="${escapeHtml(proxyUrl)}" style="flex: 1; width: 100%; height: 100%; border: none;" allowfullscreen></iframe>
     </div>
   `;
 

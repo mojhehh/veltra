@@ -10,6 +10,13 @@
     const CURRENT_V86_VERSION = '2.0.0';
     const VERSION_KEY = 'v86_implementation_version';
     
+    // Enable verbose logging only in development
+    const DEBUG_MODE = localStorage.getItem('veltra_debug') === 'true';
+    
+    function debugLog(...args) {
+        if (DEBUG_MODE) console.log('[V86 Cache]', ...args);
+    }
+    
     /**
      * Check if V86 implementation has been updated
      */
@@ -17,7 +24,9 @@
         const storedVersion = localStorage.getItem(VERSION_KEY);
         
         if (!storedVersion || storedVersion !== CURRENT_V86_VERSION) {
-            console.log(`V86 version mismatch: stored=${storedVersion}, current=${CURRENT_V86_VERSION}`);
+            // Silently update version instead of logging noise
+            debugLog(`Version updated: ${storedVersion} -> ${CURRENT_V86_VERSION}`);
+            localStorage.setItem(VERSION_KEY, CURRENT_V86_VERSION);
             return false;
         }
         
@@ -29,7 +38,7 @@
      */
     function updateV86Version() {
         localStorage.setItem(VERSION_KEY, CURRENT_V86_VERSION);
-        console.log(`V86 version updated to ${CURRENT_V86_VERSION}`);
+        debugLog(`Version updated to ${CURRENT_V86_VERSION}`);
     }
     
     /**
@@ -78,7 +87,7 @@
         
         for (const globalName of oldGlobals) {
             if (typeof window[globalName] !== 'undefined') {
-                console.warn(`Detected old V86 global: ${globalName}`);
+                debugLog(`Detected old V86 global: ${globalName}`);
                 return true;
             }
         }
@@ -95,16 +104,12 @@
         const oldFilesDetected = detectOldV86Files();
         
         if (!versionMatch || oldFilesDetected) {
-            console.log('V86 cache issue detected, showing notification...');
+            debugLog('Cache issue detected, auto-updating...');
             
-            // Wait for DOM to be ready
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', showCacheClearNotification);
-            } else {
-                showCacheClearNotification();
-            }
+            // Auto-update silently instead of showing notification
+            updateV86Version();
         } else {
-            console.log('V86 version check passed');
+            debugLog('Version check passed');
         }
         
         // Listen for V86 errors

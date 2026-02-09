@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Welcome to Veltra</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * {
             margin: 0;
@@ -12,20 +11,37 @@
             box-sizing: border-box;
         }
 
-        /* Logo filter - converts black to teal */
-        .veltra-logo {
-            filter: invert(78%) sepia(25%) saturate(522%) hue-rotate(112deg) brightness(92%) contrast(87%);
-        }
-
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #0a0e1a 0%, #151923 100%);
+            background: linear-gradient(135deg, #0a0e1a 0%, #131720 50%, #151923 100%);
             color: #e0e0e0;
-            min-height: 100vh;
+            height: 100vh;
+            overflow: hidden;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* Subtle background glow */
+        .bg-glow {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
             overflow: hidden;
         }
 
-        /* Animated background */
+        .bg-glow::before {
+            content: '';
+            position: absolute;
+            top: -30%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(125, 211, 192, 0.06) 0%, transparent 70%);
+            border-radius: 50%;
+        }
+
+        /* Particles */
         .bg-particles {
             position: fixed;
             inset: 0;
@@ -35,18 +51,18 @@
 
         .particle {
             position: absolute;
-            width: 4px;
-            height: 4px;
-            background: rgba(125, 211, 192, 0.3);
+            width: 3px;
+            height: 3px;
+            background: rgba(125, 211, 192, 0.25);
             border-radius: 50%;
-            animation: float 15s infinite;
+            animation: float linear infinite;
         }
 
         @keyframes float {
-            0%, 100% { transform: translateY(100vh) scale(0); opacity: 0; }
-            10% { opacity: 1; }
-            90% { opacity: 1; }
-            100% { transform: translateY(-10vh) scale(1); opacity: 0; }
+            0% { transform: translateY(100vh) scale(0); opacity: 0; }
+            8% { opacity: 0.8; transform: translateY(90vh) scale(1); }
+            92% { opacity: 0.8; }
+            100% { transform: translateY(-5vh) scale(0.5); opacity: 0; }
         }
 
         /* Walkthrough container */
@@ -57,20 +73,29 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 2rem;
         }
 
         /* Slide */
         .slide {
             position: absolute;
-            width: 100%;
-            max-width: 600px;
-            padding: 2rem;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
             opacity: 0;
-            transform: translateX(100px);
-            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            transform: translateX(60px);
+            transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                        transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             pointer-events: none;
+            will-change: transform, opacity;
+            overflow-y: auto;
+            overflow-x: hidden;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(125, 211, 192, 0.2) transparent;
         }
+
+        .slide::-webkit-scrollbar { width: 4px; }
+        .slide::-webkit-scrollbar-track { background: transparent; }
+        .slide::-webkit-scrollbar-thumb { background: rgba(125, 211, 192, 0.2); border-radius: 2px; }
 
         .slide.active {
             opacity: 1;
@@ -78,190 +103,259 @@
             pointer-events: auto;
         }
 
-        .slide.exit {
+        .slide.exit-left {
             opacity: 0;
-            transform: translateX(-100px);
+            transform: translateX(-60px);
         }
 
-        /* Slide content */
+        .slide.exit-right {
+            opacity: 0;
+            transform: translateX(60px);
+        }
+
+        .slide-inner {
+            max-width: 560px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 1.5rem 2rem 1.25rem;
+            display: flex;
+            flex-direction: column;
+            min-height: 100%;
+            justify-content: center;
+        }
+
+        /* Slide icon */
         .slide-icon {
-            width: 100px;
-            height: 100px;
-            background: linear-gradient(135deg, rgba(125, 211, 192, 0.2), rgba(125, 211, 192, 0.1));
-            border: 2px solid rgba(125, 211, 192, 0.3);
-            border-radius: 24px;
+            width: 72px;
+            height: 72px;
+            background: linear-gradient(135deg, rgba(125, 211, 192, 0.12), rgba(125, 211, 192, 0.06));
+            border: 1.5px solid rgba(125, 211, 192, 0.2);
+            border-radius: 20px;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin: 0 auto 2rem;
-            font-size: 2.5rem;
+            margin: 0 auto 1.25rem;
             color: #7dd3c0;
-            animation: pulse 2s ease-in-out infinite;
+            animation: iconPulse 3s ease-in-out infinite;
+            flex-shrink: 0;
         }
 
-        /* Fish icon should have no box/background */
-        .slide-icon.fish-icon,
-        .slide-icon:has(.fa-fish) {
-            background: transparent !important;
-            border: none !important;
-            box-shadow: none !important;
+        .slide-icon svg {
+            width: 34px;
+            height: 34px;
         }
 
-        .slide-icon .fa-fish {
-            font-size: 5rem;
-            text-shadow: 0 0 40px rgba(125, 211, 192, 0.6), 0 0 80px rgba(125, 211, 192, 0.3);
+        .slide-icon.logo-icon {
+            background: transparent;
+            border: none;
+            width: 80px;
+            height: 80px;
+            animation: logoPulse 3s ease-in-out infinite;
         }
 
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(125, 211, 192, 0.4); }
-            50% { transform: scale(1.05); box-shadow: 0 0 30px 10px rgba(125, 211, 192, 0.2); }
+        .slide-icon.logo-icon svg {
+            width: 56px;
+            height: 56px;
+            filter: drop-shadow(0 0 16px rgba(125, 211, 192, 0.35));
         }
 
+        @keyframes iconPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(125, 211, 192, 0.15); }
+            50% { box-shadow: 0 0 20px 4px rgba(125, 211, 192, 0.1); }
+        }
+
+        @keyframes logoPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.03); }
+        }
+
+        /* Headings */
         .slide h1 {
-            font-size: 2rem;
+            font-size: 1.6rem;
             text-align: center;
-            margin-bottom: 1rem;
+            margin-bottom: 0.5rem;
             background: linear-gradient(135deg, #7dd3c0, #5ec4ab);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
+            line-height: 1.3;
+            flex-shrink: 0;
         }
 
-        .slide p {
+        .slide-desc {
             text-align: center;
-            color: #888;
-            font-size: 1rem;
-            line-height: 1.7;
-            margin-bottom: 1.5rem;
+            color: #999;
+            font-size: 0.88rem;
+            line-height: 1.65;
+            margin-bottom: 1rem;
+            flex-shrink: 0;
         }
 
         /* Feature cards */
         .feature-cards {
             display: flex;
             flex-direction: column;
-            gap: 0.75rem;
-            margin: 1.5rem 0;
-        }
-
-        .feature-card {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            padding: 1rem 1.25rem;
-            background: rgba(30, 35, 48, 0.6);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 12px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .feature-card:hover {
-            border-color: rgba(125, 211, 192, 0.3);
-            background: rgba(125, 211, 192, 0.05);
-            transform: translateX(5px);
-        }
-
-        .feature-card.recommended {
-            border-color: rgba(125, 211, 192, 0.5);
-            background: rgba(125, 211, 192, 0.1);
-        }
-
-        .feature-card.recommended::after {
-            content: 'Recommended';
-            position: absolute;
-            right: 1rem;
-            font-size: 0.7rem;
-            color: #7dd3c0;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-
-        .feature-card-icon {
-            width: 48px;
-            height: 48px;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.25rem;
+            gap: 0.5rem;
+            margin-bottom: 0.625rem;
             flex-shrink: 0;
         }
 
-        .feature-card-icon.uv { background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(139, 92, 246, 0.3)); color: #a855f7; }
-        .feature-card-icon.browser { background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(37, 99, 235, 0.3)); color: #3b82f6; }
-        .feature-card-icon.apps { background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(22, 163, 74, 0.3)); color: #22c55e; }
-        .feature-card-icon.themes { background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(245, 158, 11, 0.3)); color: #fbbf24; }
-        .feature-card-icon.files { background: linear-gradient(135deg, rgba(236, 72, 153, 0.2), rgba(219, 39, 119, 0.3)); color: #ec4899; }
-        .feature-card-icon.nebula { background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(124, 58, 237, 0.3)); color: #a855f7; }
+        .feature-card {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.625rem 0.875rem;
+            background: rgba(30, 35, 48, 0.55);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s, transform 0.2s;
+        }
+
+        .feature-card:hover {
+            border-color: rgba(125, 211, 192, 0.25);
+            background: rgba(125, 211, 192, 0.04);
+            transform: translateX(3px);
+        }
+
+        .feature-card.recommended {
+            border-color: rgba(125, 211, 192, 0.3);
+            background: rgba(125, 211, 192, 0.06);
+        }
+
+        /* Card icons */
+        .feature-card-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 9px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .feature-card-icon svg {
+            width: 19px;
+            height: 19px;
+        }
+
+        .feature-card-icon.purple { background: linear-gradient(135deg, rgba(168, 85, 247, 0.15), rgba(139, 92, 246, 0.25)); color: #a855f7; }
+        .feature-card-icon.blue { background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(37, 99, 235, 0.25)); color: #3b82f6; }
+        .feature-card-icon.green { background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(22, 163, 74, 0.25)); color: #22c55e; }
+        .feature-card-icon.amber { background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.25)); color: #fbbf24; }
+        .feature-card-icon.teal { background: linear-gradient(135deg, rgba(125, 211, 192, 0.15), rgba(94, 196, 171, 0.25)); color: #7dd3c0; }
+        .feature-card-icon.gray { background: linear-gradient(135deg, rgba(107, 114, 128, 0.15), rgba(75, 85, 99, 0.25)); color: #9ca3af; }
+
+        .feature-card-content {
+            flex: 1;
+            min-width: 0;
+        }
 
         .feature-card-content h3 {
-            font-size: 0.95rem;
+            font-size: 0.84rem;
             color: #e0e0e0;
-            margin-bottom: 0.25rem;
+            margin-bottom: 0.15rem;
+            font-weight: 600;
         }
 
         .feature-card-content p {
-            font-size: 0.8rem;
+            font-size: 0.74rem;
             color: #888;
             text-align: left;
             margin: 0;
+            line-height: 1.4;
         }
 
         .feature-badge {
-            margin-left: auto;
-            padding: 0.25rem 0.75rem;
-            background: rgba(125, 211, 192, 0.2);
-            border-radius: 20px;
-            font-size: 0.7rem;
+            padding: 0.15rem 0.5rem;
+            background: rgba(125, 211, 192, 0.12);
+            border-radius: 12px;
+            font-size: 0.65rem;
             color: #7dd3c0;
             font-weight: 600;
             white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .feature-badge.preview {
+            background: rgba(168, 85, 247, 0.12);
+            color: #c084fc;
+        }
+
+        .card-arrow {
+            flex-shrink: 0;
+            color: #444;
+            display: flex;
+            align-items: center;
+        }
+
+        .card-arrow svg {
+            width: 14px;
+            height: 14px;
         }
 
         /* Progress indicator */
-        .progress-dots {
+        .progress-bar-container {
             display: flex;
-            justify-content: center;
+            align-items: center;
             gap: 0.5rem;
-            margin: 2rem 0 1.5rem;
+            margin: 0.875rem 0 0.75rem;
+            flex-shrink: 0;
         }
 
-        .progress-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: rgba(125, 211, 192, 0.2);
-            transition: all 0.3s ease;
+        .progress-track {
+            flex: 1;
+            height: 3px;
+            background: rgba(125, 211, 192, 0.1);
+            border-radius: 2px;
+            overflow: hidden;
         }
 
-        .progress-dot.active {
-            background: #7dd3c0;
-            width: 24px;
-            border-radius: 4px;
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #7dd3c0, #5ec4ab);
+            border-radius: 2px;
+            transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        .progress-dot.completed {
-            background: rgba(125, 211, 192, 0.5);
+        .progress-label {
+            font-size: 0.7rem;
+            color: #555;
+            white-space: nowrap;
+            min-width: 2.5rem;
+            text-align: right;
         }
 
         /* Navigation buttons */
         .nav-buttons {
             display: flex;
-            gap: 1rem;
+            gap: 0.625rem;
             justify-content: center;
+            flex-shrink: 0;
         }
 
         .nav-btn {
-            padding: 0.875rem 2rem;
+            padding: 0.6rem 1.5rem;
             border: none;
-            border-radius: 12px;
-            font-size: 0.95rem;
+            border-radius: 9px;
+            font-size: 0.85rem;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.2s ease;
-            display: flex;
+            display: inline-flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 0.4rem;
+            font-family: inherit;
+            outline: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .nav-btn svg {
+            width: 15px;
+            height: 15px;
+            flex-shrink: 0;
         }
 
         .nav-btn-primary {
@@ -270,473 +364,528 @@
         }
 
         .nav-btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 24px rgba(125, 211, 192, 0.3);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px rgba(125, 211, 192, 0.25);
+        }
+
+        .nav-btn-primary:active {
+            transform: translateY(0);
+            box-shadow: none;
         }
 
         .nav-btn-secondary {
-            background: rgba(255, 255, 255, 0.08);
-            color: #e0e0e0;
+            background: rgba(255, 255, 255, 0.06);
+            color: #bbb;
         }
 
         .nav-btn-secondary:hover {
-            background: rgba(255, 255, 255, 0.12);
+            background: rgba(255, 255, 255, 0.1);
         }
 
         .nav-btn-skip {
-            position: absolute;
-            top: 1.5rem;
-            right: 1.5rem;
+            position: fixed;
+            top: 0.875rem;
+            right: 1rem;
             background: transparent;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: #888;
-            padding: 0.5rem 1rem;
-            font-size: 0.85rem;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: #666;
+            padding: 0.35rem 0.75rem;
+            font-size: 0.75rem;
+            z-index: 10;
+            border-radius: 8px;
         }
 
         .nav-btn-skip:hover {
-            border-color: rgba(125, 211, 192, 0.3);
+            border-color: rgba(125, 211, 192, 0.25);
             color: #7dd3c0;
         }
 
-        /* Checkbox for "Don't show again" */
-        .dont-show-again {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            margin-top: 1.5rem;
-            color: #888;
-            font-size: 0.85rem;
-        }
-
-        .dont-show-again input {
-            width: 18px;
-            height: 18px;
-            accent-color: #7dd3c0;
+        .nav-btn-skip svg {
+            width: 13px;
+            height: 13px;
         }
 
         /* Tip box */
         .tip-box {
             display: flex;
             align-items: flex-start;
-            gap: 0.75rem;
-            padding: 1rem;
-            background: rgba(251, 191, 36, 0.1);
-            border: 1px solid rgba(251, 191, 36, 0.2);
-            border-radius: 12px;
-            margin: 1rem 0;
+            gap: 0.6rem;
+            padding: 0.625rem 0.875rem;
+            background: rgba(251, 191, 36, 0.06);
+            border: 1px solid rgba(251, 191, 36, 0.14);
+            border-radius: 9px;
+            margin-bottom: 0.5rem;
+            flex-shrink: 0;
         }
 
-        .tip-box i {
+        .tip-box svg {
+            width: 16px;
+            height: 16px;
             color: #fbbf24;
-            font-size: 1.1rem;
-            margin-top: 0.1rem;
+            flex-shrink: 0;
+            margin-top: 1px;
         }
 
         .tip-box p {
             text-align: left;
             margin: 0;
-            font-size: 0.85rem;
-            color: #e0e0e0;
+            font-size: 0.76rem;
+            color: #bbb;
+            line-height: 1.45;
         }
 
-        /* Install button in cards */
-        .install-btn {
-            padding: 0.5rem 1rem;
-            background: linear-gradient(135deg, #7dd3c0, #5ec4ab);
-            border: none;
-            border-radius: 8px;
-            color: #0a0e1a;
-            font-size: 0.8rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            margin-left: auto;
-            flex-shrink: 0;
-            position: relative;
-            z-index: 1;
+        .tip-box p strong {
+            color: #ddd;
         }
 
-        .install-btn:hover {
-            transform: scale(1.05);
+        /* Keyboard tags */
+        .kbd {
+            display: inline-block;
+            padding: 0.1rem 0.35rem;
+            background: rgba(255, 255, 255, 0.07);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            font-size: 0.68rem;
+            font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+            color: #999;
+            line-height: 1;
+            vertical-align: middle;
         }
 
-        .install-btn.installed {
-            background: rgba(34, 197, 94, 0.2);
-            color: #22c55e;
-        }
-
-        /* Animation for entrance */
+        /* Animations */
         @keyframes slideUp {
-            from { opacity: 0; transform: translateY(20px); }
+            from { opacity: 0; transform: translateY(12px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
-        .animate-in {
-            animation: slideUp 0.5s ease forwards;
+        .animate-in { animation: slideUp 0.4s ease forwards; }
+        .delay-1 { animation-delay: 0.06s; opacity: 0; }
+        .delay-2 { animation-delay: 0.12s; opacity: 0; }
+        .delay-3 { animation-delay: 0.18s; opacity: 0; }
+        .delay-4 { animation-delay: 0.24s; opacity: 0; }
+
+        .walkthrough-closing {
+            animation: fadeOutScale 0.25s ease forwards;
         }
 
-        .delay-1 { animation-delay: 0.1s; opacity: 0; }
-        .delay-2 { animation-delay: 0.2s; opacity: 0; }
-        .delay-3 { animation-delay: 0.3s; opacity: 0; }
-        .delay-4 { animation-delay: 0.4s; opacity: 0; }
+        @keyframes fadeOutScale {
+            to { opacity: 0; transform: scale(0.97); }
+        }
+
+        /* Selection color */
+        ::selection {
+            background: rgba(125, 211, 192, 0.3);
+            color: #fff;
+        }
     </style>
 </head>
 <body>
-    <!-- Animated particles -->
+    <div class="bg-glow"></div>
     <div class="bg-particles" id="particles"></div>
 
-    <div class="walkthrough-container">
+    <div class="walkthrough-container" id="walkthroughRoot">
         <!-- Skip button -->
-        <button class="nav-btn nav-btn-skip" onclick="skipWalkthrough()">
-            Skip <i class="fas fa-forward"></i>
+        <button class="nav-btn nav-btn-skip" onclick="closeWalkthrough()" aria-label="Skip walkthrough">
+            Skip
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg>
         </button>
 
-        <!-- Slide 1: Welcome -->
+        <!-- Slide 0: Welcome -->
         <div class="slide active" id="slide-0">
-            <div class="slide-icon fish-icon animate-in">
-                <i class="fas fa-fish"></i>
-            </div>
-            <h1 class="animate-in delay-1">Welcome to Veltra!</h1>
-            <p class="animate-in delay-2">
-                Your new favorite web-based operating system. Let's take a quick tour to help you get the most out of Veltra.
-            </p>
-            <div class="progress-dots animate-in delay-3">
-                <div class="progress-dot active"></div>
-                <div class="progress-dot"></div>
-                <div class="progress-dot"></div>
-                <div class="progress-dot"></div>
-                <div class="progress-dot"></div>
-            </div>
-            <div class="nav-buttons animate-in delay-4">
-                <button class="nav-btn nav-btn-primary" onclick="nextSlide()">
-                    Get Started <i class="fas fa-arrow-right"></i>
-                </button>
+            <div class="slide-inner">
+                <div class="slide-icon logo-icon animate-in">
+                    <svg viewBox="0 0 64 64" fill="none">
+                        <circle cx="32" cy="32" r="27" stroke="#7dd3c0" stroke-width="2.5" fill="none"/>
+                        <path d="M20 36c0 0 4 8 12 8s12-8 12-8" stroke="#7dd3c0" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+                        <circle cx="24" cy="26" r="2.5" fill="#7dd3c0"/>
+                        <circle cx="40" cy="26" r="2.5" fill="#7dd3c0"/>
+                    </svg>
+                </div>
+                <h1 class="animate-in delay-1">Welcome to Veltra</h1>
+                <p class="slide-desc animate-in delay-2">
+                    Veltra is a web-based operating system that runs entirely in your browser.
+                    This short guide will walk you through the key features so you can get started quickly.
+                </p>
+                <div class="progress-bar-container animate-in delay-3">
+                    <div class="progress-track"><div class="progress-fill" style="width: 20%"></div></div>
+                    <span class="progress-label">1 / 5</span>
+                </div>
+                <div class="nav-buttons animate-in delay-4">
+                    <button class="nav-btn nav-btn-primary" onclick="nextSlide()">
+                        Get Started
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                    </button>
+                </div>
             </div>
         </div>
 
-        <!-- Slide 2: Browser & Ultraviolet -->
+        <!-- Slide 1: Browsing -->
         <div class="slide" id="slide-1">
-            <div class="slide-icon">
-                <i class="fas fa-globe"></i>
-            </div>
-            <h1>Browse Freely</h1>
-            <p>
-                Need to access blocked websites? Veltra has you covered with powerful browsing tools.
-            </p>
-            <div class="feature-cards">
-                <div class="feature-card recommended" style="position: relative;">
-                    <div class="feature-card-icon uv">
-                        <i class="fas fa-shield-alt"></i>
-                    </div>
-                    <div class="feature-card-content">
-                        <h3>Ultraviolet</h3>
-                        <p>The best unblocker for YouTube, Discord, social media & more</p>
-                    </div>
-                    <span class="feature-badge">Pre-installed</span>
+            <div class="slide-inner">
+                <div class="slide-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#7dd3c0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
                 </div>
-                <div class="feature-card">
-                    <div class="feature-card-icon browser">
-                        <i class="fas fa-compass"></i>
+                <h1>Web Browsing</h1>
+                <p class="slide-desc">
+                    Veltra includes two ways to browse the web. Ultraviolet lets you access
+                    sites that may be restricted on your network. The built-in browser handles everyday browsing.
+                </p>
+                <div class="feature-cards">
+                    <div class="feature-card recommended">
+                        <div class="feature-card-icon purple">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                        </div>
+                        <div class="feature-card-content">
+                            <h3>Ultraviolet Proxy</h3>
+                            <p>Access blocked sites like YouTube, Discord, and social media. Handles logins, video playback, and interactive content.</p>
+                        </div>
+                        <span class="feature-badge">Included</span>
                     </div>
-                    <div class="feature-card-content">
-                        <h3>Veltra Browser</h3>
-                        <p>Built-in browser for quick browsing</p>
+                    <div class="feature-card">
+                        <div class="feature-card-icon blue">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+                        </div>
+                        <div class="feature-card-content">
+                            <h3>Veltra Browser</h3>
+                            <p>A lightweight built-in browser for quick searches, reading articles, and general web browsing.</p>
+                        </div>
+                        <span class="feature-badge">Included</span>
                     </div>
-                    <span class="feature-badge">Pre-installed</span>
                 </div>
-            </div>
-            <div class="tip-box">
-                <i class="fas fa-lightbulb"></i>
-                <p><strong>Pro tip:</strong> Ultraviolet works with video sites, login systems, and even games. It's the most reliable option for unblocking!</p>
-            </div>
-            <div class="progress-dots">
-                <div class="progress-dot completed"></div>
-                <div class="progress-dot active"></div>
-                <div class="progress-dot"></div>
-                <div class="progress-dot"></div>
-                <div class="progress-dot"></div>
-            </div>
-            <div class="nav-buttons">
-                <button class="nav-btn nav-btn-secondary" onclick="prevSlide()">
-                    <i class="fas fa-arrow-left"></i> Back
-                </button>
-                <button class="nav-btn nav-btn-primary" onclick="nextSlide()">
-                    Continue <i class="fas fa-arrow-right"></i>
-                </button>
+                <div class="tip-box">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 1 4 12.9V17H8v-2.1A7 7 0 0 1 12 2z"/></svg>
+                    <p><strong>Tip:</strong> Ultraviolet supports login sessions, so you can sign into accounts on proxied sites. It works with YouTube, Discord, Google, and most social media.</p>
+                </div>
+                <div class="progress-bar-container">
+                    <div class="progress-track"><div class="progress-fill" style="width: 40%"></div></div>
+                    <span class="progress-label">2 / 5</span>
+                </div>
+                <div class="nav-buttons">
+                    <button class="nav-btn nav-btn-secondary" onclick="prevSlide()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                        Back
+                    </button>
+                    <button class="nav-btn nav-btn-primary" onclick="nextSlide()">
+                        Continue
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                    </button>
+                </div>
             </div>
         </div>
 
-        <!-- Slide 3: App Store -->
+        <!-- Slide 2: App Store -->
         <div class="slide" id="slide-2">
-            <div class="slide-icon">
-                <i class="fas fa-store"></i>
-            </div>
-            <h1>Discover Apps</h1>
-            <p>
-                The App Store is your gateway to new features and experiences. Install apps, themes, and tools!
-            </p>
-            <div class="feature-cards">
-                <div class="feature-card" onclick="openAppFromWalkthrough('appstore')">
-                    <div class="feature-card-icon apps">
-                        <i class="fas fa-rocket"></i>
-                    </div>
-                    <div class="feature-card-content">
-                        <h3>Productivity Apps</h3>
-                        <p>Task Manager, Startup Apps, Snap Manager & more</p>
-                    </div>
-                    <i class="fas fa-chevron-right" style="color: #888;"></i>
+            <div class="slide-inner">
+                <div class="slide-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#7dd3c0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
                 </div>
-                <div class="feature-card" onclick="openAppFromWalkthrough('appstore')">
-                    <div class="feature-card-icon themes">
-                        <i class="fas fa-palette"></i>
+                <h1>App Store</h1>
+                <p class="slide-desc">
+                    Install new tools, games, and themes from the App Store.
+                    Everything is organized by category so you can find what you need.
+                </p>
+                <div class="feature-cards">
+                    <div class="feature-card" onclick="openAppFromWalkthrough('appstore')">
+                        <div class="feature-card-icon green">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                        </div>
+                        <div class="feature-card-content">
+                            <h3>Productivity Tools</h3>
+                            <p>Task Manager, Startup Apps, Snap Manager for window tiling, and more.</p>
+                        </div>
+                        <span class="card-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
                     </div>
-                    <div class="feature-card-content">
-                        <h3>Beautiful Themes</h3>
-                        <p>Dark, Light, Purple, Blue, Golden & more</p>
+                    <div class="feature-card" onclick="openAppFromWalkthrough('appstore')">
+                        <div class="feature-card-icon amber">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                        </div>
+                        <div class="feature-card-content">
+                            <h3>Themes</h3>
+                            <p>Dark, Light, Purple, Blue, Golden, Green, and Red. Each theme changes the entire interface.</p>
+                        </div>
+                        <span class="card-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
                     </div>
-                    <i class="fas fa-chevron-right" style="color: #888;"></i>
+                    <div class="feature-card" onclick="openAppFromWalkthrough('appstore')">
+                        <div class="feature-card-icon purple">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+                        </div>
+                        <div class="feature-card-content">
+                            <h3>Nebula (Coming Soon)</h3>
+                            <p>A real browser streaming proxy for TikTok, Roblox, and other heavy web apps.</p>
+                        </div>
+                        <span class="feature-badge preview">Preview</span>
+                    </div>
                 </div>
-                <div class="feature-card" onclick="openAppFromWalkthrough('appstore')">
-                    <div class="feature-card-icon nebula">
-                        <i class="fas fa-cloud"></i>
-                    </div>
-                    <div class="feature-card-content">
-                        <h3>Coming Soon: Nebula</h3>
-                        <p>Real browser streaming proxy for TikTok, Roblox & more</p>
-                    </div>
-                    <span class="feature-badge">Preview</span>
+                <div class="progress-bar-container">
+                    <div class="progress-track"><div class="progress-fill" style="width: 60%"></div></div>
+                    <span class="progress-label">3 / 5</span>
                 </div>
-            </div>
-            <div class="progress-dots">
-                <div class="progress-dot completed"></div>
-                <div class="progress-dot completed"></div>
-                <div class="progress-dot active"></div>
-                <div class="progress-dot"></div>
-                <div class="progress-dot"></div>
-            </div>
-            <div class="nav-buttons">
-                <button class="nav-btn nav-btn-secondary" onclick="prevSlide()">
-                    <i class="fas fa-arrow-left"></i> Back
-                </button>
-                <button class="nav-btn nav-btn-primary" onclick="nextSlide()">
-                    Continue <i class="fas fa-arrow-right"></i>
-                </button>
+                <div class="nav-buttons">
+                    <button class="nav-btn nav-btn-secondary" onclick="prevSlide()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                        Back
+                    </button>
+                    <button class="nav-btn nav-btn-primary" onclick="nextSlide()">
+                        Continue
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                    </button>
+                </div>
             </div>
         </div>
 
-        <!-- Slide 4: Customization -->
+        <!-- Slide 3: Customization -->
         <div class="slide" id="slide-3">
-            <div class="slide-icon">
-                <i class="fas fa-magic"></i>
-            </div>
-            <h1>Make It Yours</h1>
-            <p>
-                Veltra is highly customizable. Change themes, wallpapers, and settings to match your style.
-            </p>
-            <div class="feature-cards">
-                <div class="feature-card" onclick="openAppFromWalkthrough('settings')">
-                    <div class="feature-card-icon" style="background: linear-gradient(135deg, rgba(125, 211, 192, 0.2), rgba(94, 196, 171, 0.3)); color: #7dd3c0;">
-                        <i class="fas fa-cog"></i>
-                    </div>
-                    <div class="feature-card-content">
-                        <h3>Settings</h3>
-                        <p>Wallpapers, clock format, taskbar style & more</p>
-                    </div>
-                    <i class="fas fa-chevron-right" style="color: #888;"></i>
+            <div class="slide-inner">
+                <div class="slide-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#7dd3c0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                 </div>
-                <div class="feature-card" onclick="openAppFromWalkthrough('cloaking')">
-                    <div class="feature-card-icon" style="background: linear-gradient(135deg, rgba(107, 114, 128, 0.2), rgba(75, 85, 99, 0.3)); color: #6b7280;">
-                        <i class="fas fa-mask"></i>
+                <h1>Personalization</h1>
+                <p class="slide-desc">
+                    Adjust Veltra to fit your preferences. Change wallpapers, switch themes,
+                    configure the taskbar, and set up tab cloaking for privacy.
+                </p>
+                <div class="feature-cards">
+                    <div class="feature-card" onclick="openAppFromWalkthrough('settings')">
+                        <div class="feature-card-icon teal">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                        </div>
+                        <div class="feature-card-content">
+                            <h3>Settings</h3>
+                            <p>Change your wallpaper, clock format, taskbar position, and other display preferences.</p>
+                        </div>
+                        <span class="card-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
                     </div>
-                    <div class="feature-card-content">
-                        <h3>Cloaking</h3>
-                        <p>Hide Veltra by disguising the tab</p>
+                    <div class="feature-card" onclick="openAppFromWalkthrough('cloaking')">
+                        <div class="feature-card-icon gray">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                        </div>
+                        <div class="feature-card-content">
+                            <h3>Tab Cloaking</h3>
+                            <p>Disguise the browser tab so Veltra looks like a different website (e.g. Google Classroom).</p>
+                        </div>
+                        <span class="card-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
                     </div>
-                    <i class="fas fa-chevron-right" style="color: #888;"></i>
                 </div>
-            </div>
-            <div class="tip-box">
-                <i class="fas fa-star"></i>
-                <p><strong>Did you know?</strong> You can right-click on the desktop for quick actions, and drag icons to rearrange them!</p>
-            </div>
-            <div class="progress-dots">
-                <div class="progress-dot completed"></div>
-                <div class="progress-dot completed"></div>
-                <div class="progress-dot completed"></div>
-                <div class="progress-dot active"></div>
-                <div class="progress-dot"></div>
-            </div>
-            <div class="nav-buttons">
-                <button class="nav-btn nav-btn-secondary" onclick="prevSlide()">
-                    <i class="fas fa-arrow-left"></i> Back
-                </button>
-                <button class="nav-btn nav-btn-primary" onclick="nextSlide()">
-                    Continue <i class="fas fa-arrow-right"></i>
-                </button>
+                <div class="tip-box">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 1 4 12.9V17H8v-2.1A7 7 0 0 1 12 2z"/></svg>
+                    <p><strong>Tip:</strong> Right-click on the desktop for quick actions. Drag desktop icons to rearrange them. Press <span class="kbd">Alt</span>+<span class="kbd">F4</span> to close the focused window.</p>
+                </div>
+                <div class="progress-bar-container">
+                    <div class="progress-track"><div class="progress-fill" style="width: 80%"></div></div>
+                    <span class="progress-label">4 / 5</span>
+                </div>
+                <div class="nav-buttons">
+                    <button class="nav-btn nav-btn-secondary" onclick="prevSlide()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                        Back
+                    </button>
+                    <button class="nav-btn nav-btn-primary" onclick="nextSlide()">
+                        Continue
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                    </button>
+                </div>
             </div>
         </div>
 
-        <!-- Slide 5: Get Help & Finish -->
+        <!-- Slide 4: Help & Finish -->
         <div class="slide" id="slide-4">
-            <div class="slide-icon">
-                <i class="fas fa-check-circle"></i>
-            </div>
-            <h1>You're All Set!</h1>
-            <p>
-                Need help anytime? We've got you covered with these resources.
-            </p>
-            <div class="feature-cards">
-                <div class="feature-card" onclick="openAppFromWalkthrough('support')">
-                    <div class="feature-card-icon" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(37, 99, 235, 0.3)); color: #3b82f6;">
-                        <i class="fas fa-headset"></i>
-                    </div>
-                    <div class="feature-card-content">
-                        <h3>Support Center</h3>
-                        <p>Bug reports, feature requests, AI chat & FAQ</p>
-                    </div>
-                    <i class="fas fa-chevron-right" style="color: #888;"></i>
+            <div class="slide-inner">
+                <div class="slide-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#7dd3c0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                 </div>
-                <div class="feature-card" onclick="openAppFromWalkthrough('help')">
-                    <div class="feature-card-icon" style="background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(245, 158, 11, 0.3)); color: #fbbf24;">
-                        <i class="fas fa-book-open"></i>
+                <h1>You are Ready</h1>
+                <p class="slide-desc">
+                    That covers the basics. If you ever need help, these resources are always
+                    available from the taskbar or the Start menu.
+                </p>
+                <div class="feature-cards">
+                    <div class="feature-card" onclick="openAppFromWalkthrough('support')">
+                        <div class="feature-card-icon blue">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                        </div>
+                        <div class="feature-card-content">
+                            <h3>Support Center</h3>
+                            <p>Submit bug reports, request features, read the FAQ, or ask the AI assistant.</p>
+                        </div>
+                        <span class="card-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
                     </div>
-                    <div class="feature-card-content">
-                        <h3>Help Guide</h3>
-                        <p>Detailed documentation and tutorials</p>
+                    <div class="feature-card" onclick="openAppFromWalkthrough('help')">
+                        <div class="feature-card-icon amber">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                        </div>
+                        <div class="feature-card-content">
+                            <h3>Help Guide</h3>
+                            <p>Step-by-step documentation covering every feature, shortcut, and setting.</p>
+                        </div>
+                        <span class="card-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
                     </div>
-                    <i class="fas fa-chevron-right" style="color: #888;"></i>
+                    <div class="feature-card" onclick="openAppFromWalkthrough('veltra-ai')">
+                        <div class="feature-card-icon purple">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><path d="M9 9h.01M15 9h.01M9 15c.83.67 1.83 1 3 1s2.17-.33 3-1"/></svg>
+                        </div>
+                        <div class="feature-card-content">
+                            <h3>Veltra AI</h3>
+                            <p>An AI assistant that can answer questions, help with tasks, and explain features.</p>
+                        </div>
+                        <span class="card-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+                    </div>
                 </div>
-                <div class="feature-card" onclick="openAppFromWalkthrough('veltra-ai')">
-                    <div class="feature-card-icon" style="background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(139, 92, 246, 0.3)); color: #a855f7;">
-                        <i class="fas fa-robot"></i>
-                    </div>
-                    <div class="feature-card-content">
-                        <h3>Veltra AI</h3>
-                        <p>Your personal AI assistant</p>
-                    </div>
-                    <i class="fas fa-chevron-right" style="color: #888;"></i>
+                <div class="progress-bar-container">
+                    <div class="progress-track"><div class="progress-fill" style="width: 100%"></div></div>
+                    <span class="progress-label">5 / 5</span>
+                </div>
+                <div class="nav-buttons">
+                    <button class="nav-btn nav-btn-secondary" onclick="prevSlide()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                        Back
+                    </button>
+                    <button class="nav-btn nav-btn-primary" onclick="closeWalkthrough()">
+                        Start Using Veltra
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg>
+                    </button>
                 </div>
             </div>
-            <div class="progress-dots">
-                <div class="progress-dot completed"></div>
-                <div class="progress-dot completed"></div>
-                <div class="progress-dot completed"></div>
-                <div class="progress-dot completed"></div>
-                <div class="progress-dot active"></div>
-            </div>
-            <div class="nav-buttons">
-                <button class="nav-btn nav-btn-secondary" onclick="prevSlide()">
-                    <i class="fas fa-arrow-left"></i> Back
-                </button>
-                <button class="nav-btn nav-btn-primary" onclick="finishWalkthrough()">
-                    <i class="fas fa-rocket"></i> Start Using Veltra
-                </button>
-            </div>
-            <label class="dont-show-again">
-                <input type="checkbox" id="dontShowAgain" onchange="toggleDontShow()">
-                Don't show this again
-            </label>
         </div>
     </div>
 
     <script>
-        let currentSlide = 0;
-        const totalSlides = 5;
+        'use strict';
 
-        // Create particles
-        function createParticles() {
-            const container = document.getElementById('particles');
-            for (let i = 0; i < 30; i++) {
-                const particle = document.createElement('div');
-                particle.className = 'particle';
-                particle.style.left = Math.random() * 100 + '%';
-                particle.style.animationDelay = Math.random() * 15 + 's';
-                particle.style.animationDuration = (10 + Math.random() * 10) + 's';
-                container.appendChild(particle);
+        var currentSlide = 0;
+        var totalSlides = 5;
+        var isTransitioning = false;
+        var isClosing = false;
+
+        // -- Particles --
+        (function createParticles() {
+            var container = document.getElementById('particles');
+            if (!container) return;
+            var count = Math.min(20, Math.floor(window.innerWidth / 50));
+            for (var i = 0; i < count; i++) {
+                var p = document.createElement('div');
+                p.className = 'particle';
+                p.style.left = (Math.random() * 100) + '%';
+                p.style.animationDelay = (Math.random() * 12) + 's';
+                p.style.animationDuration = (12 + Math.random() * 8) + 's';
+                container.appendChild(p);
             }
-        }
-        createParticles();
+        })();
 
+        // -- Navigation --
         function nextSlide() {
-            if (currentSlide < totalSlides - 1) {
-                document.getElementById(`slide-${currentSlide}`).classList.remove('active');
-                document.getElementById(`slide-${currentSlide}`).classList.add('exit');
-                currentSlide++;
-                setTimeout(() => {
-                    document.getElementById(`slide-${currentSlide - 1}`).classList.remove('exit');
-                    document.getElementById(`slide-${currentSlide}`).classList.add('active');
-                }, 100);
-            }
+            if (isTransitioning || isClosing || currentSlide >= totalSlides - 1) return;
+            isTransitioning = true;
+
+            var current = document.getElementById('slide-' + currentSlide);
+            current.classList.remove('active');
+            current.classList.add('exit-left');
+
+            currentSlide++;
+
+            setTimeout(function() {
+                current.classList.remove('exit-left');
+                var next = document.getElementById('slide-' + currentSlide);
+                next.classList.add('active');
+                next.scrollTop = 0;
+                isTransitioning = false;
+            }, 100);
         }
 
         function prevSlide() {
-            if (currentSlide > 0) {
-                document.getElementById(`slide-${currentSlide}`).classList.remove('active');
-                currentSlide--;
-                document.getElementById(`slide-${currentSlide}`).classList.add('active');
-            }
+            if (isTransitioning || isClosing || currentSlide <= 0) return;
+            isTransitioning = true;
+
+            var current = document.getElementById('slide-' + currentSlide);
+            current.classList.remove('active');
+            current.classList.add('exit-right');
+
+            currentSlide--;
+
+            setTimeout(function() {
+                current.classList.remove('exit-right');
+                var prev = document.getElementById('slide-' + currentSlide);
+                prev.classList.add('active');
+                prev.scrollTop = 0;
+                isTransitioning = false;
+            }, 100);
         }
 
-        function skipWalkthrough() {
-            finishWalkthrough();
-        }
+        // -- Close walkthrough --
+        function closeWalkthrough() {
+            if (isClosing) return;
+            isClosing = true;
 
-        function finishWalkthrough() {
-            // Save completion status
-            localStorage.setItem('Veltra_walkthroughComplete', 'true');
-            
-            if (document.getElementById('dontShowAgain').checked) {
-                localStorage.setItem('Veltra_showWalkthrough', 'false');
-            }
-            
-            // Show toast first
-            if (window.parent && window.parent.showToast) {
-                window.parent.showToast('Welcome to Veltra! Enjoy exploring.', 'fa-rocket');
-            }
-            
-            // Close the walkthrough window
-            if (window.parent && window.parent.closeWindowByAppName) {
-                window.parent.closeWindowByAppName('walkthrough');
-            }
-        }
-
-        function toggleDontShow() {
-            const checked = document.getElementById('dontShowAgain').checked;
-            localStorage.setItem('Veltra_showWalkthrough', checked ? 'false' : 'true');
-        }
-
-        function installFromWalkthrough(appName) {
-            const btn = document.getElementById('installUV');
-            
-            if (window.parent && window.parent.installApp) {
-                window.parent.installApp(appName);
-                btn.textContent = 'Installed';
-                btn.classList.add('installed');
-                btn.disabled = true;
-            }
-        }
-
-        function openAppFromWalkthrough(appName) {
-            if (window.parent && window.parent.openApp) {
-                window.parent.openApp(appName);
-            }
-        }
-
-        // Check if UV is already installed
-        document.addEventListener('DOMContentLoaded', () => {
+            // Mark completed in parent localStorage
             try {
-                const installedApps = JSON.parse(localStorage.getItem('Veltra_installedApps') || '[]');
-                if (installedApps.includes('uv')) {
-                    const btn = document.getElementById('installUV');
-                    if (btn) {
-                        btn.textContent = 'Installed';
-                        btn.classList.add('installed');
-                        btn.disabled = true;
-                    }
+                if (window.parent && window.parent !== window) {
+                    window.parent.localStorage.setItem('Veltra_walkthroughComplete', 'true');
                 }
             } catch (e) {}
+            try {
+                localStorage.setItem('Veltra_walkthroughComplete', 'true');
+            } catch (e) {}
+
+            // Animate out
+            var root = document.getElementById('walkthroughRoot');
+            if (root) root.classList.add('walkthrough-closing');
+
+            setTimeout(function() {
+                // Method 1: closeWindowByAppName
+                try {
+                    if (window.parent && typeof window.parent.closeWindowByAppName === 'function') {
+                        window.parent.closeWindowByAppName('walkthrough');
+                        return;
+                    }
+                } catch (e) {}
+
+                // Method 2: Find close button in parent DOM
+                try {
+                    if (window.parent && window.parent.document) {
+                        var wins = window.parent.document.querySelectorAll('.window');
+                        for (var i = 0; i < wins.length; i++) {
+                            var iframe = wins[i].querySelector('iframe');
+                            if (iframe && iframe.contentWindow === window) {
+                                var closeBtn = wins[i].querySelector('.window-btn.close');
+                                if (closeBtn) { closeBtn.click(); return; }
+                            }
+                        }
+                    }
+                } catch (e) {}
+
+                // Method 3: postMessage fallback
+                try {
+                    window.parent.postMessage({ type: 'veltra-close-walkthrough' }, '*');
+                } catch (e) {}
+            }, 240);
+        }
+
+        // -- Open apps --
+        function openAppFromWalkthrough(appName) {
+            if (!appName) return;
+            try {
+                if (window.parent && typeof window.parent.openApp === 'function') {
+                    window.parent.openApp(appName);
+                }
+            } catch (e) {}
+        }
+
+        // -- Keyboard navigation --
+        document.addEventListener('keydown', function(e) {
+            if (isClosing) return;
+            if (e.key === 'ArrowRight' || e.key === 'Enter') {
+                e.preventDefault();
+                if (currentSlide < totalSlides - 1) {
+                    nextSlide();
+                } else {
+                    closeWalkthrough();
+                }
+            } else if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                prevSlide();
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                closeWalkthrough();
+            }
         });
     </script>
 </body>

@@ -3405,6 +3405,15 @@ function youtubeShowTab(tab) {
   if (tab === 'notifications') { loadYoutubeNotifications().then(() => renderYoutubeNotifications()); }
 }
 
+function refreshYoutubeHomepage() {
+  // Clear cache so we fetch fresh data
+  ytRecommendCache.trending = null;
+  ytRecommendCache.forYou = null;
+  ytRecommendCache.lastFetch = 0;
+  youtubeShowTab('home');
+  showToast('Refreshing homepage...', 'fa-sync-alt');
+}
+
 async function searchYoutube(query) {
   if (!query || !query.trim()) return;
   
@@ -3538,7 +3547,8 @@ function renderYoutubeVideoGrid(videos, source) {
     const safeTitle = escapeHtml(video.title || 'Untitled');
     const safeArtist = escapeHtml(video.artist || video.channel || 'Unknown');
     const thumbUrl = getYoutubeThumbnailUrl(video);
-    let videoId = video.id;
+    // Support both video.id (search results) and video.videoId (history/watchlater)
+    let videoId = video.id || video.videoId;
     if (!videoId && video.url) {
       const match = video.url.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([^&?/]+)/);
       if (match) videoId = match[1];
@@ -3576,7 +3586,8 @@ function playYoutubeVideo(source, index) {
   if (!videos || !videos[index]) return;
   
   const video = videos[index];
-  let videoId = video.id;
+  // Support both video.id (search results) and video.videoId (history/watchlater)
+  let videoId = video.id || video.videoId;
   if (!videoId && video.url) {
     const match = video.url.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([^&?/]+)/);
     if (match) videoId = match[1];
@@ -4002,8 +4013,10 @@ async function loadYoutubeSubscriptions() {
     const resp = await fetch(`${YT_SOCIAL_FIREBASE}/${youtubeState.userId}/subscriptions.json`);
     const data = await resp.json();
     youtubeState.subscriptions = data || {};
+    // Persist to localStorage so data survives Firebase failures
+    localStorage.setItem('Veltra_ytSubscriptions', JSON.stringify(youtubeState.subscriptions));
   } catch (e) {
-    console.warn('[YouTube] Failed to load subscriptions:', e.message);
+    console.warn('[YouTube] Failed to load subscriptions from Firebase, using localStorage:', e.message);
     youtubeState.subscriptions = JSON.parse(localStorage.getItem('Veltra_ytSubscriptions') || '{}');
   }
 }
@@ -5617,8 +5630,8 @@ function togglePassword() {
 document.addEventListener("keydown", function (e) {
   const bootloader = document.getElementById("bootloader");
   if (
-    !bootloader.classList.contains("hidden") &&
-    document.getElementById("bootOptions").style.display !== "none"
+    bootloader && !bootloader.classList.contains("hidden") &&
+    document.getElementById("bootOptions") && document.getElementById("bootOptions").style.display !== "none"
   ) {
     const options = document.querySelectorAll(".boot-option");
 
@@ -5745,7 +5758,7 @@ function startBootSequence() {
         veltraLog.boot(`${new Date().toISOString()}: Boot sequence complete, hiding bootloader`);
         setTimeout(() => {
           const bootloader = document.getElementById("bootloader");
-          bootloader.classList.add("hidden");
+          if (bootloader) bootloader.classList.add("hidden");
 
           if (bootSelectedIndex === 1) {
             setTimeout(() => {
@@ -9297,6 +9310,9 @@ alt="favicon">
                 <i class="fab fa-youtube" style="color: #ff0000;"></i>
                 <span>YouTube</span>
               </div>
+              <button class="yt-refresh-btn" onclick="refreshYoutubeHomepage()" title="Refresh Homepage">
+                <i class="fas fa-sync-alt"></i>
+              </button>
             </div>
             <div class="youtube-search-bar">
               <input type="text" id="ytSearchInput" placeholder="Search videos..." 

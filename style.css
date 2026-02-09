@@ -5686,6 +5686,37 @@ select:focus {
 
 .youtube-nav-left {
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.yt-refresh-btn {
+    background: none;
+    border: none;
+    color: #aaa;
+    font-size: 0.95rem;
+    cursor: pointer;
+    padding: 6px 8px;
+    border-radius: 50%;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.yt-refresh-btn:hover {
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+}
+
+.yt-refresh-btn:active i {
+    animation: yt-spin 0.5s ease;
+}
+
+@keyframes yt-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
 }
 
 .youtube-search-bar {
@@ -6348,8 +6379,6 @@ select:focus {
     transition: all 0.2s;
     white-space: nowrap;
     flex-shrink: 0;
-    max-width: 130px;
-    overflow: hidden;
 }
 
 .yt-subscribe-btn:hover {

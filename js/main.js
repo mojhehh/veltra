@@ -3464,7 +3464,8 @@ function sanitizeYoutubeThumbnail(url) {
 function getYoutubeThumbnailUrl(video) {
   if (!video) return '';
   // If we have a video ID, build reliable thumbnail URLs
-  let videoId = video.id;
+  // Support both video.id (search results) and video.videoId (history/watchlater)
+  let videoId = video.id || video.videoId;
   if (!videoId && video.url) {
     const match = video.url.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([^&?/]+)/);
     if (match) videoId = match[1];
@@ -3621,7 +3622,7 @@ function playYoutubeVideo(source, index) {
   const playerChannel = document.getElementById('ytPlayerChannel');
   
   if (playerSection && playerIframe) {
-    playerIframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`;
+    playerIframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&playsinline=1`;
     if (playerTitle) playerTitle.textContent = video.title;
     if (playerChannel) playerChannel.textContent = video.artist || video.channel || '';
     playerSection.classList.add('active');
@@ -4537,7 +4538,7 @@ async function handleYoutubeNotifClick(videoId, notifId) {
     const playerSection = document.getElementById('ytPlayerSection');
     const playerIframe = document.getElementById('ytPlayerIframe');
     if (playerSection && playerIframe) {
-      playerIframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`;
+      playerIframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&playsinline=1`;
       playerSection.classList.add('active');
       loadYoutubeComments(videoId);
       loadVideoLikeCounts(videoId);
@@ -9263,7 +9264,7 @@ alt="favicon">
           <div class="yt-player-section" id="ytPlayerSection">
             <div class="yt-player-wrapper">
               <div class="yt-player-container">
-                <iframe id="ytPlayerIframe" src="" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen frameborder="0"></iframe>
+                <iframe id="ytPlayerIframe" src="" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen style="border:0;"></iframe>
               </div>
               <div class="yt-player-controls-bar">
                 <button class="yt-back-btn" onclick="closeYoutubePlayer()" title="Back">

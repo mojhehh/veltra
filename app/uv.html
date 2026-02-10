@@ -427,83 +427,151 @@
             "wss://aluu.xyz/wisp/"
         ];
         
-        let wispUrl = WISP_FALLBACKS[0]; // default fallback
-        let currentWispIndex = 0;
+        let wispUrl = WISP_FALLBACKS[0];
         let connectionRetries = 0;
-        const MAX_RETRIES = 3;
+        const MAX_RETRIES = 4;
+        let uvConnected = false;    // True once transport is confirmed working
+        let uvConnecting = false;   // Prevents concurrent init attempts
+        let lastWorkingWisp = null; // Remember what worked last time
         
-        // Test if a wisp URL is working
-        async function testWispConnection(url) {
+        // Test if a wisp URL is reachable (WebSocket handshake completes)
+        function testWispConnection(url, timeout = 4000) {
             return new Promise((resolve) => {
-                const ws = new WebSocket(url);
-                const timeout = setTimeout(() => {
-                    ws.close();
+                try {
+                    const ws = new WebSocket(url);
+                    const timer = setTimeout(() => {
+                        try { ws.close(); } catch (_) {}
+                        resolve(false);
+                    }, timeout);
+                    ws.onopen = () => {
+                        clearTimeout(timer);
+                        try { ws.close(); } catch (_) {}
+                        resolve(true);
+                    };
+                    ws.onerror = () => {
+                        clearTimeout(timer);
+                        try { ws.close(); } catch (_) {}
+                        resolve(false);
+                    };
+                } catch (e) {
                     resolve(false);
-                }, 5000); // 5 second timeout for slower connections
-                
-                ws.onopen = () => {
-                    clearTimeout(timeout);
-                    ws.close();
-                    resolve(true);
-                };
-                ws.onerror = () => {
-                    clearTimeout(timeout);
-                    resolve(false);
-                };
+                }
             });
         }
         
-        // Find working wisp server
+        // Find a working wisp server — tests every candidate, prefers Firebase URL, returns first success
         async function findWorkingWisp() {
-            // First try Firebase URL - trust status if online
+            const candidates = [...WISP_FALLBACKS];
+            
+            // Prepend lastWorkingWisp so it's tried first on reconnect
+            if (lastWorkingWisp && !candidates.includes(lastWorkingWisp)) {
+                candidates.unshift(lastWorkingWisp);
+            }
+            
+            // Try Firebase backend URL (but actually verify it connects)
             try {
-                const resp = await fetch('https://procces-3efd9-default-rtdb.firebaseio.com/backends/veltra.json');
+                const ctrl = new AbortController();
+                const fetchTimer = setTimeout(() => ctrl.abort(), 4000);
+                const resp = await fetch('https://procces-3efd9-default-rtdb.firebaseio.com/backends/veltra.json', { signal: ctrl.signal });
+                clearTimeout(fetchTimer);
                 const data = await resp.json();
-                if (data?.url && data?.status === 'online') {
+                if (data?.url) {
                     let firebaseWisp = data.url.replace('https://', 'wss://').replace('http://', 'ws://');
                     if (!firebaseWisp.endsWith('/wisp/')) firebaseWisp = firebaseWisp.replace(/\/$/, '') + '/wisp/';
-                    console.log('[UV] Using Firebase wisp (status online):', firebaseWisp);
-                    return firebaseWisp;
+                    // Add to front of candidates (but still test it)
+                    if (!candidates.includes(firebaseWisp)) candidates.unshift(firebaseWisp);
                 }
             } catch (e) { 
                 console.warn('[UV] Firebase fetch failed:', e.message); 
             }
             
-            // Try fallbacks
-            for (const fallback of WISP_FALLBACKS) {
-                console.log('[UV] Testing fallback wisp:', fallback);
-                if (await testWispConnection(fallback)) {
-                    console.log('[UV] Fallback wisp working:', fallback);
-                    return fallback;
+            // Test candidates in parallel batches of 3 for speed
+            for (let i = 0; i < candidates.length; i += 3) {
+                const batch = candidates.slice(i, i + 3);
+                console.log('[UV] Testing wisp batch:', batch);
+                const results = await Promise.all(batch.map(url => testWispConnection(url).then(ok => ({ url, ok }))));
+                const winner = results.find(r => r.ok);
+                if (winner) {
+                    console.log('[UV] Working wisp found:', winner.url);
+                    return winner.url;
                 }
             }
             
-            // Return first fallback anyway as last resort
-            console.warn('[UV] No wisp servers responding, using first fallback');
+            console.warn('[UV] No wisp servers responded, returning first fallback');
             return WISP_FALLBACKS[0];
         }
         
-        // Initialize connection with working wisp
-        (async () => {
-            showToast("Connecting to proxy server...", "fas fa-spinner fa-spin", 2000);
-            wispUrl = await findWorkingWisp();
-            console.log('[UV] Using wisp:', wispUrl);
-            await connection.setTransport(basePath + "/libcurl/index.mjs", [{ websocket: wispUrl }]);
-            showToast("Proxy connected!", "fas fa-check", 1500);
-        })();
+        // Set transport with validation
+        async function setTransportSafe(url) {
+            try {
+                await connection.setTransport(basePath + "/libcurl/index.mjs", [{ websocket: url }]);
+                // Verify transport was actually set
+                const t = await connection.getTransport();
+                if (t) {
+                    wispUrl = url;
+                    lastWorkingWisp = url;
+                    uvConnected = true;
+                    connectionRetries = 0;
+                    return true;
+                }
+            } catch (e) {
+                console.error('[UV] setTransport error for', url, ':', e.message);
+            }
+            return false;
+        }
         
-        // Auto-retry on connection failure
+        // Initialize connection — called on page load, and can be called again to reconnect
+        async function initConnection(silent = false) {
+            if (uvConnecting) return uvConnected;
+            uvConnecting = true;
+            uvConnected = false;
+            
+            if (!silent) showToast("Connecting to proxy server...", "fas fa-spinner fa-spin", 2500);
+            
+            try {
+                const url = await findWorkingWisp();
+                if (await setTransportSafe(url)) {
+                    if (!silent) showToast("Proxy connected!", "fas fa-check-circle", 1500);
+                    console.log('[UV] Connected to:', url);
+                } else {
+                    // findWorkingWisp returned a URL but setTransport failed — try all fallbacks directly
+                    let connected = false;
+                    for (const fb of WISP_FALLBACKS) {
+                        if (fb === url) continue; // already tried
+                        if (await setTransportSafe(fb)) { connected = true; break; }
+                    }
+                    if (connected) {
+                        if (!silent) showToast("Proxy connected (fallback)!", "fas fa-check-circle", 1500);
+                    } else {
+                        showToast("Proxy connection failed — pages may not load", "fas fa-exclamation-triangle", 4000);
+                    }
+                }
+            } catch (e) {
+                console.error('[UV] Connection init error:', e);
+                showToast("Proxy connection error. Try refreshing.", "fas fa-exclamation-triangle", 4000);
+            } finally {
+                uvConnecting = false;
+            }
+            return uvConnected;
+        }
+        
+        // Start initial connection
+        initConnection();
+        
+        // Auto-retry on navigation failure
         async function retryConnection() {
             if (connectionRetries >= MAX_RETRIES) {
-                showToast("Connection failed. Try refreshing.", "fas fa-exclamation-triangle", 3000);
+                showToast("Connection failed after multiple retries. Try refreshing.", "fas fa-exclamation-triangle", 4000);
+                connectionRetries = 0; // Reset so user can try again
                 return false;
             }
             connectionRetries++;
-            currentWispIndex = (currentWispIndex + 1) % WISP_FALLBACKS.length;
-            wispUrl = WISP_FALLBACKS[currentWispIndex];
-            console.log('[UV] Retrying with:', wispUrl);
-            await connection.setTransport(basePath + "/libcurl/index.mjs", [{ websocket: wispUrl }]);
-            return true;
+            showToast(`Reconnecting... (attempt ${connectionRetries}/${MAX_RETRIES})`, "fas fa-spinner fa-spin", 2000);
+            console.log('[UV] Retry attempt', connectionRetries);
+            
+            // Find a new working server instead of just cycling blindly
+            const url = await findWorkingWisp();
+            return await setTransportSafe(url);
         }
 
         const tabCont = document.querySelector(".tabs")
@@ -584,33 +652,22 @@
         const urlParams = new URLSearchParams(window.location.search);
         const directUrl = urlParams.get('url');
         if (directUrl) {
-            // Wait for connection to be fully ready, then navigate
-            async function waitAndNav() {
-                // Wait for transport to be set (connection initialization)
+            (async function waitAndNav() {
+                // Wait for initial connection to finish (max 12s)
                 let attempts = 0;
-                while (attempts < 20) { // Max 10 seconds (500ms * 20)
-                    try {
-                        const transport = await connection.getTransport();
-                        if (transport) {
-                            console.log('[UV] Transport ready, navigating to:', directUrl);
-                            const urlInput = document.getElementById("urlbar");
-                            if (urlInput) urlInput.value = directUrl;
-                            nav(directUrl);
-                            return;
-                        }
-                    } catch (e) {
-                        console.log('[UV] Waiting for transport...', e.message);
-                    }
+                while (!uvConnected && attempts < 24) {
                     await new Promise(r => setTimeout(r, 500));
                     attempts++;
                 }
-                // Fallback - try anyway
-                console.warn('[UV] Transport not ready after timeout, trying anyway');
+                if (!uvConnected) {
+                    // Force one more init attempt
+                    await initConnection(false);
+                }
+                console.log('[UV] Direct nav to:', directUrl, 'connected:', uvConnected);
                 const urlInput = document.getElementById("urlbar");
                 if (urlInput) urlInput.value = directUrl;
                 nav(directUrl);
-            }
-            waitAndNav();
+            })();
         }
 
         function switchTab(tId) {
@@ -644,7 +701,7 @@
             bTabs.splice(tIndex, 1)
 
             const tEl = document.querySelector(`.tab[data-tab-id="${tId}"]`)
-            const frame = document.querySelector(`.viewframe[data-view-id="${tId}"]`)
+            const frame = document.querySelector(`.viewframe[data-frame-id="${tId}"]`)
 
             if (tEl) tEl.remove()
             if (frame) frame.remove()
@@ -702,35 +759,44 @@
             go(fUrl)
         }
 
-        async function go(u) {
-            // Wait for service worker to be ready
+        async function ensureReady() {
+            // 1. Wait for service worker
             let swAttempts = 0;
-            while (!swReady && swAttempts < 20) {
-                console.log('[UV] Waiting for service worker...');
-                await new Promise(r => setTimeout(r, 250));
+            while (!swReady && swAttempts < 30) {
+                await new Promise(r => setTimeout(r, 200));
                 swAttempts++;
             }
-            if (!swReady) {
-                console.warn('[UV] Service worker not ready, trying anyway');
-            }
+            if (!swReady) console.warn('[UV] SW not ready after 6s, proceeding anyway');
             
-            // Ensure transport is set with retries
-            let transportReady = false;
-            for (let i = 0; i < 5 && !transportReady; i++) {
+            // 2. Wait for / establish transport connection
+            if (uvConnected) {
+                // Verify transport is still set
                 try {
-                    if (!await connection.getTransport()) {
-                        console.log('[UV] Setting transport, attempt', i + 1);
-                        await connection.setTransport(basePath + "/libcurl/index.mjs", [{ websocket: wispUrl }]);
-                    }
-                    transportReady = true;
-                } catch (e) {
-                    console.error('[UV] Transport error:', e.message);
-                    await new Promise(r => setTimeout(r, 500));
-                }
+                    const t = await connection.getTransport();
+                    if (t) return true;
+                } catch (_) {}
+                uvConnected = false;
             }
             
-            if (!transportReady) {
-                showToast("Proxy connection failed. Try refreshing.", "fas fa-exclamation-triangle", 3000);
+            // Not connected — try to (re)connect
+            if (!uvConnected) {
+                const ok = await initConnection(true);
+                return ok;
+            }
+            return uvConnected;
+        }
+        
+        async function go(u) {
+            // Ensure SW + transport are ready
+            const ready = await ensureReady();
+            if (!ready) {
+                showToast("Proxy not connected — retrying...", "fas fa-spinner fa-spin", 2000);
+                // One more attempt
+                if (await initConnection(false)) {
+                    // Retry this navigation
+                    return go(u);
+                }
+                showToast("Proxy connection failed. Try refreshing the page.", "fas fa-exclamation-triangle", 4000);
                 return;
             }
 
@@ -741,31 +807,41 @@
             if (!viewframe) return
 
             const ubar = document.getElementById("urlbar")
-            if (ubar) ubar.value = __uv$config.decodeUrl(u.replace("/uv/service/", ""))
-            const favUrl = __uv$config.decodeUrl(u.replace("/uv/service/", ""))
-            if (favEl) favEl.src = `https://www.google.com/s2/favicons?domain=${favUrl}&sz=256`
+            try {
+                const decoded = __uv$config.decodeUrl(u.replace(__uv$config.prefix, "").replace("/uv/service/", ""));
+                if (ubar) ubar.value = decoded;
+                if (favEl) favEl.src = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(decoded)}&sz=256`;
+            } catch (_) {}
 
             try {
-                // Set loading state
                 viewframe.style.opacity = '0.5';
                 viewframe.src = u;
                 console.log("[UV] Frame src set");
+                
+                // Timeout: if frame doesn't load within 15s, retry connection
+                let loadTimeout = setTimeout(async () => {
+                    console.warn('[UV] Frame load timeout (15s), retrying connection...');
+                    viewframe.style.opacity = '1';
+                    if (await retryConnection()) {
+                        go(u);
+                    }
+                }, 15000);
 
                 viewframe.onload = () => {
+                    clearTimeout(loadTimeout);
                     viewframe.style.opacity = '1';
-                    connectionRetries = 0; // Reset retries on success
+                    connectionRetries = 0;
                     
                     try {
                         const iframeDoc = viewframe.contentDocument || viewframe.contentWindow.document;
                         const title = iframeDoc?.title || new URL(cTab.url).hostname;
-                        
                         const tabEl = document.querySelector(`.tab[data-tab-id="${aTab}"]`);
                         if (tabEl) {
                             const titleEl = tabEl.querySelector(".btitle");
                             if (titleEl) titleEl.textContent = title;
                         }
                     } catch (e) {
-                        // Cross-origin, can't access title
+                        // Cross-origin, can't access title — expected
                     }
 
                     const loadC = document.querySelector(".backgroundtext");
@@ -778,10 +854,11 @@
                 };
                 
                 viewframe.onerror = async () => {
+                    clearTimeout(loadTimeout);
                     console.error("[UV] Frame load error, retrying...");
                     viewframe.style.opacity = '1';
                     if (await retryConnection()) {
-                        setTimeout(() => go(u), 500);
+                        setTimeout(() => go(u), 300);
                     }
                 };
                 
@@ -806,9 +883,11 @@
 
         function f() {
             const cTab = bTabs.find((t) => t.id === aTab)
+            if (!cTab || cTab.historyIndex >= cTab.history.length - 1) return;
 
             cTab.historyIndex++
             const u = cTab.history[cTab.historyIndex]
+            if (!u) return;
             cTab.url = u
             const furl = __uv$config.prefix + __uv$config.encodeUrl(u)
 
@@ -817,9 +896,8 @@
 
         function r() {
             const viewframe = document.querySelector(`.viewframe[data-frame-id="${aTab}"]`)
-            const curl = viewframe.src
-
-            viewframe.src = curl
+            if (!viewframe || !viewframe.src) return;
+            viewframe.src = viewframe.src
         }
 
         function full() {

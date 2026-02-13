@@ -1738,36 +1738,42 @@ function closeToast(btn) {
   }, 300);
 }
 
-// Startup Animation Handler
+// Splash Screen Handler
 let startupAnimationComplete = false;
 
 function initStartupAnimation() {
-  const startupEl = document.getElementById("startupAnimation");
-  if (!startupEl) {
+  const splashEl = document.getElementById('veltraSplash');
+  if (!splashEl) {
     startupAnimationComplete = true;
     startBootAfterAnimation();
     return;
   }
-  
+
   // Check if user disabled startup animation
-  const skipStartup = localStorage.getItem("veltra_skipStartupAnimation") === "true";
-  
+  const skipStartup = localStorage.getItem('veltra_skipStartupAnimation') === 'true';
   if (skipStartup) {
-    startupEl.classList.add("hidden");
+    splashEl.classList.add('gone');
+    document.body.classList.remove('splash-active');
     startupAnimationComplete = true;
     startBootAfterAnimation();
     return;
   }
-  
-  // Auto-hide after animation completes (3.5 seconds)
+
+  // Block scrolling during splash
+  document.body.classList.add('splash-active');
+
+  // Sequence: 1s fade-in (CSS animation), 1.5s hold, 1s fade-out
+  // Logo fade-in starts immediately via CSS @keyframes splashFadeIn (1s)
+  // After 1s (fade-in done) + 1.5s (hold) = 2.5s, start fade-out
   setTimeout(() => {
-    startupEl.classList.add("fade-out");
+    splashEl.classList.add('fade-out'); // 1s CSS transition
     setTimeout(() => {
-      startupEl.classList.add("hidden");
+      splashEl.classList.add('gone');
+      document.body.classList.remove('splash-active');
       startupAnimationComplete = true;
       startBootAfterAnimation();
-    }, 800);
-  }, 3500);
+    }, 1000); // After fade-out transition completes
+  }, 2500); // 1s fade-in + 1.5s hold
 }
 
 // Start boot sequence only after startup animation is done

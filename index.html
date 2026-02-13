@@ -128,10 +128,10 @@
                 <div class="login-avatar"><i class="fas fa-user"></i></div>
                 <h2 class="login-title" id="loginGreeting">Welcome Back</h2>
                 <p class="login-subtitle" id="loginSubtitle">Sign in to continue</p>
-                <input type="text" class="login-input" id="username" placeholder="Username" value="" />
+                <input type="text" class="login-input" id="username" placeholder="Username" autocomplete="username" aria-label="Username" />
                 <div class="login-input-wrapper" id="passwordWrapper">
-                    <input type="password" class="login-input" id="password" placeholder="Password" value="" />
-                    <i class="fas fa-eye password-toggle" id="passwordToggle" onclick="togglePassword()"></i>
+                    <input type="password" class="login-input" id="password" placeholder="Password" autocomplete="current-password" aria-label="Password" />
+                    <i class="fas fa-eye password-toggle" id="passwordToggle" onclick="togglePassword()" role="button" tabindex="0" aria-label="Toggle password visibility"></i>
                 </div>
                 <button class="login-btn" onclick="login()">Sign In</button>
                 <a href="#" onclick="event.preventDefault(); forgotPassword()"
@@ -414,64 +414,64 @@
         </div>
 
         <div class="desktop-icons" id="desktopIcons">
-            <div class="desktop-icon" ondblclick="openApp('files')" data-app="files">
+            <div class="desktop-icon" ondblclick="openApp('files')" data-app="files" role="button" tabindex="0" aria-label="Open Files">
                 <i class="fas fa-folder"></i> <span>Files</span>
             </div>
-            <div class="desktop-icon" ondblclick="openApp('terminal')" data-app="terminal">
+            <div class="desktop-icon" ondblclick="openApp('terminal')" data-app="terminal" role="button" tabindex="0" aria-label="Open Terminal">
                 <i class="fas fa-terminal"></i> <span>Terminal</span>
             </div>
-            <div class="desktop-icon" ondblclick="openApp('settings')" data-app="settings">
+            <div class="desktop-icon" ondblclick="openApp('settings')" data-app="settings" role="button" tabindex="0" aria-label="Open Settings">
                 <i class="fas fa-cog"></i> <span>Settings</span>
             </div>
-            <div class="desktop-icon" ondblclick="openApp('editor')" data-app="editor">
+            <div class="desktop-icon" ondblclick="openApp('editor')" data-app="editor" role="button" tabindex="0" aria-label="Open Text Editor">
                 <i class="fas fa-edit"></i> <span>Text Editor</span>
             </div>
-            <div class="desktop-icon" ondblclick="openApp('melodify')" data-app="melodify">
+            <div class="desktop-icon" ondblclick="openApp('melodify')" data-app="melodify" role="button" tabindex="0" aria-label="Open Melodify">
                 <i class="fas fa-music"></i> <span>Melodify</span>
             </div>
-            <div class="desktop-icon" ondblclick="openApp('youtube')" data-app="youtube">
+            <div class="desktop-icon" ondblclick="openApp('youtube')" data-app="youtube" role="button" tabindex="0" aria-label="Open YouTube">
                 <i class="fas fa-play-circle"></i> <span>YouTube</span>
             </div>
-            <div class="desktop-icon" ondblclick="openApp('photos')" data-app="photos">
+            <div class="desktop-icon" ondblclick="openApp('photos')" data-app="photos" role="button" tabindex="0" aria-label="Open Photos">
                 <i class="fas fa-images"></i> <span>Photos</span>
             </div>
-            <div class="desktop-icon" ondblclick="openApp('help')" data-app="help">
+            <div class="desktop-icon" ondblclick="openApp('help')" data-app="help" role="button" tabindex="0" aria-label="Open Help">
                 <i class="fas fa-question-circle"></i> <span>Help</span>
             </div>
-            <div class="desktop-icon" ondblclick="openApp('whatsnew')" data-app="whatsnew">
+            <div class="desktop-icon" ondblclick="openApp('whatsnew')" data-app="whatsnew" role="button" tabindex="0" aria-label="Open What's New">
                 <i class="fas fa-star"></i> <span>What's New</span>
             </div>
-            <div class="desktop-icon" ondblclick="openApp('appstore')" data-app="appstore">
+            <div class="desktop-icon" ondblclick="openApp('appstore')" data-app="appstore" role="button" tabindex="0" aria-label="Open App Store">
                 <i class="fas fa-store"></i> <span>App Store</span>
             </div>
-            <div class="desktop-icon" ondblclick="openApp('calculator')" data-app="calculator">
+            <div class="desktop-icon" ondblclick="openApp('calculator')" data-app="calculator" role="button" tabindex="0" aria-label="Open Calculator">
                 <i class="fas fa-calculator"></i> <span>Calculator</span>
             </div>
-            <div class="desktop-icon" ondblclick="openApp('cloaking')" data-app="cloaking">
+            <div class="desktop-icon" ondblclick="openApp('cloaking')" data-app="cloaking" role="button" tabindex="0" aria-label="Open Cloaking">
                 <i class="fas fa-mask"></i> <span>Cloaking</span>
             </div>
-            <div class="desktop-icon" ondblclick="openApp('achievements')" data-app="achievements">
+            <div class="desktop-icon" ondblclick="openApp('achievements')" data-app="achievements" role="button" tabindex="0" aria-label="Open Achievements">
                 <i class="fas fa-trophy"></i> <span>Achievements</span>
             </div>
-            <div class="desktop-icon" ondblclick="openApp('browser')" data-app="browser">
+            <div class="desktop-icon" ondblclick="openApp('browser')" data-app="browser" role="button" tabindex="0" aria-label="Open Veltra Browser">
                 <i class="fas fa-globe"></i> <span>Veltra Browser</span>
             </div>
-            <div class="desktop-icon" ondblclick="openApp('nebula')" data-app="nebula">
+            <div class="desktop-icon" ondblclick="openApp('nebula')" data-app="nebula" role="button" tabindex="0" aria-label="Open Nebula">
                 <i class="fas fa-cloud"></i> <span>Nebula</span>
             </div>
-            <div class="desktop-icon" ondblclick="openApp('ai-snake')" data-app="ai-snake">
+            <div class="desktop-icon" ondblclick="openApp('ai-snake')" data-app="ai-snake" role="button" tabindex="0" aria-label="Open AI Snake Learning">
                 <i class="fas fa-brain"></i> <span>AI Snake Learning</span>
             </div>
-            <div class="desktop-icon" ondblclick="openApp('veltra-ai')" data-app="veltra-ai">
+            <div class="desktop-icon" ondblclick="openApp('veltra-ai')" data-app="veltra-ai" role="button" tabindex="0" aria-label="Open Veltra AI Assistant">
                 <i class="fas fa-robot"></i> <span>Veltra AI Assistant</span>
             </div>
-            <div class="desktop-icon" ondblclick="openApp('python')" data-app="python">
+            <div class="desktop-icon" ondblclick="openApp('python')" data-app="python" role="button" tabindex="0" aria-label="Open Python Interpreter">
                 <i class="fas fa-code"></i> <span>Python Interpreter</span>
             </div>
-            <div class="desktop-icon" ondblclick="openApp('web-app-creator')" data-app="web-app-creator">
+            <div class="desktop-icon" ondblclick="openApp('web-app-creator')" data-app="web-app-creator" role="button" tabindex="0" aria-label="Open Web App Creator">
                 <i class="fas fa-puzzle-piece"></i> <span>Web App Creator</span>
             </div>
-            <div class="desktop-icon" ondblclick="openApp('about')" data-app="about">
+            <div class="desktop-icon" ondblclick="openApp('about')" data-app="about" role="button" tabindex="0" aria-label="Open About Veltra">
                 <i class="fas fa-info-circle"></i> <span>About Veltra</span>
             </div>
             <div class="desktop-icon" ondblclick="openApp('support')" data-app="support">
@@ -685,7 +685,6 @@
             </div>
         </div>
     </div>
-    <div class="context-menu" id="contextMenu"></div>
     <div class="properties-tooltip" id="propertiesTooltip">
         <div class="properties-close" onclick="hideProperties()">
             <i class="fas fa-times"></i>

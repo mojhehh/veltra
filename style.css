@@ -2,6 +2,8 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
 }
 
 @font-face {
@@ -167,6 +169,7 @@ input {
     flex-direction: column;
     gap: 0.75rem;
     width: 600px;
+    max-width: 90vw;
 }
 
 .boot-option {
@@ -210,6 +213,7 @@ input {
 .boot-loading {
     display: none;
     width: 600px;
+    max-width: 90vw;
     margin-top: 2rem;
 }
 
@@ -1807,7 +1811,10 @@ select:focus {
     left: 50%;
     transform: translateX(-50%) scale(0.95);
     width: 650px;
+    max-width: 95vw;
     height: 520px;
+    max-height: calc(100vh - 120px);
+    overflow-y: auto;
     background: rgba(21, 25, 35, 0.9);
     -webkit-backdrop-filter: blur(50px) saturate(180%);
     backdrop-filter: blur(50px) saturate(180%);
@@ -3914,7 +3921,7 @@ select:focus {
     }
 }
 
-@keyframes slideUp {
+@keyframes tileSlideUp {
     from {
         transform: translateY(110px);
     }
@@ -3972,7 +3979,7 @@ select:focus {
 }
 
 .tile-slide-up {
-    animation: slideUp 0.2s ease;
+    animation: tileSlideUp 0.2s ease;
 }
 
 .tile-slide-down {
@@ -4017,7 +4024,7 @@ select:focus {
 }
 
 .tile-slide-up {
-    animation: slideUp 0.2s ease;
+    animation: tileSlideUp 0.2s ease;
 }
 
 .tile-slide-down {
@@ -7799,7 +7806,7 @@ select:focus {
 .illustration-calc-number {
     color: var(--accent);
     font-size: 1.5rem;
-    font-family: 'SEUS Mono', monospace;
+    font-family: 'SUSE Mono', monospace;
     font-weight: bold;
     animation: calcNumberBlink 2s ease-in-out infinite;
 }
@@ -9077,7 +9084,6 @@ select:focus {
 }
 
 .cloaking-label {
-    display: block;
     color: var(--text-primary);
     font-family: fontb;
     margin-bottom: 0.75rem;
@@ -9617,11 +9623,10 @@ select:focus {
 
 
 
-@import "https://unpkg.com/open-props";
-@import "https://unpkg.com/open-props/normalize.min.css";
-@import "https://unpkg.com/open-props/buttons.min.css";
 
 
+/* Wrapping experimental select features for Chrome-only support */
+@supports (appearance: base-select) {
 select {
 
     /* opt into customizing select */
@@ -9790,6 +9795,7 @@ select {
         }
     }
 }
+} /* end @supports (appearance: base-select) */
 
 /* utilities to aid in custom select children */
 .custom-option {
@@ -9850,16 +9856,6 @@ select {
     overflow: hidden;
 }
 
-
-@layer demo.support {
-    body {
-        display: grid;
-        place-items: start;
-        place-content: center;
-        padding: var(--size-5);
-        gap: var(--size-5);
-    }
-}
 
 .offline-support {
     background: var(--bg-secondary);
@@ -10287,7 +10283,8 @@ body.splash-active {
         font-size: 0.75rem;
     }
     
-    .taskbar-app span {
+    .taskbar-app span,
+    .taskbar-icon span {
         display: none;
     }
     
@@ -10295,6 +10292,25 @@ body.splash-active {
         width: 100vw;
         left: 0 !important;
         border-radius: 12px 12px 0 0;
+        transform: translateX(0) scale(0.95) !important;
+        max-height: calc(100vh - 60px);
+    }
+    
+    .start-menu.active {
+        transform: translateX(0) scale(1) !important;
+    }
+    
+    .login-left {
+        display: none;
+    }
+    
+    .login-wrapper {
+        grid-template-columns: 1fr;
+    }
+
+    .boot-options {
+        width: 100%;
+        max-width: 90vw;
     }
     
     .settings-sidebar {

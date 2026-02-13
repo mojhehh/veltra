@@ -327,7 +327,7 @@
         <p>made by $xor | built for veltra-os</p>
     </div>
 
-    <iframe src="" frameborder="0" id="iframe"></iframe>
+    <iframe src="" id="iframe" title="Browser content" style="border: none;"></iframe>
 
     <script>
         // Toast notification function for UV
@@ -710,7 +710,6 @@
                 const newATab = bTabs[Math.max(0, tIndex - 1)];
                 if (newATab) {
                     switchTab(newATab.id);
-                    console.log("woah")
                 }
             }
         }
@@ -719,11 +718,9 @@
             e.preventDefault()
             const inp = document.getElementById("urlbar")
             nav(inp.value)
-            console.log("i")
         })
 
         function nav(i) {
-            console.log("e")
             if (!i.trim()) return
 
             let url = i.trim()
@@ -902,9 +899,7 @@
 
         function full() {
             const viewframe = document.querySelector(`.viewframe[data-frame-id="${aTab}"]`)
-            console.log("adksjfh")
             const popup = window.open(viewframe.src, "_blank")
-            if (popup) console.log("popped out")
         }
 
         function hide() {

@@ -1,4 +1,4 @@
-// ==================== VELTRA FIREBASE BACKEND CONFIG ====================
+﻿// ==================== VELTRA FIREBASE BACKEND CONFIG ====================
 // Note: VELTRA_FIREBASE_URL and FALLBACK_WISP_URL
 // are declared in index.html's inline script to ensure early availability
 
@@ -969,22 +969,25 @@ async function fetchVeltraBackend(retries = 3) {
     location.reload();
   };
 
-  window.biosResetAll = function () {
-    if (confirm('Are you sure you want to reset all Veltra settings? This cannot be undone.')) {
+  window.biosResetAll = async function () {
+    const confirmed = await window.confirm('Are you sure you want to reset all Veltra settings? This cannot be undone.');
+    if (confirmed) {
       const keys = Object.keys(localStorage).filter(k => k.startsWith('Veltra_'));
       keys.forEach(k => localStorage.removeItem(k));
-      alert('Settings reset. The system will now reload.');
+      await window.alert('Settings reset. The system will now reload.');
       location.reload();
     }
   };
 
-  window.biosClearData = function () {
-    if (confirm('WARNING: This will delete ALL Veltra data including files, settings, and accounts. Continue?')) {
-      if (confirm('Are you ABSOLUTELY sure? This cannot be undone!')) {
+  window.biosClearData = async function () {
+    const confirmed1 = await window.confirm('WARNING: This will delete ALL Veltra data including files, settings, and accounts. Continue?');
+    if (confirmed1) {
+      const confirmed2 = await window.confirm('Are you ABSOLUTELY sure? This cannot be undone!');
+      if (confirmed2) {
         localStorage.clear();
         sessionStorage.clear();
         indexedDB.deleteDatabase('VeltraFS');
-        alert('All data cleared. The system will now reload.');
+        await window.alert('All data cleared. The system will now reload.');
         location.reload();
       }
     }
@@ -2933,8 +2936,8 @@ function renderMelodifyQueue() {
       <div class="melodify-queue-item-info">
         <img src="${escapeHtml(track.thumbnail || '')}" alt="" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 40 40%22><rect fill=%22%23282828%22 width=%2240%22 height=%2240%22/><text x=%2220%22 y=%2220%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23555%22 font-size=%2216%22>♪</text></svg>'">
         <div>
-          <div class="melodify-queue-item-title">${track.title}</div>
-          <div class="melodify-queue-item-artist">${track.artist}</div>
+          <div class="melodify-queue-item-title">${escapeHtml(track.title)}</div>
+          <div class="melodify-queue-item-artist">${escapeHtml(track.artist)}</div>
         </div>
       </div>
       <button class="melodify-queue-remove" onclick="event.stopPropagation(); removeFromQueue(${i})" title="Remove">
@@ -6072,11 +6075,12 @@ function generateNeofetch() {
   return output;
 }
 
-function countFiles(fs) {
+function countFiles(fs, depth = 0) {
+  if (depth > 100) return 0;
   let count = 0;
   for (const key in fs) {
     if (typeof fs[key] === 'object') {
-      count += countFiles(fs[key]);
+      count += countFiles(fs[key], depth + 1);
     } else {
       count++;
     }
@@ -6084,12 +6088,13 @@ function countFiles(fs) {
   return count;
 }
 
-function countFolders(fs) {
+function countFolders(fs, depth = 0) {
+  if (depth > 100) return 0;
   let count = 0;
   for (const key in fs) {
     if (typeof fs[key] === 'object') {
       count++;
-      count += countFolders(fs[key]);
+      count += countFolders(fs[key], depth + 1);
     }
   }
   return count;
@@ -6712,6 +6717,7 @@ async function login() {
       }
 
       initDesktopIconDragging();
+      initDesktopIconKeyboard();
       initContextMenu();
       initScrollIndicator();
 
@@ -6859,6 +6865,19 @@ function removeDynamicTaskbarIcon(appName) {
   if (icon) {
     icon.remove();
   }
+}
+
+// Enable keyboard activation (Enter/Space) for desktop icons
+function initDesktopIconKeyboard() {
+  document.querySelectorAll('.desktop-icon').forEach(icon => {
+    icon.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        const appName = icon.getAttribute('data-app');
+        if (appName) openApp(appName);
+      }
+    });
+  });
 }
 
 function initDesktopIconDragging() {
@@ -7053,7 +7072,7 @@ function createWindow(
               <div class="window-header">
                   <div class="window-title">
                       <i class="${icon}"></i>
-                      <span>${title}</span>
+                      <span>${escapeHtmlSimple(title)}</span>
                   </div>
                   <div class="window-controls">
                       <div class="window-btn" onclick="minimizeWindow(this)">
@@ -7268,6 +7287,11 @@ function closeWindow(btn, appName) {
       document.removeEventListener('keydown', handleSnakeKeyPress);
       snakeGame.keyListenerAttached = false;
     }
+  }
+
+  // Handle 2048 game cleanup
+  if (appName === "2048") {
+    document.removeEventListener('keydown', handle2048KeyPress);
   }
 
   // Generic onClose callback for any app
@@ -11398,16 +11422,16 @@ function formatBytes(bytes) {
 }
 
 // Recursive search for find command
-function findInFS(node, currentPath, name, type) {
+function findInFS(node, currentPath, name, type, depth = 0) {
   const results = [];
-  if (typeof node !== 'object' || node === null) return results;
+  if (depth > 100 || typeof node !== 'object' || node === null) return results;
   for (const key in node) {
     const fullPath = currentPath ? currentPath + '/' + key : key;
     const isDir = typeof node[key] === 'object';
     const matchesName = !name || matchGlob(key, name);
     const matchesType = !type || (type === 'd' && isDir) || (type === 'f' && !isDir);
     if (matchesName && matchesType) results.push(fullPath);
-    if (isDir) results.push(...findInFS(node[key], fullPath, name, type));
+    if (isDir) results.push(...findInFS(node[key], fullPath, name, type, depth + 1));
   }
   return results;
 }
@@ -11419,8 +11443,9 @@ function matchGlob(str, pattern) {
 }
 
 // Grep text in file content
-function grepInFS(node, currentPath, pattern, flags) {
+function grepInFS(node, currentPath, pattern, flags, depth = 0) {
   const results = [];
+  if (depth > 100) return results;
   if (typeof node === 'string') {
     const lines = node.split('\n');
     const regex = new RegExp(pattern, flags.includes('i') ? 'i' : '');
@@ -11432,7 +11457,7 @@ function grepInFS(node, currentPath, pattern, flags) {
   } else if (typeof node === 'object' && node !== null) {
     for (const key in node) {
       const fullPath = currentPath ? currentPath + '/' + key : key;
-      results.push(...grepInFS(node[key], fullPath, pattern, flags));
+      results.push(...grepInFS(node[key], fullPath, pattern, flags, depth + 1));
     }
   }
   return results;
@@ -16069,13 +16094,25 @@ async function setupComplete() {
   }, 500);
 }
 async function forgotPassword() {
+  const currentUsername = localStorage.getItem("Veltra_username");
   const isPasswordless =
     localStorage.getItem("Veltra_isPasswordless") === "true";
-  const message = isPasswordless
-    ? "This will reset your passwordless account and return you to setup. All data will be preserved. Continue?"
-    : "This will reset your account and return you to setup. All data will be preserved. Continue?";
-
-  const confirmed = await confirm(message);
+  
+  // Require username verification before allowing reset
+  const enteredUsername = await window.prompt(
+    "Enter your username to confirm account reset. This will return you to setup while preserving your data."
+  );
+  
+  if (!enteredUsername) return;
+  
+  if (currentUsername && enteredUsername.trim().toLowerCase() !== currentUsername.trim().toLowerCase()) {
+    showToast("Username does not match. Reset cancelled.", "fa-exclamation-circle");
+    return;
+  }
+  
+  const confirmed = await window.confirm(
+    "Are you sure you want to reset your account? You will need to set up again. Your files will be preserved."
+  );
   if (!confirmed) return;
 
   localStorage.removeItem("Veltra_username");
@@ -16141,11 +16178,6 @@ function setupStep3Next() {
 function setupStep4Back() {
   document.getElementById("setupStep4").style.display = "none";
   document.getElementById("setupStep3").style.display = "block";
-}
-
-function setupStep3Back() {
-  document.getElementById("setupStep3").style.display = "none";
-  document.getElementById("setupStep2").style.display = "block";
 }
 
 function saveSettingsToLocalStorage() {
@@ -16239,6 +16271,9 @@ window.addEventListener("DOMContentLoaded", () => {
 async function signOutToLogin() {
   const confirmed = await confirm("Are you sure you want to sign out?");
   if (!confirmed) return;
+
+  // Stop polling intervals
+  stopSupportNotificationPolling();
 
   // Save current user's settings before signing out
   if (currentUsername) {
@@ -16342,10 +16377,24 @@ async function changeuser() {
   } else if (newUsername === currentUsername) {
     showToast("New username cannot be the same as the current one", "fa-exclamation-circle");
     return
-  };
+  }
+
+  // Check if username already taken (multi-account)
+  const existingAccount = typeof getAccountByUsername === 'function' ? getAccountByUsername(newUsername) : null;
+  if (existingAccount) {
+    showToast("Username already taken by another account", "fa-exclamation-circle");
+    return;
+  }
+
+  // Sanitize username - no HTML special chars
+  const sanitized = newUsername.replace(/[<>&"']/g, '');
+  if (sanitized !== newUsername) {
+    showToast("Username contains invalid characters", "fa-exclamation-circle");
+    return;
+  }
 
   showToast("Username changed successfully. Reloading...", "fa-check-circle");
-  localStorage.setItem("Veltra_username", newUsername);
+  localStorage.setItem("Veltra_username", sanitized);
 
   setTimeout(() => {
     location.reload();
@@ -19390,7 +19439,7 @@ document.addEventListener("keydown", (e) => {
 
 function checkNightOwl() {
   const hour = new Date().getHours();
-  if (hour >= 11 && hour < 3) {
+  if (hour >= 23 || hour < 3) {
     unlockEasterEgg("night-owl");
   }
 }
@@ -20581,10 +20630,11 @@ function updateLoginWithAccounts(accounts) {
         <div style="margin-bottom: 0.5rem; color: var(--text-secondary);">Select an account:</div>
         <div id="accountSelector" style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: -15px; margin-top: 20px; max-height: 200px; overflow-y: auto;">
           ${accounts.map(acc => `
-            <div class="account-select-item" onclick="selectLoginAccount('${acc.username}')" style="padding: 0.5rem 1rem; background: rgba(30, 35, 48, 0.6); border: 1px solid var(--border); border-radius: 12px; cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; gap: 0.75rem;">
+            <div class="account-select-item" onclick="selectLoginAccount('${escapeHtmlSimple(acc.username).replace(/'/g, "\\'")}')"
+              style="padding: 0.5rem 1rem; background: rgba(30, 35, 48, 0.6); border: 1px solid var(--border); border-radius: 12px; cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; gap: 0.75rem;">
               <i class="fas fa-user" style="color: var(--accent);"></i>
               <div style="flex: 1;">
-                <div style="color: var(--text-primary); font-family: fontb;">${acc.username}</div>
+                <div style="color: var(--text-primary); font-family: fontb;">${escapeHtmlSimple(acc.username)}</div>
                 <div style="color: var(--text-secondary); font-size: 0.8rem;">${acc.role === "superuser" ? "Super User" : "Standard User"}</div>
               </div>
               ${acc.isPasswordless ? '<i class="fas fa-unlock" style="color: var(--success-green);" title="Passwordless"></i>' : '<i class="fas fa-lock" style="color: var(--text-secondary);"></i>'}
@@ -20630,7 +20680,7 @@ function selectLoginAccount(username) {
   if (loginSubtitle) {
     loginSubtitle.innerHTML = account.isPasswordless ?
       `<a href="#" onclick="event.preventDefault(); updateLoginScreen();" style="color: var(--accent); text-decoration: underline; cursor: pointer;"><i class="fa-solid fa-arrow-left"></i> Back to account list</a>` :
-      `Enter password for ${username} <a href="#" onclick="event.preventDefault(); updateLoginScreen();" style="color: var(--accent); text-decoration: underline; cursor: pointer; margin-left: 0.5rem;">â† Back</a>`;
+      `Enter password for ${escapeHtmlSimple(username)} <a href="#" onclick="event.preventDefault(); updateLoginScreen();" style="color: var(--accent); text-decoration: underline; cursor: pointer; margin-left: 0.5rem;">â† Back</a>`;
   }
 
   // Focus password input if needed
@@ -20729,8 +20779,8 @@ function createAccountFromLogin() {
         return;
       }
 
-      if (!isPasswordless && (!password || password.length < 1)) {
-        showToast("Password is required for non-passwordless accounts", "fa-exclamation-circle");
+      if (!isPasswordless && (!password || password.length < 6)) {
+        showToast("Password must be at least 6 characters", "fa-exclamation-circle");
         return;
       }
 
@@ -22425,14 +22475,14 @@ function endTTTGame(result) {
   if (result === 'X') {
     tttGame.wins++;
     localStorage.setItem('tttWins', tttGame.wins);
-    status.innerHTML = 'You won! <i class="fa-solid fa-trophy"</i>';
+    status.innerHTML = 'You won! <i class="fa-solid fa-trophy"></i>';
     document.getElementById('tttWins').textContent = tttGame.wins;
     showToast('You won!', 'fa-trophy');
 
   } else if (result === 'O') {
     tttGame.losses++;
     localStorage.setItem('tttLosses', tttGame.losses);
-    status.innerHTML = 'AI won! <i class="fa-solid fa-robot" </i>';
+    status.innerHTML = 'AI won! <i class="fa-solid fa-robot"></i>';
     document.getElementById('tttLosses').textContent = tttGame.losses;
     showToast('AI won!', 'fa-robot');
 
@@ -24533,7 +24583,12 @@ function executeTool_CloseApp(params) {
   windows.forEach(win => {
     const title = win.querySelector('.window-title')?.textContent?.toLowerCase();
     if (title && title.includes(app_name.toLowerCase())) {
-      win.remove();
+      const closeBtn = win.querySelector('.window-btn.close');
+      if (closeBtn) {
+        closeWindow(closeBtn, app_name.toLowerCase());
+      } else {
+        win.remove();
+      }
       closed = true;
     }
   });
@@ -25321,6 +25376,13 @@ function createCustomWebApp() {
 
   if (!url.startsWith('http://') && !url.startsWith('https://')) {
     url = 'https://' + url;
+  }
+
+  // Block dangerous URL schemes
+  const urlLower = url.toLowerCase();
+  if (urlLower.startsWith('javascript:') || urlLower.startsWith('data:') || urlLower.startsWith('vbscript:')) {
+    showToast('Invalid URL scheme', 'fa-exclamation-circle');
+    return;
   }
 
   const appId = 'webapp_' + Date.now();

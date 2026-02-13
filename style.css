@@ -6497,6 +6497,90 @@ select:focus {
     margin-top: 6px;
 }
 
+/* Veltra-only notice */
+.yt-comment-veltra-notice {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #888;
+    font-size: 0.75rem;
+    margin-top: 6px;
+    padding: 4px 0;
+}
+
+.yt-comment-veltra-notice i {
+    color: #3ea6ff;
+    font-size: 0.7rem;
+}
+
+/* Section labels for YouTube vs Veltra comments */
+.yt-comments-section-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #aaa;
+    padding: 10px 0 8px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid #272727;
+}
+
+.yt-comments-section-label .fa-youtube {
+    color: #ff0000;
+}
+
+.yt-comments-section-label .fa-fish {
+    color: #7dd3c0;
+}
+
+.yt-real-comments-section {
+    margin-bottom: 16px;
+}
+
+/* Real YouTube comment avatar */
+.yt-real-avatar-img {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+/* Real comment read-only action styles */
+.yt-real-likes,
+.yt-real-reply-count {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: #717171;
+    font-size: 0.78rem;
+    margin-right: 12px;
+}
+
+.yt-real-heart {
+    color: #ff0000;
+    margin-left: 6px;
+    font-size: 0.8rem;
+}
+
+.yt-real-pinned {
+    color: #aaa;
+    font-size: 0.72rem;
+    margin-right: 6px;
+}
+
+.yt-real-pinned i {
+    margin-right: 3px;
+}
+
+.yt-real-comment {
+    opacity: 0.95;
+}
+
+.yt-real-comment .yt-comment-actions {
+    pointer-events: none;
+}
+
 .yt-comment-username {
     color: #888;
     font-size: 0.78rem;

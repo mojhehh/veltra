@@ -4202,8 +4202,71 @@ function updateYoutubeLikeButtons(videoId) {
 }
 
 // ---- COMMENTS SYSTEM ----
-// Comments are stored in a shared Firebase location so all users see them
+// Comments: real YouTube comments fetched via Invidious API + Veltra user comments via Firebase
 // Path: youtube_comments/{videoId}/{commentId}
+
+// Invidious instances for fetching real YouTube comments
+const INVIDIOUS_INSTANCES = [
+  'https://vid.puffyan.us',
+  'https://invidious.lunar.icu',
+  'https://inv.nadeko.net',
+  'https://invidious.privacyredirect.com',
+  'https://invidious.protokolla.fi'
+];
+
+// Fetch real YouTube comments from Invidious
+async function fetchRealYoutubeComments(videoId) {
+  for (const instance of INVIDIOUS_INSTANCES) {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 6000);
+      const resp = await fetch(`${instance}/api/v1/comments/${videoId}?hl=en`, { signal: ctrl.signal });
+      clearTimeout(timer);
+      if (!resp.ok) continue;
+      const data = await resp.json();
+      if (data && data.comments && data.comments.length > 0) {
+        return data.comments.slice(0, 20); // Cap at 20 real comments
+      }
+    } catch (e) {
+      // Try next instance
+    }
+  }
+  return []; // No instance worked
+}
+
+// Render a real YouTube comment (read-only)
+function renderRealYoutubeComment(comment) {
+  const author = escapeHtml(comment.author || 'YouTube User');
+  const authorThumb = comment.authorThumbnails && comment.authorThumbnails.length > 0
+    ? comment.authorThumbnails[comment.authorThumbnails.length > 1 ? 1 : 0].url
+    : '';
+  const text = escapeHtml(comment.contentHtml ? comment.content : (comment.content || ''));
+  const likeCount = comment.likeCount || 0;
+  const timeText = comment.publishedText || '';
+  const hearted = comment.creatorHeart ? '<span class="yt-real-heart" title="Creator hearted"><i class="fas fa-heart"></i></span>' : '';
+  const pinned = comment.isPinned ? '<span class="yt-real-pinned"><i class="fas fa-thumbtack"></i> Pinned</span>' : '';
+  const replyCount = comment.replies ? comment.replies.replyCount || 0 : 0;
+
+  return `
+    <div class="yt-comment yt-real-comment">
+      <div class="yt-comment-avatar">
+        ${authorThumb ? `<img src="${authorThumb}" alt="" class="yt-real-avatar-img" loading="lazy" onerror="this.outerHTML='<i class=\\'fas fa-user-circle\\'></i>'">` : '<i class="fas fa-user-circle"></i>'}
+      </div>
+      <div class="yt-comment-body">
+        <div class="yt-comment-meta">
+          ${pinned}
+          <span class="yt-comment-author">${author}</span>
+          <span class="yt-comment-time">${escapeHtml(timeText)}</span>
+          ${hearted}
+        </div>
+        <div class="yt-comment-text">${text}</div>
+        <div class="yt-comment-actions">
+          <span class="yt-real-likes"><i class="fas fa-thumbs-up"></i> ${likeCount > 0 ? likeCount.toLocaleString() : ''}</span>
+          ${replyCount > 0 ? `<span class="yt-real-reply-count"><i class="fas fa-comment"></i> ${replyCount} repl${replyCount === 1 ? 'y' : 'ies'}</span>` : ''}
+        </div>
+      </div>
+    </div>`;
+}
 
 async function loadYoutubeComments(videoId) {
   if (!videoId || !/^[a-zA-Z0-9_-]{5,20}$/.test(videoId)) return;
@@ -4220,6 +4283,9 @@ async function loadYoutubeComments(videoId) {
       <div class="yt-comment-input-wrap">
         <input type="text" id="ytCommentInput" class="yt-comment-input" placeholder="Add a comment..." 
           maxlength="500" onkeydown="if(event.key === 'Enter') postYoutubeComment('${escapeJsString(videoId)}')">
+        <div class="yt-comment-veltra-notice">
+          <i class="fas fa-info-circle"></i> Only users on Veltra will see your comment
+        </div>
         <div class="yt-comment-input-actions">
           <span class="yt-comment-username">${escapeHtml(getYoutubeUsername())}</span>
           <button class="yt-comment-submit" onclick="postYoutubeComment('${escapeJsString(videoId)}')">
@@ -4232,31 +4298,44 @@ async function loadYoutubeComments(videoId) {
       <div class="yt-loading"><i class="fas fa-spinner fa-spin"></i><p>Loading comments...</p></div>
     </div>`;
   
-  try {
-    const resp = await fetch(`${YT_COMMENTS_FIREBASE}/${videoId}.json`);
-    const data = (await resp.json()) || {};
-    
-    const comments = Object.entries(data)
-      .map(([id, c]) => ({ ...c, id }))
-      .filter(c => !c.parentId) // Only top-level comments
-      .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-    
-    const allComments = Object.entries(data).map(([id, c]) => ({ ...c, id }));
-    
-    const listEl = document.getElementById('ytCommentsList');
-    if (!listEl) return;
-    
-    if (comments.length === 0) {
-      listEl.innerHTML = '<div class="yt-empty" style="padding:1rem;"><p>No comments yet. Be the first!</p></div>';
-      return;
-    }
-    
-    listEl.innerHTML = comments.map(comment => renderYoutubeComment(comment, allComments, videoId)).join('');
-  } catch (e) {
-    console.warn('[YouTube] Failed to load comments:', e.message);
-    const listEl = document.getElementById('ytCommentsList');
-    if (listEl) listEl.innerHTML = '<div class="yt-empty"><p>Could not load comments</p></div>';
+  // Fetch real YouTube comments and Veltra comments in parallel
+  const [realComments, veltraData] = await Promise.all([
+    fetchRealYoutubeComments(videoId).catch(() => []),
+    fetch(`${YT_COMMENTS_FIREBASE}/${videoId}.json`).then(r => r.json()).catch(() => ({}))
+  ]);
+  
+  const listEl = document.getElementById('ytCommentsList');
+  if (!listEl) return;
+
+  let html = '';
+
+  // Render real YouTube comments section
+  if (realComments.length > 0) {
+    html += `<div class="yt-real-comments-section">
+      <div class="yt-comments-section-label"><i class="fab fa-youtube"></i> YouTube Comments</div>
+      ${realComments.map(c => renderRealYoutubeComment(c)).join('')}
+    </div>`;
   }
+
+  // Render Veltra community comments section
+  const data = veltraData || {};
+  const veltraComments = Object.entries(data)
+    .map(([id, c]) => ({ ...c, id }))
+    .filter(c => !c.parentId)
+    .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+  const allVeltraComments = Object.entries(data).map(([id, c]) => ({ ...c, id }));
+
+  html += `<div class="yt-veltra-comments-section">
+    <div class="yt-comments-section-label"><i class="fas fa-fish"></i> Veltra Comments</div>`;
+  
+  if (veltraComments.length === 0) {
+    html += '<div class="yt-empty" style="padding:1rem;"><p>No Veltra comments yet. Be the first!</p></div>';
+  } else {
+    html += veltraComments.map(comment => renderYoutubeComment(comment, allVeltraComments, videoId)).join('');
+  }
+  html += '</div>';
+
+  listEl.innerHTML = html;
 }
 
 function renderYoutubeComment(comment, allComments, videoId) {
